@@ -21,7 +21,7 @@ spec:
       terminationGracePeriodSeconds: 60
       containers:
       - name: gateway
-        image: 50.0.2.102:5000/codehaunt/gateway:0.1.3@sha256:db1715f3e3290c571ef6fd3012397f422347a166d694534a8388cff717bca7a5
+        image: 50.0.2.102:5000/codehaunt/gateway:0.1.4@sha256:82c0c571f0cf0e7b4537ef07917ac96bbda0d27b0863745e2fd5ec9e7f8fd912
         ports: [{name: http, containerPort: 8080}]
         env:
         - {name: GATEWAY_TOKEN, valueFrom: {secretKeyRef: {name: gateway-token, key: token}}}
@@ -60,7 +60,7 @@ spec:
       terminationGracePeriodSeconds: 60
       containers:
       - name: gateway
-        image: 50.0.2.102:5000/codehaunt/gateway:0.1.3@sha256:db1715f3e3290c571ef6fd3012397f422347a166d694534a8388cff717bca7a5
+        image: 50.0.2.102:5000/codehaunt/gateway:0.1.4@sha256:82c0c571f0cf0e7b4537ef07917ac96bbda0d27b0863745e2fd5ec9e7f8fd912
         ports: [{name: http, containerPort: 8080}]
         env:
         - {name: GATEWAY_TOKEN, valueFrom: {secretKeyRef: {name: gateway-token, key: token}}}

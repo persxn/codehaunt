@@ -120,6 +120,11 @@ spec:
         - {name: VLLM_API_KEY, valueFrom: {secretKeyRef: {name: model-api-key, key: key}}}
         - {name: CODEHAUNT_MODEL_KEY, valueFrom: {secretKeyRef: {name: model-api-key, key: key}}}
         - {name: PYTHONPATH, value: /opt/codehaunt}
+        # The engine's internal sockets (torch.distributed gloo/NCCL, single GPU) bind to loopback, not the pod IP
+        # (audit run-7 R7-2).
+        - {name: VLLM_HOST_IP, value: 127.0.0.1}
+        - {name: GLOO_SOCKET_IFNAME, value: lo}
+        - {name: NCCL_SOCKET_IFNAME, value: lo}
         - {name: MODEL, valueFrom: {configMapKeyRef: {name: model-config, key: model}}}
         - {name: REVISION, valueFrom: {configMapKeyRef: {name: model-config, key: revision}}}
         - {name: EXTRA_ARGS, valueFrom: {configMapKeyRef: {name: model-config, key: extraArgs}}}

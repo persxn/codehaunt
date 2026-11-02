@@ -202,13 +202,17 @@ export function createGateway(deps: ServerDeps): http.Server {
         }
       }
     } catch (err) {
-      if (err instanceof Refusal || err instanceof RouterError) {
+      if (clientGone.signal.aborted) {
+        // The client left (queued, mid-tokenize or mid-stream): not a node failure, not "busy" (run-6 N2, run-7 R7-3).
+        entry.outcome = 'client_closed';
+        entry.detail ??= err instanceof Error ? err.message : String(err);
+        sendError(res, 'upstream_failed', 'client closed', requestId);
+      } else if (err instanceof Refusal || err instanceof RouterError) {
         entry.outcome = err.code;
         entry.detail ??= err.message;
         sendError(res, err.code, err.message, requestId);
       } else {
-        // A client that left is not a node failure (audit run-6 N2).
-        entry.outcome = clientGone.signal.aborted || res.destroyed ? 'client_closed' : 'upstream_failed';
+        entry.outcome = res.destroyed ? 'client_closed' : 'upstream_failed';
         entry.detail = err instanceof Error ? err.message : String(err);
         sendError(res, 'upstream_failed', 'the model node failed', requestId);
       }
@@ -269,6 +273,7 @@ export function createGateway(deps: ServerDeps): http.Server {
     // Headers alone don't prove the node is alive: the body read is bounded too (audit run-6 N1).
     const tokBody = await withTimeout(tok.json(), tokenizeTimeoutMs).catch(async (err) => {
       await tok.body?.cancel().catch(() => {});
+      if (clientGone.aborted) throw err; // the client left; the node is fine (audit run-7 R7-1)
       deps.health.markDown(node);
       throw new NodeFailure(`${node}/tokenize: ${(err as Error).message}`);
     });

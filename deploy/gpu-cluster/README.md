@@ -37,7 +37,8 @@ Load test from the DGX: `apps/gateway/load/README.md`.
   digest in `gateway.yaml`.
 - vLLM runs as uid 1000 with no capabilities. Its own `VLLM_API_KEY` covers only `/v1/*`, so the `model-auth`
   middleware (`codehaunt_auth.RequireKey`) requires the key on every path except `/health` and `/metrics`; the weights' commit is pinned in
-  `model-config` and fetched only if missing, so a pod restart never downloads during the event.
+  `model-config` and fetched only if missing (`/models/.complete-<model>-<revision>` marks a finished download), so a
+  pod restart never downloads during the event. vLLM's internal engine sockets bind to 127.0.0.1 (`VLLM_HOST_IP`).
 - A model pod's PVC binds to the node it first ran on; deleting the PVC re-downloads the weights (~5 GB).
 - The vLLM image (9.7 GB) comes from Docker Hub; pre-pull it on every node (`crictl pull`) before applying, so a
   rescheduled pod never waits on the lab uplink. Mirroring it into the local registry fails (k3s discards pulled blobs).

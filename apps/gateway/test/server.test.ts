@@ -331,6 +331,61 @@ test('a node that sends tokenize headers and then stalls is abandoned (audit run
   assert.equal(gw.router.nodes.get('n0')!.healthy, false);
 });
 
+test('a client that leaves while queued is logged client_closed, not gateway_busy (audit run-7 R7-3)', async () => {
+  const node = await scriptedNode(() => {}); // never answers: holds the only slot
+  const gw = await gateway([node], { GATEWAY_SLOTS_PER_NODE: '1' });
+  const first = post(gw.url, chat('hi')).catch(() => {});
+  await new Promise((r) => setTimeout(r, 100));
+  const gone = new AbortController();
+  const queued = fetch(`${gw.url}/v1/chat/completions`, {
+    method: 'POST',
+    headers: { 'content-type': 'application/json', authorization: `Bearer ${TOKEN}` },
+    body: JSON.stringify(chat('hi')),
+    signal: gone.signal,
+  }).catch(() => {});
+  await new Promise((r) => setTimeout(r, 100));
+  gone.abort();
+  await queued;
+  const t0 = Date.now();
+  while (!gw.logs.some((l) => l.outcome === 'client_closed')) {
+    assert.ok(Date.now() - t0 < 3000, `no client_closed log: ${JSON.stringify(gw.logs)}`);
+    await new Promise((r) => setTimeout(r, 20));
+  }
+  assert.ok(!gw.logs.some((l) => l.outcome === 'gateway_busy'));
+  void first;
+});
+
+test('a client leaving during a slow tokenize does not drain the node (audit run-7 R7-1)', async () => {
+  const slow = await fakeNode();
+  slow.server.removeAllListeners('request');
+  slow.server.on('request', (req, res) => {
+    req.resume();
+    req.on('end', () => {
+      if (req.url === '/health') return res.end('ok');
+      res.writeHead(200, { 'content-type': 'application/json' });
+      res.write('{"count":'); // body still coming
+    });
+  });
+  const gw = await gateway([slow], { GATEWAY_FIRST_BYTE_TIMEOUT_MS: '5000' });
+  const gone = new AbortController();
+  const req = fetch(`${gw.url}/v1/chat/completions`, {
+    method: 'POST',
+    headers: { 'content-type': 'application/json', authorization: `Bearer ${TOKEN}` },
+    body: JSON.stringify(chat('hi')),
+    signal: gone.signal,
+  }).catch(() => {});
+  await new Promise((r) => setTimeout(r, 200));
+  gone.abort();
+  await req;
+  const t0 = Date.now();
+  while (gw.logs.length === 0) {
+    assert.ok(Date.now() - t0 < 3000, 'request never finished');
+    await new Promise((r) => setTimeout(r, 20));
+  }
+  assert.equal(gw.logs[0]!.outcome, 'client_closed');
+  assert.equal(gw.router.nodes.get('n0')!.healthy, true);
+});
+
 test('an unauthenticated request is answered and closed without reading its body (audit run-6 L2)', async () => {
   const gw = await gateway([await fakeNode()]);
   const socket = net.connect(Number(new URL(gw.url).port), '127.0.0.1');
