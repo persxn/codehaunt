@@ -8,13 +8,14 @@ Inference tier on the lab k3s cluster (ADR-016): one vLLM model server per RTX 5
 | `namespace.yaml` | namespace `codehaunt` |
 | `gpu-full-mode.sh` | `apply` / `revert` / `status`: full (unshared) GPUs on the 4 nodes for event week, back to `mps-3` after |
 | `model-server.yaml` | `model-config` ConfigMap (model, vLLM flags), headless Service, StatefulSet `model` (4 pods, one per node, weights on `scratch`), PDB, ServiceMonitor |
-| `gateway.yaml` | `gateway-a` + `gateway-b` Deployments on different nodes, Traefik failover (a → b, per request on 502/503/504), IngressRoute `/codehaunt-gateway/v1/`, ServiceMonitor |
+| `gateway.yaml` | `gateway-a` + `gateway-b` Deployments on different nodes, one IngressRoute path each (`/codehaunt-gateway-a/v1/`, `-b/v1/`, priority 1000), ServiceMonitor |
 | `network-policy.yaml` | model pods: only the gateway and Prometheus; gateway: only Traefik and Prometheus |
 
 ## Affects / depends on
 - Depends on: GPU operator `device-plugin-config` (`full` entry), Traefik CRDs (v3), Prometheus operator, topolvm
   `scratch`, the registry at `50.0.2.102:5000` (image `codehaunt/gateway`), Docker Hub `vllm/vllm-openai:v0.33.0`, Secret `gateway-token`.
-- Used by: the DGX web API (`GATEWAY_URL=http://<gpu-master tailnet IP>/codehaunt-gateway`, `GATEWAY_TOKEN`).
+- Used by: the DGX web API (`GATEWAY_URL=https://gpu-master.<tailnet>.ts.net/codehaunt-gateway-a`,
+  `GATEWAY_FALLBACK_URL=…/codehaunt-gateway-b`, `GATEWAY_TOKEN`); Tailscale Serve on gpu-master proxies to Traefik.
 - Changing `model-config` changes the participants' model: restart `statefulset/model` and both gateways.
 
 ## Entry points & how to test

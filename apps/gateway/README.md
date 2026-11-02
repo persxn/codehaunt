@@ -14,7 +14,7 @@ reserved, and streams the reply back with exact token usage. Security-critical (
 | `load/` | load generator: N concurrent synthetic sessions against a running gateway (`load/README.md`) |
 
 ## Affects / depends on
-- Used by: the DGX web API's model client (WP-03), through Traefik on gpu-master's tailnet IP (`deploy/gpu-cluster/`).
+- Used by: the DGX web API's model client (WP-03), via Tailscale Serve on gpu-master → Traefik (`deploy/gpu-cluster/`).
 - Depends on: the model servers' vLLM API (`/health`, `/tokenize`, `/v1/chat/completions`), `@codehaunt/contracts`
   (`GatewayChatRequest`, `GatewayError`), env vars below.
 - Changing the request/response shape changes `packages/contracts/src/gateway.ts` and the web's model client together.
