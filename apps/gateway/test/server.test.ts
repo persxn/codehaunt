@@ -5,6 +5,7 @@
  */
 import assert from 'node:assert/strict';
 import http from 'node:http';
+import net from 'node:net';
 import type { AddressInfo } from 'node:net';
 import { afterEach, test } from 'node:test';
 
@@ -243,4 +244,68 @@ test('reply tokens are merged into few compact chunks; content and usage survive
   assert.match(events.at(-2)!, /"usage"/);
   assert.equal(events.at(-1), 'data: [DONE]');
   assert.equal(gw.logs[0]!.completionTokens, 40);
+});
+
+/** A node whose chat reply is produced by `reply(res)`; tokenize counts 3. */
+async function scriptedNode(reply: (res: http.ServerResponse) => void): Promise<FakeNode> {
+  const node = await fakeNode();
+  node.server.removeAllListeners('request');
+  node.server.on('request', (req, res) => {
+    req.resume();
+    req.on('end', () => {
+      if (req.url === '/health') return res.end('ok');
+      if (req.url === '/tokenize') return res.end(JSON.stringify({ count: 3 }));
+      res.writeHead(200, { 'content-type': 'text/event-stream' });
+      reply(res);
+    });
+  });
+  return node;
+}
+const delta = (t: string) => `data: ${JSON.stringify({ choices: [{ index: 0, delta: { content: t }, finish_reason: null }] })}\n\n`;
+const usageChunk = `data: ${JSON.stringify({ choices: [], usage: { prompt_tokens: 3, completion_tokens: 9, total_tokens: 12 } })}\n\n`;
+
+test('a healthy reply streaming longer than the first-byte timeout is not cut (audit H1)', async () => {
+  const node = await scriptedNode((res) => {
+    let i = 0;
+    const t = setInterval(() => {
+      res.write(delta(`t${i} `));
+      if (++i === 9) {
+        clearInterval(t);
+        res.write(usageChunk);
+        res.end('data: [DONE]\n\n');
+      }
+    }, 200); // 1.8 s in total, timeout 1 s
+  });
+  const gw = await gateway([node], { GATEWAY_FIRST_BYTE_TIMEOUT_MS: '1000', GATEWAY_IDLE_TIMEOUT_MS: '1000' });
+  const res = await post(gw.url, chat('hi'));
+  assert.match(await res.text(), /"usage"/);
+  assert.equal(gw.logs[0]!.outcome, 'ok');
+});
+
+test('a client that disconnects under backpressure frees the slot and is logged (audit H2)', async () => {
+  const node = await scriptedNode((res) => {
+    res.write(`data: ${JSON.stringify({ choices: [{ index: 0, delta: { content: 'A'.repeat(4 * 1024 * 1024) }, finish_reason: 'stop' }] })}\n\n`);
+    res.write(usageChunk);
+    res.end('data: [DONE]\n\n');
+  });
+  const gw = await gateway([node]);
+  const body = JSON.stringify(chat('hi'));
+  const socket = net.connect(Number(new URL(gw.url).port), '127.0.0.1');
+  socket.write(`POST /v1/chat/completions HTTP/1.1\r\nhost: x\r\nauthorization: Bearer ${TOKEN}\r\n`
+    + `content-type: application/json\r\ncontent-length: ${Buffer.byteLength(body)}\r\n\r\n${body}`);
+  socket.pause(); // never read: the gateway's writes back up
+  await new Promise((r) => setTimeout(r, 1500));
+  socket.destroy();
+  const t0 = Date.now();
+  while (gw.logs.length === 0) {
+    assert.ok(Date.now() - t0 < 3000, 'request never finished');
+    await new Promise((r) => setTimeout(r, 20));
+  }
+  assert.equal(gw.router.nodes.get('n0')!.inflight, 0);
+});
+
+test('a prompt exactly at the context limit is context_exceeded (audit L5)', async () => {
+  const gw = await gateway([await fakeNode()]);
+  const res = await post(gw.url, chat(Array(256).fill('w').join(' '), { contextLimit: 256, budgetTokens: 5000 }));
+  assert.equal(res.status, 413);
 });

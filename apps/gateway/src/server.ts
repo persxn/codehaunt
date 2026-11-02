@@ -9,13 +9,15 @@
 import { createHash, randomUUID, timingSafeEqual } from 'node:crypto';
 import http, { type IncomingMessage, type ServerResponse } from 'node:http';
 
-import { GatewayChatRequest, type GatewayErrorCode, type GatewayUsage } from '@codehaunt/contracts';
+import { GatewayChatRequest, type GatewayErrorCode, GatewayUsage } from '@codehaunt/contracts';
 
 import type { GatewayConfig } from './config.ts';
 import type { HealthChecker } from './health.ts';
 import { Router, RouterError } from './router.ts';
 
 const MAX_BODY_BYTES = 1024 * 1024;
+/** A client gets this long to send its whole body (the request head has its own 10 s limit). */
+const BODY_TIMEOUT_MS = 10_000;
 const REQUEST_ID = /^[A-Za-z0-9._:-]{1,128}$/;
 
 const STATUS: Record<GatewayErrorCode, number> = {
@@ -85,6 +87,11 @@ function readBody(req: IncomingMessage): Promise<Buffer> {
   return new Promise((resolve, reject) => {
     const chunks: Buffer[] = [];
     let size = 0;
+    const timer = setTimeout(() => {
+      reject(new Refusal('bad_request', 'request body too slow'));
+      req.destroy();
+    }, BODY_TIMEOUT_MS);
+    req.on('close', () => clearTimeout(timer));
     req.on('data', (c: Buffer) => {
       size += c.length;
       if (size > MAX_BODY_BYTES) {
@@ -163,7 +170,7 @@ export function createGateway(deps: ServerDeps): http.Server {
 
       const tried = new Set<string>();
       for (;;) {
-        const node = await router.acquire(chat.codehaunt.sessionId, tried);
+        const node = await router.acquire(chat.codehaunt.sessionId, tried, clientGone.signal);
         entry.node = node;
         entry.attempts++;
         tried.add(node);
@@ -206,18 +213,28 @@ export function createGateway(deps: ServerDeps): http.Server {
     clientGone: AbortSignal,
   ): Promise<void> {
     const base = config.nodes.find((n) => n.name === node)!.url;
+    // The timeout covers only the wait for the response to start (audit H1); once a reply streams,
+    // the idle timeout between chunks takes over, so long healthy replies are never cut.
     const call = async (path: string, payload: unknown, timeoutMs: number) => {
+      const startTimeout = new AbortController();
+      const timer = setTimeout(() => startTimeout.abort(new Error(`no response within ${timeoutMs} ms`)), timeoutMs);
       try {
         return await fetch(`${base}${path}`, {
           method: 'POST',
-          headers: { 'content-type': 'application/json', 'x-request-id': entry.requestId },
+          headers: {
+            'content-type': 'application/json',
+            'x-request-id': entry.requestId,
+            ...(config.nodeApiKey && { authorization: `Bearer ${config.nodeApiKey}` }),
+          },
           body: JSON.stringify(payload),
-          signal: AbortSignal.any([clientGone, AbortSignal.timeout(timeoutMs)]),
+          signal: AbortSignal.any([clientGone, startTimeout.signal]),
         });
       } catch (err) {
         if (clientGone.aborted) throw err;
         deps.health.markDown(node);
         throw new NodeFailure(`${node}${path}: ${(err as Error).message}`);
+      } finally {
+        clearTimeout(timer);
       }
     };
 
@@ -236,7 +253,7 @@ export function createGateway(deps: ServerDeps): http.Server {
     if (!Number.isInteger(count) || count < 0) throw new NodeFailure(`${node}/tokenize: no count`);
     entry.promptTokens = count;
     const { budgetTokens, contextLimit } = chat.codehaunt;
-    if (count > contextLimit) throw new Refusal('context_exceeded', `prompt is ${count} tokens; the context limit is ${contextLimit}`);
+    if (count >= contextLimit) throw new Refusal('context_exceeded', `prompt is ${count} tokens; the context limit is ${contextLimit}`);
     const maxTokens = Math.min(chat.max_tokens, budgetTokens - count, contextLimit - count);
     if (maxTokens < 1) throw new Refusal('budget_exceeded', `prompt is ${count} tokens; ${budgetTokens} were reserved`);
 
@@ -266,13 +283,17 @@ export function createGateway(deps: ServerDeps): http.Server {
     let finish: string | null = null;
     let usage: GatewayUsage | undefined;
     let lastFlush = 0;
+    // Never wait on a closed response: its 'close' has already fired, so the wait would never end and
+    // the node slot would leak (audit H2).
     const send = async (chunk: string) => {
-      if (!res.write(chunk)) {
+      if (res.destroyed) throw new Error('client closed the connection');
+      if (!res.write(chunk) && !res.destroyed) {
         await new Promise((r) => {
           res.once('drain', r);
           res.once('close', r);
         });
       }
+      if (res.destroyed) throw new Error('client closed the connection');
     };
     const flush = async () => {
       if (!text && !finish) return;
@@ -309,7 +330,10 @@ export function createGateway(deps: ServerDeps): http.Server {
         } catch {
           continue; // a malformed chunk carries nothing we can forward
         }
-        if (chunk.usage) usage = chunk.usage;
+        if (chunk.usage) {
+          const u = GatewayUsage.safeParse(chunk.usage);
+          if (u.success) usage = u.data;
+        }
         const choice = chunk.choices?.[0];
         if (typeof choice?.delta?.content === 'string') text += choice.delta.content;
         if (typeof choice?.finish_reason === 'string') finish = choice.finish_reason;

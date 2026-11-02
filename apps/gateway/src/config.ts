@@ -36,6 +36,8 @@ export interface GatewayConfig {
   maxAttempts: number;
   /** Reply tokens are merged into one SSE chunk per window of this many ms (0 = one chunk per upstream chunk). */
   streamFlushMs: number;
+  /** Bearer key the model servers require (vLLM `--api-key`); unset = none. */
+  nodeApiKey: string | undefined;
   /** Passed to the model server as `chat_template_kwargs` (e.g. `{"enable_thinking":false}`). */
   chatTemplateKwargs: Record<string, unknown> | undefined;
 }
@@ -101,6 +103,7 @@ export function loadConfig(env: Env): GatewayConfig {
     idleTimeoutMs: int(env, 'GATEWAY_IDLE_TIMEOUT_MS', 10_000, 1_000, 600_000),
     maxAttempts: int(env, 'GATEWAY_MAX_ATTEMPTS', 3, 1, 10),
     streamFlushMs: int(env, 'GATEWAY_STREAM_FLUSH_MS', 100, 0, 2_000),
+    nodeApiKey: env.GATEWAY_NODE_API_KEY || undefined,
     chatTemplateKwargs,
   };
 }

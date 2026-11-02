@@ -3,6 +3,8 @@
  * Before a model call the web API reserves tokens under the participant's row lock; after it, one
  * RELEASE returns the unused part (everything, if the call failed). Every reservation fits the
  * balance read under the lock, so the balance never goes negative.
+ * Invariant (audit L4): every writer of a negative delta (RESERVE here, admin ADJUSTMENT later) must take the same
+ * participant row lock and check the balance first, or "never negative" no longer holds.
  * Security-critical: Claude-owned.
  */
 import type { PrismaClient } from './generated/client.ts';
@@ -55,6 +57,10 @@ export async function reserveTokens(prisma: PrismaClient, input: ReserveInput): 
     const existing = await tx.tokenLedger.findUnique({ where: { idempotencyKey: reserveKey(input.promptTurnId) } });
     if (existing) {
       if (existing.participantId !== input.participantId) throw new Error('reservation belongs to another participant');
+      // A settled turn is finished: handing its reservation back would make a second call free (audit M1).
+      if (await tx.tokenLedger.findUnique({ where: { idempotencyKey: settleKey(input.promptTurnId) } })) {
+        throw new Error('turn already settled; a new call needs a new turn');
+      }
       return { reserved: -existing.delta, remaining: await sum(tx, input.participantId) };
     }
 

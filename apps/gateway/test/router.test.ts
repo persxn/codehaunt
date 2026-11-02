@@ -71,3 +71,16 @@ test('queued requests fail when the last usable node is drained', async () => {
   r.setHealthy('a', false);
   await assert.rejects(waiting, (e) => e instanceof RouterError && e.code === 'no_healthy_node');
 });
+
+test('a queued request whose client leaves gives up its place (audit L2)', async () => {
+  const r = new Router(['a'], 1, 5, 5_000);
+  r.setHealthy('a', true);
+  await r.acquire('s1');
+  const gone = new AbortController();
+  const waiting = r.acquire('s2', new Set(), gone.signal);
+  gone.abort();
+  await assert.rejects(waiting, (e) => e instanceof RouterError);
+  assert.equal(r.queueDepth, 0);
+  r.release('a');
+  assert.equal(r.nodes.get('a')!.inflight, 0);
+});

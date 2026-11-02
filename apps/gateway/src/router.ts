@@ -56,7 +56,8 @@ export class Router {
   }
 
   /** Resolves with a node whose slot is now held; the caller must `release` it exactly once. */
-  acquire(sessionId: string, exclude: ReadonlySet<string> = new Set()): Promise<string> {
+  acquire(sessionId: string, exclude: ReadonlySet<string> = new Set(), signal?: AbortSignal): Promise<string> {
+    if (signal?.aborted) return Promise.reject(new RouterError('gateway_busy', 'client gone'));
     const node = this.pick(sessionId, exclude);
     if (node) return Promise.resolve(this.take(node, sessionId));
     if (!this.anyUsable(exclude)) {
@@ -77,6 +78,13 @@ export class Router {
         }, this.queueTimeoutMs),
       };
       this.queue.push(waiter);
+      // A client that leaves while queued gives up its place instead of taking a slot later.
+      signal?.addEventListener('abort', () => {
+        if (!this.queue.includes(waiter)) return;
+        this.drop(waiter);
+        clearTimeout(waiter.timer);
+        reject(new RouterError('gateway_busy', 'client gone'));
+      }, { once: true });
     });
   }
 

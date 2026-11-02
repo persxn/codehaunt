@@ -70,6 +70,15 @@ test('reserve and settle are idempotent per turn; over-reported usage is clamped
   assert.equal(await tokenBalance(db.prisma, p.participantId), 900);
 });
 
+test('a settled turn cannot be reserved again (audit M1)', async () => {
+  const p = await participantWithGrant(db.prisma, 1000);
+  const t = await p.turn();
+  await reserveTokens(db.prisma, { ...p, promptTurnId: t, wanted: 300, now: new Date() });
+  await settleTokens(db.prisma, { ...p, promptTurnId: t, used: 300 });
+  await assert.rejects(reserveTokens(db.prisma, { ...p, promptTurnId: t, wanted: 300, now: new Date() }), /already settled/);
+  assert.equal(await tokenBalance(db.prisma, p.participantId), 700);
+});
+
 test('a stale unsettled reservation is released in full at the next reserve', async () => {
   const p = await participantWithGrant(db.prisma, 1000);
   const t1 = await p.turn();

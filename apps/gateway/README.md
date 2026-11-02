@@ -28,12 +28,13 @@ load: `GATEWAY_URL=… GATEWAY_TOKEN=… node --experimental-strip-types apps/ga
 | `GATEWAY_TOKEN` | required | shared bearer token (≥32 chars); only the DGX holds it |
 | `GATEWAY_MODEL` | required | served model name sent to every node |
 | `GATEWAY_NODES` | required | `name=http://host:port,…` model servers |
+| `GATEWAY_NODE_API_KEY` | unset | bearer key the model servers require (vLLM `VLLM_API_KEY`) |
 | `GATEWAY_CHAT_TEMPLATE_KWARGS` | unset | JSON passed to vLLM as `chat_template_kwargs`, e.g. `{"enable_thinking":false}` |
 | `GATEWAY_HOST` / `GATEWAY_PORT` | `0.0.0.0` / `8080` | listen address |
 | `GATEWAY_SLOTS_PER_NODE` | 12 | concurrent requests per node before queueing |
 | `GATEWAY_QUEUE_MAX` / `GATEWAY_QUEUE_TIMEOUT_MS` | 100 / 30000 | FIFO queue when all slots are busy |
 | `GATEWAY_HEALTH_INTERVAL_MS` / `GATEWAY_HEALTH_FAIL_THRESHOLD` | 2000 / 2 | node drained after N failed probes (≈4 s) |
-| `GATEWAY_FIRST_BYTE_TIMEOUT_MS` / `GATEWAY_IDLE_TIMEOUT_MS` | 60000 / 10000 | node gets this long for its first byte / between chunks |
+| `GATEWAY_FIRST_BYTE_TIMEOUT_MS` / `GATEWAY_IDLE_TIMEOUT_MS` | 60000 / 10000 | node gets this long to start answering / between chunks once streaming |
 | `GATEWAY_STREAM_FLUSH_MS` | 100 | reply tokens merged into one SSE chunk per window (first token sent at once) |
 | `GATEWAY_MAX_ATTEMPTS` | 3 | nodes tried per request, only before the first byte reaches the client |
 
@@ -48,5 +49,8 @@ load: `GATEWAY_URL=… GATEWAY_TOKEN=… node --experimental-strip-types apps/ga
   merged per 100 ms, then a `usage` chunk and `[DONE]`. vLLM's ~200 bytes per token would saturate the ~0.5 MB/s
   DERP relay to the DGX at full load (load test 2026-11-02: client TTFT max 22 s while the gateway's was 124 ms).
 - vLLM keeps a connection open after SIGTERM, so a reply cut by a node restart ends after the 10 s idle timeout.
-- A client disconnect aborts generation on the node, freeing its slot.
+- A client disconnect aborts generation on the node and frees its slot, also while the gateway waits on a full
+  socket buffer or in the queue. A request body must arrive within 10 s.
+- A prompt of `contextLimit` tokens or more is `context_exceeded` (413); one that leaves no room in the reservation
+  is `budget_exceeded` (402).
 - `/metrics`, `/healthz`, `/readyz` are unauthenticated; Traefik routes only `/v1/` from outside the pod.

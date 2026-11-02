@@ -21,11 +21,12 @@ spec:
       terminationGracePeriodSeconds: 30
       containers:
       - name: gateway
-        image: 50.0.2.102:5000/codehaunt/gateway:0.1.1
+        image: 50.0.2.102:5000/codehaunt/gateway:0.1.2@sha256:9c413628627c56f25b2246a92053717683af47fd29208c5addd1da5c4f7287b3
         ports: [{name: http, containerPort: 8080}]
         env:
         - {name: GATEWAY_TOKEN, valueFrom: {secretKeyRef: {name: gateway-token, key: token}}}
         - {name: GATEWAY_MODEL, value: junior}
+        - {name: GATEWAY_NODE_API_KEY, valueFrom: {secretKeyRef: {name: model-api-key, key: key}}}
         - name: GATEWAY_NODES
           value: model-0=http://model-0.model:8000,model-1=http://model-1.model:8000,model-2=http://model-2.model:8000,model-3=http://model-3.model:8000
         - {name: GATEWAY_SLOTS_PER_NODE, value: "14"}
@@ -34,6 +35,8 @@ spec:
         - {name: GATEWAY_IDLE_TIMEOUT_MS, value: "10000"}
         - {name: GATEWAY_CHAT_TEMPLATE_KWARGS, valueFrom: {configMapKeyRef: {name: model-config, key: chatTemplateKwargs, optional: true}}}
         readinessProbe: {httpGet: {path: /readyz, port: http}, periodSeconds: 2, failureThreshold: 2}
+        # Keep serving while Traefik drops this pod from its endpoints (rollout test: 4/8 got 502 without it).
+        lifecycle: {preStop: {sleep: {seconds: 5}}}
         livenessProbe: {httpGet: {path: /healthz, port: http}, periodSeconds: 10, failureThreshold: 3}
         resources: {requests: {cpu: 500m, memory: 256Mi}, limits: {memory: 512Mi}}
         securityContext: {allowPrivilegeEscalation: false, readOnlyRootFilesystem: true, capabilities: {drop: [ALL]}}
@@ -57,11 +60,12 @@ spec:
       terminationGracePeriodSeconds: 30
       containers:
       - name: gateway
-        image: 50.0.2.102:5000/codehaunt/gateway:0.1.1
+        image: 50.0.2.102:5000/codehaunt/gateway:0.1.2@sha256:9c413628627c56f25b2246a92053717683af47fd29208c5addd1da5c4f7287b3
         ports: [{name: http, containerPort: 8080}]
         env:
         - {name: GATEWAY_TOKEN, valueFrom: {secretKeyRef: {name: gateway-token, key: token}}}
         - {name: GATEWAY_MODEL, value: junior}
+        - {name: GATEWAY_NODE_API_KEY, valueFrom: {secretKeyRef: {name: model-api-key, key: key}}}
         - name: GATEWAY_NODES
           value: model-0=http://model-0.model:8000,model-1=http://model-1.model:8000,model-2=http://model-2.model:8000,model-3=http://model-3.model:8000
         - {name: GATEWAY_SLOTS_PER_NODE, value: "14"}
@@ -70,6 +74,8 @@ spec:
         - {name: GATEWAY_IDLE_TIMEOUT_MS, value: "10000"}
         - {name: GATEWAY_CHAT_TEMPLATE_KWARGS, valueFrom: {configMapKeyRef: {name: model-config, key: chatTemplateKwargs, optional: true}}}
         readinessProbe: {httpGet: {path: /readyz, port: http}, periodSeconds: 2, failureThreshold: 2}
+        # Keep serving while Traefik drops this pod from its endpoints (rollout test: 4/8 got 502 without it).
+        lifecycle: {preStop: {sleep: {seconds: 5}}}
         livenessProbe: {httpGet: {path: /healthz, port: http}, periodSeconds: 10, failureThreshold: 3}
         resources: {requests: {cpu: 500m, memory: 256Mi}, limits: {memory: 512Mi}}
         securityContext: {allowPrivilegeEscalation: false, readOnlyRootFilesystem: true, capabilities: {drop: [ALL]}}

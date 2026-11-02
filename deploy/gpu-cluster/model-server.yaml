@@ -7,6 +7,8 @@ kind: ConfigMap
 metadata: {name: model-config, namespace: codehaunt}
 data:
   model: Qwen/Qwen3-4B-Instruct-2507-FP8
+  # Pinned Hugging Face commit: weights are fetched once per node and never re-fetched while present (audit L3).
+  revision: 8591804019c8b22094c3b5b4454e0edc05dffc98
   # Extra vLLM flags for this model (quantisation etc.).
   extraArgs: --kv-cache-dtype fp8
   # Read by the gateway; `{}` when the model needs none.
@@ -40,27 +42,48 @@ spec:
             topologyKey: kubernetes.io/hostname
       automountServiceAccountToken: false
       terminationGracePeriodSeconds: 30
+      # Non-root (audit M3). fsGroup makes the node-local weights volume writable for uid 1000.
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        runAsGroup: 1000
+        fsGroup: 1000
+        fsGroupChangePolicy: OnRootMismatch
+        # Ignore the image's /etc/group (its uid-1000 user is in sudo/adm).
+        supplementalGroupsPolicy: Strict
+        seccompProfile: {type: RuntimeDefault}
       initContainers:
       - name: fetch-weights
-        image: docker.io/vllm/vllm-openai:v0.33.0
-        command: ["bash", "-c", "hf download \"$MODEL\" --quiet"]
-        env:
-        - {name: HF_HOME, value: /models/hf}
-        - {name: MODEL, valueFrom: {configMapKeyRef: {name: model-config, key: model}}}
-        volumeMounts: [{name: models, mountPath: /models}]
-      containers:
-      - name: vllm
-        image: docker.io/vllm/vllm-openai:v0.33.0
+        image: docker.io/vllm/vllm-openai:v0.33.0@sha256:d825baf9ce4b1b6bfc5ecc7b79880c7e6748c65a72d697ce3d47607aafa84c6e
         command: ["bash", "-c"]
         args:
         - >-
-          exec vllm serve "$MODEL" --served-model-name junior --host 0.0.0.0 --port 8000
+          [ -d "/models/hf/hub/models--${MODEL//\//--}/snapshots/$REVISION" ]
+          || hf download "$MODEL" --revision "$REVISION" --quiet
+        env:
+        - {name: HF_HOME, value: /models/hf}
+        - {name: HOME, value: /models/home}
+        - {name: MODEL, valueFrom: {configMapKeyRef: {name: model-config, key: model}}}
+        - {name: REVISION, valueFrom: {configMapKeyRef: {name: model-config, key: revision}}}
+        securityContext: {allowPrivilegeEscalation: false, capabilities: {drop: [ALL]}}
+        volumeMounts: [{name: models, mountPath: /models}, {name: tmp, mountPath: /tmp}]
+      containers:
+      - name: vllm
+        image: docker.io/vllm/vllm-openai:v0.33.0@sha256:d825baf9ce4b1b6bfc5ecc7b79880c7e6748c65a72d697ce3d47607aafa84c6e
+        command: ["bash", "-c"]
+        args:
+        - >-
+          exec vllm serve "$MODEL" --revision "$REVISION" --served-model-name junior --host 0.0.0.0 --port 8000
           --max-model-len 10240 --gpu-memory-utilization 0.90 --max-num-seqs 16 --enable-prefix-caching
           --disable-log-requests $EXTRA_ARGS
         env:
         - {name: HF_HOME, value: /models/hf}
         - {name: HF_HUB_OFFLINE, value: "1"}
+        - {name: HOME, value: /models/home}
+        # Only the gateway holds this key; without it a shell on a GPU node could use the model unmetered (audit M3).
+        - {name: VLLM_API_KEY, valueFrom: {secretKeyRef: {name: model-api-key, key: key}}}
         - {name: MODEL, valueFrom: {configMapKeyRef: {name: model-config, key: model}}}
+        - {name: REVISION, valueFrom: {configMapKeyRef: {name: model-config, key: revision}}}
         - {name: EXTRA_ARGS, valueFrom: {configMapKeyRef: {name: model-config, key: extraArgs}}}
         ports: [{name: http, containerPort: 8000}]
         startupProbe: {httpGet: {path: /health, port: http}, periodSeconds: 5, failureThreshold: 120}
@@ -69,13 +92,16 @@ spec:
         resources:
           limits: {nvidia.com/gpu: 1, memory: 20Gi}
           requests: {cpu: "6", memory: 12Gi}
-        securityContext: {allowPrivilegeEscalation: false}
+        securityContext: {allowPrivilegeEscalation: false, capabilities: {drop: [ALL]}}
         volumeMounts:
         - {name: models, mountPath: /models}
         - {name: shm, mountPath: /dev/shm}
+        - {name: tmp, mountPath: /tmp}
       volumes:
       - name: shm
         emptyDir: {medium: Memory, sizeLimit: 4Gi}
+      - name: tmp
+        emptyDir: {sizeLimit: 8Gi}
   volumeClaimTemplates:
   - metadata: {name: models}
     spec:
