@@ -27,3 +27,8 @@ A compromised worker can at most start sandbox containers: no network, read-only
 - A create is rebuilt from the sandbox template, not validated field by field: unknown fields are dropped, so
   `--privileged` or `-v /:/host` produce an ordinary sandbox, not an error.
 - Responses flush headers immediately: `docker run` waits for `/wait`'s headers before it starts the container.
+- Attach (HTTP upgrade): nothing from the client is forwarded until the daemon answers 101; any other answer ends both
+  connections with 502. The client's API version is never forwarded (re-audit N1: the daemon keeps a connection open
+  after a 400 for an unsupported version, which allowed a smuggled second request).
+- Caps: 32 live sandbox containers, 256 connections, a 64 KiB create body; a half-closed attach stream is ended after
+  10 minutes. Malformed requests are refused, never crash the process (restart would forget owned containers).

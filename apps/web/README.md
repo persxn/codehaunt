@@ -26,4 +26,5 @@ Next.js application serving the participant UI and admin console.
 - `middleware.ts` denies all routes by default; any new route must be added to `packages/auth/src/policy.ts` (`ROUTE_POLICY`).
 - Tests fail if a public route is missing from the allow‑list.
 - `postcss` is a dev dependency only to pin the patched version Next would otherwise get (root `overrides`; NV3).
-- In compose it connects as `codehaunt_app` (not the owner) and runs read-only with `.next/cache` on tmpfs.
+- In compose it connects as `codehaunt_web` (not the owner) and runs read-only with `.next/cache` on tmpfs (2 GiB, 256 processes max).
+- An empty `COOKIE_SECURE` (what compose passes when it is unset) means unset: Secure cookies in production.

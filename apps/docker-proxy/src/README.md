@@ -4,8 +4,8 @@ Implementation of the Docker socket proxy.
 ## Contents
 | Path | What it does |
 |---|---|
-| `policy.ts` | pure rules: route parsing, fixed upstream paths, runner-image allowlist, create-body template, owned-container registry |
-| `server.ts` | HTTP server: refuses, rebuilds, forwards over the unix socket; hijacked `attach` via HTTP upgrade |
+| `policy.ts` | pure rules: route parsing (never throws), fixed unversioned upstream paths, runner-image allowlist, create-body template, owned-container registry with live count |
+| `server.ts` | HTTP server: refuses, rebuilds, forwards over a fresh unix-socket connection per request; `attach` upgrade forwarded only after the daemon's 101 |
 | `main.ts` | reads env and listens (default `0.0.0.0:2375`) |
 
 ## Affects / depends on

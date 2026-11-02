@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 
-import { Owned, parseRoute, runnerImages, sandboxCreateBody, upstreamPath } from '../src/policy.ts';
+import { MAX_LIVE_CONTAINERS, Owned, parseRoute, runnerImages, sandboxCreateBody, upstreamPath } from '../src/policy.ts';
 
 const IMAGES = runnerImages('codehaunt-runner:1');
 const NAME = 'cjudge-52b3b75d-8ede-4d28-a212-290663e632bc';
@@ -43,10 +43,18 @@ test('everything else is refused', () => {
   }
 });
 
-test('query strings are fixed by the proxy, never copied', () => {
+test('query strings and API versions are fixed by the proxy, never copied', () => {
   assert.equal(upstreamPath(parseRoute('POST', `/v1.52/containers/${ID}/wait?condition=next-exit&x=1`)!),
-    `/v1.52/containers/${ID}/wait?condition=removed`);
-  assert.equal(upstreamPath(parseRoute('POST', `/v1.52/containers/${ID}/kill?signal=SIGHUP`)!), `/v1.52/containers/${ID}/kill`);
+    `/containers/${ID}/wait?condition=removed`);
+  assert.equal(upstreamPath(parseRoute('POST', `/v1.999/containers/${ID}/kill?signal=SIGHUP`)!), `/containers/${ID}/kill`);
+  assert.equal(upstreamPath(parseRoute('POST', `/v1.999/containers/${ID}/attach`)!),
+    `/containers/${ID}/attach?stderr=1&stdin=1&stdout=1&stream=1`);
+});
+
+test('malformed URLs are refused, never thrown', () => {
+  for (const url of ['//', 'http://[::1', '/v1.47/images/%E0%A4%A/json', '/v1.47/images/%/json', '\\x']) {
+    assert.equal(parseRoute('GET', url), null, url);
+  }
 });
 
 test('a create body is rebuilt from the template: extra fields vanish', () => {
@@ -90,6 +98,17 @@ test('runner images: the C image and its three siblings only', () => {
   assert.deepEqual([...IMAGES].sort(), [
     'codehaunt-runner-cpp:1', 'codehaunt-runner-java:1', 'codehaunt-runner-python:1', 'codehaunt-runner:1',
   ]);
+});
+
+test('live containers are counted until their wait completes', () => {
+  const owned = new Owned();
+  owned.add(ID, NAME);
+  owned.add('b'.repeat(64), 'cjudge-00000000-0000-0000-0000-000000000000');
+  assert.equal(owned.liveCount(), 2);
+  owned.done(NAME);
+  assert.equal(owned.liveCount(), 1);
+  assert.ok(owned.has(ID), 'a finished container may still be killed or waited on');
+  assert.ok(MAX_LIVE_CONTAINERS >= 8);
 });
 
 test('only created containers are owned, by ID or name, until they expire', () => {

@@ -4,11 +4,17 @@ import { z } from 'zod';
 const WebConfig = z.object({
   DATABASE_URL: z.string().startsWith('postgresql://', 'must be a postgresql:// URL'),
   NODE_ENV: z.enum(['development', 'production', 'test']).default('development'),
-  COOKIE_SECURE: z.enum(['true', 'false']).optional(),
+  // Compose passes an unset variable as "" (`${COOKIE_SECURE:-}`): treat that as unset, i.e. Secure in production.
+  COOKIE_SECURE: z.preprocess((v) => (v === '' ? undefined : v), z.enum(['true', 'false']).optional()),
 });
 export type WebConfig = z.infer<typeof WebConfig>;
 
 let cached: WebConfig | null = null;
+
+/** Validation only, no caching or exit; for tests. */
+export function parseConfig(env: Record<string, string | undefined>) {
+  return WebConfig.safeParse(env);
+}
 
 export function loadConfig(env: NodeJS.ProcessEnv = process.env): WebConfig {
   if (cached) return cached;

@@ -6,6 +6,7 @@ import assert from 'node:assert/strict';
 import { execFile } from 'node:child_process';
 import { existsSync } from 'node:fs';
 import http from 'node:http';
+import net from 'node:net';
 import type { AddressInfo } from 'node:net';
 import { after, before, test } from 'node:test';
 import { promisify } from 'node:util';
@@ -52,7 +53,10 @@ before(async () => {
   await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', resolve));
   proxyHost = `tcp://127.0.0.1:${(server.address() as AddressInfo).port}`;
 });
-after(() => server?.close());
+after(() => {
+  server?.closeAllConnections();
+  server?.close();
+});
 
 test('the judge runs a real submission through the proxy', { skip }, async () => {
   process.env.DOCKER_HOST = proxyHost;
@@ -107,6 +111,37 @@ test('containers the proxy did not create cannot be touched', { skip }, async ()
     }
   } finally {
     await direct('DELETE', `/containers/${other.json.Id}?force=1`);
+  }
+});
+
+test('an attach with an unsupported API version smuggles nothing (audit N1)', { skip }, async () => {
+  const name = `cjudge-${crypto.randomUUID()}`;
+  const created = await viaProxy('POST', `/v1.47/containers/create?name=${name}`, {
+    Image: 'codehaunt-runner:1',
+    Cmd: ['python3', '/opt/cjudge/runner.py'],
+    HostConfig: { Memory: 268435456, MemorySwap: 268435456, PidsLimit: 16, NanoCpus: 1e9 },
+  });
+  assert.equal(created.status, 201);
+  const pwn = `cjudge-${crypto.randomUUID()}`;
+  try {
+    const { port } = server.address() as AddressInfo;
+    const evil = JSON.stringify({ Image: 'codehaunt-runner:1', Cmd: ['true'], HostConfig: { Privileged: true } });
+    await new Promise<void>((resolve) => {
+      const c = net.connect(port, '127.0.0.1', () =>
+        c.write(
+          `POST /v1.999/containers/${created.json.Id}/attach HTTP/1.1\r\nHost: x\r\nConnection: Upgrade\r\n` +
+            `Upgrade: tcp\r\nContent-Length: 0\r\n\r\nPOST /containers/create?name=${pwn} HTTP/1.1\r\nHost: d\r\n` +
+            `Content-Type: application/json\r\nContent-Length: ${evil.length}\r\n\r\n${evil}`,
+        ),
+      );
+      c.on('data', () => {});
+      c.on('close', () => resolve());
+      setTimeout(() => c.destroy(), 2000);
+    });
+    assert.equal((await direct('GET', `/containers/${pwn}/json`)).status, 404, 'the smuggled create never ran');
+  } finally {
+    await direct('DELETE', `/containers/${created.json.Id}?force=1`);
+    await direct('DELETE', `/containers/${pwn}?force=1`);
   }
 });
 

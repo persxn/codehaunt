@@ -27,9 +27,16 @@ export type Route =
   | { kind: 'create'; version: string; name: string }
   | { kind: 'container'; version: string; ref: string; action: 'attach' | 'wait' | 'start' | 'kill' };
 
-/** Method + raw URL → the one request shape it is, or null (refuse). */
+/** Method + raw URL → the one request shape it is, or null (refuse). Never throws. */
 export function parseRoute(method: string, rawUrl: string): Route | null {
-  const url = new URL(rawUrl, 'http://docker');
+  try {
+    return matchRoute(method, new URL(rawUrl, 'http://docker'));
+  } catch {
+    return null; // malformed URL or percent-encoding (audit N3)
+  }
+}
+
+function matchRoute(method: string, url: URL): Route | null {
   const path = url.pathname;
   let m: RegExpMatchArray | null;
 
@@ -50,18 +57,22 @@ export function parseRoute(method: string, rawUrl: string): Route | null {
   return null;
 }
 
-/** The upstream path for an allowed route. Query strings are fixed here, never copied. */
+/**
+ * The upstream path for an allowed route. Query strings are fixed here, never copied, and the
+ * client's API version is dropped: the daemon answers an unsupported version with 400 but keeps
+ * the connection open, which made the attach upgrade a smuggling channel (audit N1).
+ */
 export function upstreamPath(route: Route): string {
   switch (route.kind) {
     case 'ping':
       return '/_ping';
     case 'image':
-      return `${route.version}/images/${encodeURIComponent(route.image)}/json`;
+      return `/images/${encodeURIComponent(route.image)}/json`;
     case 'create':
-      return `${route.version}/containers/create?name=${route.name}`;
+      return `/containers/create?name=${route.name}`;
     case 'container': {
       const query = { attach: '?stderr=1&stdin=1&stdout=1&stream=1', wait: '?condition=removed', start: '', kill: '' };
-      return `${route.version}/containers/${route.ref}/${route.action}${query[route.action]}`;
+      return `/containers/${route.ref}/${route.action}${query[route.action]}`;
     }
   }
 }
@@ -118,26 +129,45 @@ export function sandboxCreateBody(input: unknown, allowedImages: ReadonlySet<str
   };
 }
 
+/** Sandbox containers alive at once. The judge runs a handful; this only bounds a compromised worker (audit N4). */
+export const MAX_LIVE_CONTAINERS = 32;
+
 /**
  * Containers this proxy created, by ID and by name. Entries outlive any run (the judge's
- * wall-clock budget is well under the TTL) and are pruned so the maps stay small.
+ * wall-clock budget is well under the TTL) and are pruned so the maps stay small. A container
+ * counts as live until its `wait?condition=removed` completes or the TTL passes.
  */
 export class Owned {
-  private readonly byRef = new Map<string, { id: string; until: number }>();
+  private readonly byRef = new Map<string, { id: string; until: number; live: boolean }>();
   private readonly ttlMs: number;
 
   constructor(ttlMs = 30 * 60 * 1000) {
     this.ttlMs = ttlMs;
   }
 
+  private prune(now: number): void {
+    for (const [key, entry] of this.byRef) if (entry.until <= now) this.byRef.delete(key);
+  }
+
   add(id: string, name: string, now = Date.now()): void {
-    const entry = { id, until: now + this.ttlMs };
+    const entry = { id, until: now + this.ttlMs, live: true };
     this.byRef.set(id, entry);
     this.byRef.set(name, entry);
   }
 
   has(ref: string, now = Date.now()): boolean {
-    for (const [key, entry] of this.byRef) if (entry.until <= now) this.byRef.delete(key);
+    this.prune(now);
     return this.byRef.has(ref);
+  }
+
+  /** The container was removed (its wait returned): it no longer counts against the cap. */
+  done(ref: string): void {
+    const entry = this.byRef.get(ref);
+    if (entry) entry.live = false;
+  }
+
+  liveCount(now = Date.now()): number {
+    this.prune(now);
+    return new Set([...this.byRef.values()].filter((e) => e.live)).size;
   }
 }

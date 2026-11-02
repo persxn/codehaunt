@@ -6,7 +6,7 @@ Database integration tests.
 | Path | What it does |
 |---|---|
 | `ledger.test.ts` | `audit_log`/`token_ledger` refuse UPDATE, DELETE and TRUNCATE (triggers); budget = sum of deltas |
-| `app-role.test.ts` | `codehaunt_app` can insert/read ledgers but not delete, update, truncate or disable triggers; no migration table |
+| `app-role.test.ts` | both roles insert/read ledgers but cannot delete, update, truncate or disable triggers; worker can't read accounts or write outside judging; old role dropped |
 
 ## Affects / depends on
 - Requires an in‑memory PGlite instance (used by CI) and the migration history applied.

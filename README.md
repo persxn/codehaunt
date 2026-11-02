@@ -4,7 +4,8 @@ AI‑assisted coding‑contest harness: participants solve problems by prompting
 
 ## Quick start (development)
 - Prereqs: Node 22, Docker.
-- `cp .env.example .env`, then set `POSTGRES_PASSWORD` and `APP_DB_PASSWORD` (each `openssl rand -hex 16`) and put the
+- `cp .env.example .env`, then set `POSTGRES_PASSWORD`, `WEB_DB_PASSWORD` and `WORKER_DB_PASSWORD` (each
+  `openssl rand -hex 16`) and put the
   Postgres password in `DATABASE_URL`.
 - `make runners` – build sandbox runner images.
 - `make dev` – start Postgres, apply migrations, seed demo data.

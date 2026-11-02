@@ -5,7 +5,7 @@ Server-side helpers for the web app.
 ## Contents
 | Path | What it does |
 |---|---|
-| `config.ts` | validates `DATABASE_URL`, `NODE_ENV`, `COOKIE_SECURE` at startup; exits naming the bad key |
+| `config.ts` | validates `DATABASE_URL`, `NODE_ENV`, `COOKIE_SECURE` (empty = unset) at startup; exits naming the bad key; `parseConfig` for tests |
 | `http.ts` | request IDs (`cf-ray` or UUID), `apiError` (the one `ApiError` envelope), `clientIp` (`cf-connecting-ip` only) |
 | `session.ts` | `currentUser()`: resolves the session cookie to a user on the server (route handlers, pages) |
 

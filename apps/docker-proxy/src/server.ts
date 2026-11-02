@@ -7,9 +7,26 @@ import http, { type IncomingMessage, type ServerResponse } from 'node:http';
 import net from 'node:net';
 import type { Duplex } from 'node:stream';
 
-import { Owned, parseRoute, runnerImages, sandboxCreateBody, upstreamPath, type Route } from './policy.ts';
+import {
+  MAX_LIVE_CONTAINERS,
+  Owned,
+  parseRoute,
+  runnerImages,
+  sandboxCreateBody,
+  upstreamPath,
+  type Route,
+} from './policy.ts';
 
 const MAX_BODY_BYTES = 64 * 1024;
+const MAX_CONNECTIONS = 256;
+/** How long the daemon gets to accept an attach before the proxy gives up. */
+const UPGRADE_TIMEOUT_MS = 10_000;
+/**
+ * `docker run -i` half-closes after sending the job (stdin done) and keeps reading the output, so
+ * a client half-close is normal. This bounds how long such a stream may then stay open; far above
+ * the judge's per-run wall-clock budget.
+ */
+const HALF_OPEN_LIMIT_MS = 10 * 60 * 1000;
 
 export interface ProxyOptions {
   socketPath: string;
@@ -49,10 +66,30 @@ export function createProxy(options: ProxyOptions): http.Server {
     if (!route) return 'not an allowed Docker API call';
     if (route.kind === 'image' && !allowedImages.has(route.image)) return 'not a runner image';
     if (route.kind === 'container' && !owned.has(route.ref)) return 'not a container this proxy created';
+    if (route.kind === 'create' && owned.liveCount() >= MAX_LIVE_CONTAINERS) return 'too many sandbox containers';
     return null;
   }
 
-  const server = http.createServer(async (req, res) => {
+  const server = http.createServer((req, res) => {
+    // Nothing a client sends may take the proxy down: a restart forgets owned containers (audit N3).
+    handle(req, res).catch((error: Error) => {
+      log({ msg: 'handler error', error: error.message });
+      if (!res.headersSent) refuse(res, 500, 'codehaunt docker-proxy: internal error');
+      else res.destroy();
+    });
+  });
+  server.maxConnections = MAX_CONNECTIONS;
+
+  // Upgraded attach streams leave the HTTP server's bookkeeping; close() must end them too.
+  const attached = new Set<Duplex>();
+  const closeServer = server.close.bind(server);
+  server.close = (callback?: (error?: Error) => void) => {
+    for (const socket of attached) socket.destroy();
+    return closeServer(callback);
+  };
+  server.on('clientError', (_error, socket) => socket.destroy());
+
+  async function handle(req: IncomingMessage, res: ServerResponse): Promise<void> {
     const route = parseRoute(req.method ?? '', req.url ?? '');
     const reason = denial(route) ?? (route?.kind === 'container' && route.action === 'attach' ? 'attach must upgrade' : null);
     if (reason) {
@@ -76,6 +113,8 @@ export function createProxy(options: ProxyOptions): http.Server {
 
     const upstream = http.request(
       {
+        // A fresh daemon connection per request: nothing is ever reused or pipelined on it.
+        agent: false,
         socketPath: options.socketPath,
         method: req.method,
         path: upstreamPath(route!),
@@ -97,6 +136,7 @@ export function createProxy(options: ProxyOptions): http.Server {
           });
           return;
         }
+        if (route!.kind === 'container' && route!.action === 'wait') up.on('end', () => owned.done(route!.ref));
         res.writeHead(up.statusCode ?? 502, up.headers);
         // /wait answers with headers long before its body; the CLI starts the container only once it sees them.
         res.flushHeaders();
@@ -109,9 +149,14 @@ export function createProxy(options: ProxyOptions): http.Server {
       else res.destroy();
     });
     upstream.end(body);
-  });
+  }
 
-  // `docker run -i` attaches stdin/stdout over an HTTP upgrade, then speaks raw bytes.
+  /*
+   * `docker run -i` attaches stdin/stdout over an HTTP upgrade, then speaks raw bytes. Nothing the
+   * client sends is forwarded until the daemon has answered 101: before that, the daemon is still
+   * parsing HTTP, and extra bytes would be read as a second, unchecked request (audit N1). After
+   * 101 the bytes are the container's stdin.
+   */
   server.on('upgrade', (req: IncomingMessage, client: Duplex, head: Buffer) => {
     const route = parseRoute(req.method ?? '', req.url ?? '');
     const reason = denial(route) ?? (route?.kind === 'container' && route.action === 'attach' ? null : 'only attach may upgrade');
@@ -120,21 +165,54 @@ export function createProxy(options: ProxyOptions): http.Server {
       client.end('HTTP/1.1 403 Forbidden\r\nContent-Length: 0\r\nConnection: close\r\n\r\n');
       return;
     }
-    const daemon = net.connect(options.socketPath, () => {
-      daemon.write(
-        `POST ${upstreamPath(route!)} HTTP/1.1\r\nHost: docker\r\nContent-Length: 0\r\n` +
-          'Connection: Upgrade\r\nUpgrade: tcp\r\n\r\n',
-      );
-      if (head.length > 0) daemon.write(head);
-      daemon.pipe(client);
-      client.pipe(daemon);
-    });
+    client.pause();
+    const daemon = net.connect(options.socketPath);
+    attached.add(client);
     const close = () => {
+      attached.delete(client);
       daemon.destroy();
       client.destroy();
     };
-    daemon.on('error', close);
-    client.on('error', close);
+    client.on('close', () => daemon.destroy());
+    // Either side failing or closing ends both; the daemon ending its stream (container gone) does too.
+    for (const side of [daemon, client]) {
+      side.on('error', close);
+      side.on('close', close);
+    }
+    daemon.on('end', close);
+    client.on('end', () => setTimeout(close, HALF_OPEN_LIMIT_MS).unref());
+    daemon.setTimeout(UPGRADE_TIMEOUT_MS, () => {
+      log({ msg: 'refused', url: req.url, reason: 'daemon did not accept attach in time' });
+      close();
+    });
+
+    let reply = Buffer.alloc(0);
+    const onReply = (chunk: Buffer) => {
+      reply = Buffer.concat([reply, chunk]);
+      const end = reply.indexOf('\r\n\r\n');
+      if (end < 0) {
+        if (reply.length > 16 * 1024) close();
+        return;
+      }
+      daemon.off('data', onReply);
+      daemon.setTimeout(0);
+      if (!/^HTTP\/1\.1 101 /.test(reply.subarray(0, 16).toString('latin1'))) {
+        log({ msg: 'refused', url: req.url, reason: 'daemon did not upgrade', status: reply.subarray(0, 12).toString('latin1') });
+        client.end('HTTP/1.1 502 Bad Gateway\r\nContent-Length: 0\r\nConnection: close\r\n\r\n');
+        daemon.destroy();
+        return;
+      }
+      client.write(reply); // the 101 head plus any stream bytes already received
+      if (head.length > 0) daemon.write(head);
+      daemon.pipe(client);
+      client.pipe(daemon);
+      client.resume();
+    };
+    daemon.on('data', onReply);
+    daemon.write(
+      `POST ${upstreamPath(route!)} HTTP/1.1\r\nHost: docker\r\nContent-Length: 0\r\n` +
+        'Connection: Upgrade\r\nUpgrade: tcp\r\n\r\n',
+    );
   });
 
   return server;

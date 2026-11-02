@@ -25,5 +25,5 @@ Docker backend. Since ADR-019 it has no Docker socket: it talks to `apps/docker-
 - `CodeRunner` is the only path by which generated code executes; `DockerCodeRunner` divides out the judge's `TIME_MULTIPLIER`.
 - `RunResult.outputExcerpt` and `internalError` can carry participant-controlled text (an echoed hidden input, or a
   forged runner reply: verified, it yields IE, never AC). Never show `RunResult` to participants as is (WP-03).
-- In compose: read-only filesystem, all capabilities dropped, only the internal `db` and `sandbox` networks (no
-  internet, no tailnet), DB login `codehaunt_app`. `node_modules` is root-owned so it cannot be modified at runtime.
+- In compose: 1 GiB memory and 256 processes max, read-only filesystem, all capabilities dropped, only the internal `db` and `sandbox` networks (no
+  internet, no tailnet), DB login `codehaunt_worker` (read-mostly; no accounts). `node_modules` is root-owned so it cannot be modified at runtime.

@@ -17,12 +17,14 @@ Database layer – Prisma client, schema, and migrations.
 ## Affects / depends on
 - Depends on PostgreSQL (runtime) and `@prisma/client`.
 - Changing schema requires a new migration and regeneration of the client.
-- Roles: only `migrate` holds the owner (`POSTGRES_USER`); web and worker log in as `codehaunt_app` (`APP_DB_PASSWORD`).
-  A new table is granted to `codehaunt_app` on the next deploy; add it to `APPEND_ONLY_TABLES` if it is a ledger.
+- Roles: only `migrate` holds the owner (`POSTGRES_USER`). web logs in as `codehaunt_web` (`WEB_DB_PASSWORD`), worker
+  as `codehaunt_worker` (`WORKER_DB_PASSWORD`). A new table is granted on the next deploy: read/write for web, read-only
+  for worker until added to `WORKER_WRITES`; add it to `APPEND_ONLY_TABLES` if it is a ledger.
 
 ## Entry points & how to test
 - `npm run migrate:deploy -w @codehaunt/db` applies migrations.
-- `npm run provision-app-role -w @codehaunt/db` (re)creates `codehaunt_app` (needs owner `DATABASE_URL`, `APP_DB_PASSWORD`).
+- `npm run provision-app-role -w @codehaunt/db` (re)creates both roles (needs owner `DATABASE_URL`, `WEB_DB_PASSWORD`,
+  `WORKER_DB_PASSWORD`).
 - `npm test -w @codehaunt/db` runs DB tests.
 
 ## Gotchas
