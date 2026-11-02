@@ -1,0 +1,20 @@
+{
+  "name": "@codehaunt/auth",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "main": "./src/index.ts",
+  "types": "./src/index.ts",
+  "exports": {
+    ".": "./src/index.ts",
+    "./policy": "./src/policy.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit -p tsconfig.json",
+    "test": "npm run typecheck && node --test --experimental-strip-types test/*.test.ts"
+  },
+  "dependencies": {
+    "@codehaunt/db": "*",
+    "@node-rs/argon2": "^2.0.2"
+  }
+}
