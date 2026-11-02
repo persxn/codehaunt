@@ -13,7 +13,8 @@ const SANDBOX_TMPFS = {
   '/box': 'rw,exec,nosuid,size=64m,mode=1777',
   '/tmp': 'rw,noexec,nosuid,size=8m,mode=1777',
 };
-const MAX_MEMORY_BYTES = 4 * 1024 ** 3;
+/** One sandbox's cgroup ceiling: the contract's 1 GiB run limit plus compile and runner headroom. */
+const MAX_MEMORY_BYTES = 2 * 1024 ** 3;
 const MAX_PIDS = 256;
 const MAX_NANO_CPUS = 4e9;
 
@@ -129,30 +130,67 @@ export function sandboxCreateBody(input: unknown, allowedImages: ReadonlySet<str
   };
 }
 
-/** Sandbox containers alive at once. The judge runs a handful; this only bounds a compromised worker (audit N4). */
+/**
+ * Host protection against a compromised worker (re-audit N4, R3). The DGX has 119 GiB shared with
+ * the models; sandboxes together may hold at most 24 GiB, and no more than 32 at once.
+ */
 export const MAX_LIVE_CONTAINERS = 32;
+export const SANDBOX_MEMORY_BUDGET_BYTES = 24 * 1024 ** 3;
+/**
+ * Longest a sandbox may live. The judge's own worst case is 200 tests x (10 s + 0.5 s) plus compile,
+ * about 36 minutes; past this the proxy removes the container itself.
+ */
+export const MAX_RUN_MS = 40 * 60 * 1000;
+
+interface Entry {
+  id: string;
+  memory: number;
+  created: number;
+  live: boolean;
+}
 
 /**
- * Containers this proxy created, by ID and by name. Entries outlive any run (the judge's
- * wall-clock budget is well under the TTL) and are pruned so the maps stay small. A container
- * counts as live until its `wait?condition=removed` completes or the TTL passes.
+ * Containers this proxy created, by ID and by name. A container counts as live (against the count
+ * and memory caps) until its removal is seen or the proxy removes it. Entries are kept a little
+ * past MAX_RUN_MS so late kill/wait calls on them are still recognised.
  */
 export class Owned {
-  private readonly byRef = new Map<string, { id: string; until: number; live: boolean }>();
-  private readonly ttlMs: number;
+  private readonly byRef = new Map<string, Entry>();
+  private readonly keepMs: number;
 
-  constructor(ttlMs = 30 * 60 * 1000) {
-    this.ttlMs = ttlMs;
+  constructor(keepMs = MAX_RUN_MS + 5 * 60 * 1000) {
+    this.keepMs = keepMs;
   }
 
   private prune(now: number): void {
-    for (const [key, entry] of this.byRef) if (entry.until <= now) this.byRef.delete(key);
+    for (const [key, entry] of this.byRef) if (!entry.live && entry.created + this.keepMs <= now) this.byRef.delete(key);
   }
 
-  add(id: string, name: string, now = Date.now()): void {
-    const entry = { id, until: now + this.ttlMs, live: true };
+  /**
+   * Claims a slot before the create goes upstream, so concurrent creates cannot all pass the caps.
+   * False when it does not fit.
+   */
+  reserve(name: string, memory: number, now = Date.now()): boolean {
+    if (this.byRef.has(name) || !this.fits(memory)) return false;
+    this.byRef.set(name, { id: '', memory, created: now, live: true });
+    return true;
+  }
+
+  /** The daemon created it: recognise it by ID too. */
+  confirm(name: string, id: string): void {
+    const entry = this.byRef.get(name);
+    if (!entry) return;
+    entry.id = id;
     this.byRef.set(id, entry);
-    this.byRef.set(name, entry);
+  }
+
+  /** The create failed: give the slot back. */
+  cancel(name: string): void {
+    if (!this.byRef.get(name)?.id) this.byRef.delete(name);
+  }
+
+  add(id: string, name: string, memory: number, now = Date.now()): void {
+    if (this.reserve(name, memory, now)) this.confirm(name, id);
   }
 
   has(ref: string, now = Date.now()): boolean {
@@ -160,14 +198,32 @@ export class Owned {
     return this.byRef.has(ref);
   }
 
-  /** The container was removed (its wait returned): it no longer counts against the cap. */
+  idOf(ref: string): string | undefined {
+    return this.byRef.get(ref)?.id;
+  }
+
+  /** The container is gone: it no longer counts against the caps. */
   done(ref: string): void {
     const entry = this.byRef.get(ref);
     if (entry) entry.live = false;
   }
 
-  liveCount(now = Date.now()): number {
-    this.prune(now);
-    return new Set([...this.byRef.values()].filter((e) => e.live)).size;
+  private live(): Entry[] {
+    return [...new Set([...this.byRef.values()].filter((e) => e.live))];
+  }
+
+  /** Whether one more sandbox of `memory` bytes fits under both caps. */
+  fits(memory: number): boolean {
+    const live = this.live();
+    return live.length < MAX_LIVE_CONTAINERS && live.reduce((sum, e) => sum + e.memory, memory) <= SANDBOX_MEMORY_BUDGET_BYTES;
+  }
+
+  liveCount(): number {
+    return this.live().length;
+  }
+
+  /** Live containers older than MAX_RUN_MS: the proxy removes these itself. */
+  overdue(now = Date.now()): string[] {
+    return this.live().filter((e) => e.id && now - e.created > MAX_RUN_MS).map((e) => e.id);
   }
 }

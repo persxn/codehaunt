@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { after, before, test } from 'node:test';
 
-import { appRoleStatements, WEB_ROLE, WORKER_ROLE } from '../src/app-role.ts';
+import { appRoleStatements, TABLE_ACCESS, WEB_ROLE, WORKER_ROLE } from '../src/app-role.ts';
 import { createTestDatabase, type TestDatabase } from '../src/testing.ts';
 
 const PASSWORDS = { web: 'web-password-0123456', worker: 'worker-password-012345' };
@@ -79,4 +79,24 @@ test('passwords that would need quoting, or a shared password, are refused', () 
   assert.throws(() => appRoleStatements({ ...PASSWORDS, web: "short'; DROP ROLE x; --" }, 'postgres'), /WEB_DB_PASSWORD/);
   assert.throws(() => appRoleStatements({ web: PASSWORDS.web, worker: PASSWORDS.web }, 'postgres'), /must differ/);
   assert.throws(() => appRoleStatements(PASSWORDS, 'bad;name'), /database name/);
+});
+
+test('every table in the schema is classified, and every classified table exists', async () => {
+  const { rows } = await db.pglite.query<{ name: string }>(
+    `SELECT tablename AS name FROM pg_tables WHERE schemaname = 'public' AND tablename <> '_prisma_migrations'`,
+  );
+  const actual = rows.map((r) => r.name).sort();
+  assert.deepEqual(actual, Object.keys(TABLE_ACCESS).sort(), 'add the new table to TABLE_ACCESS in src/app-role.ts');
+});
+
+test('a table nobody classified gets no grants at all', async () => {
+  await db.pglite.exec('CREATE TABLE unclassified (id int)');
+  try {
+    for (const sql of appRoleStatements(PASSWORDS, 'postgres')) await db.pglite.exec(sql);
+    for (const role of [WEB_ROLE, WORKER_ROLE]) {
+      assert.match((await as(role, 'SELECT * FROM unclassified')) ?? '', /permission denied/, role);
+    }
+  } finally {
+    await db.pglite.exec('DROP TABLE unclassified');
+  }
 });

@@ -1,10 +1,10 @@
 /**
- * The roles web and worker connect as (audit F2, N5). Neither is a superuser or a table owner, so
+ * The roles web and worker connect as (audit F2, N5, R4). Neither is a superuser or a table owner, so
  * neither can disable the append-only triggers, TRUNCATE, or run COPY ... TO PROGRAM. Only `migrate`
  * holds the owner (POSTGRES_USER) credentials.
  *
- * Re-applied after every `migrate deploy`, so tables added by later migrations are covered: web gets
- * them read/write, worker read-only until a WP adds them to WORKER_WRITES.
+ * Every table is classified in TABLE_ACCESS. Re-applied after every `migrate deploy`; a table that is
+ * not classified gets no grants at all, and test/app-role.test.ts fails until someone decides.
  */
 
 export const WEB_ROLE = 'codehaunt_web';
@@ -12,13 +12,40 @@ export const WORKER_ROLE = 'codehaunt_worker';
 /** Replaced by the two roles above; dropped on the next provisioning run. */
 const LEGACY_ROLE = 'codehaunt_app';
 
-/** Insert and read only, for every role; the triggers are the second wall, these grants the first. */
-export const APPEND_ONLY_TABLES = ['audit_log', 'token_ledger'] as const;
+/** none · read · append (read + insert; ledgers) · write (read, insert, update, delete). */
+export type Access = 'none' | 'read' | 'append' | 'write';
 
-/** The worker never reads accounts or login sessions (password hashes, session tokens' hashes). */
-const WORKER_HIDDEN = ['users', 'auth_sessions'] as const;
-/** What judging writes. WP-03/05/07 extend this when they add worker jobs. */
-export const WORKER_WRITES = ['submissions', 'verdicts', 'judge_reviews'] as const;
+/**
+ * Who may do what, per table. web serves participants and the admin console, so it edits problems,
+ * hidden tests and accounts: participant routes must still never return hidden tests (WP-03 payload
+ * scan) and role changes go only through audited admin routes (WP-04). The worker judges: it reads
+ * what it needs, never accounts or sessions, and writes only judging results. WP-03/05/07 adjust this.
+ */
+export const TABLE_ACCESS: Readonly<Record<string, { web: Access; worker: Access }>> = {
+  users: { web: 'write', worker: 'none' },
+  auth_sessions: { web: 'write', worker: 'none' },
+  events: { web: 'write', worker: 'read' },
+  problems: { web: 'write', worker: 'read' },
+  test_cases: { web: 'write', worker: 'read' },
+  participants: { web: 'write', worker: 'read' },
+  chat_sessions: { web: 'write', worker: 'read' },
+  prompt_turns: { web: 'write', worker: 'read' },
+  code_versions: { web: 'write', worker: 'read' },
+  submissions: { web: 'write', worker: 'write' },
+  verdicts: { web: 'write', worker: 'write' },
+  judge_reviews: { web: 'write', worker: 'write' },
+  score_overrides: { web: 'write', worker: 'read' },
+  // Ledgers: append-only for everyone; the triggers are the second wall, these grants the first.
+  token_ledger: { web: 'append', worker: 'read' },
+  audit_log: { web: 'append', worker: 'append' },
+};
+
+const PRIVILEGES: Record<Access, string | null> = {
+  none: null,
+  read: 'SELECT',
+  append: 'SELECT, INSERT',
+  write: 'SELECT, INSERT, UPDATE, DELETE',
+};
 
 const PASSWORD_PATTERN = /^[A-Za-z0-9_-]{16,128}$/;
 const IDENT_PATTERN = /^[a-z_][a-z0-9_]{0,62}$/;
@@ -55,7 +82,16 @@ export function appRoleStatements(passwords: RolePasswords, database: string): s
   checkPassword('WORKER_DB_PASSWORD', passwords.worker);
   if (passwords.web === passwords.worker) throw new Error('WEB_DB_PASSWORD and WORKER_DB_PASSWORD must differ');
   if (!IDENT_PATTERN.test(database)) throw new Error(`unexpected database name: ${database}`);
-  const ledgers = APPEND_ONLY_TABLES.join(', ');
+  const grants = Object.entries(TABLE_ACCESS).flatMap(([table, access]) =>
+    (
+      [
+        [WEB_ROLE, access.web],
+        [WORKER_ROLE, access.worker],
+      ] as const
+    )
+      .filter(([, level]) => PRIVILEGES[level])
+      .map(([role, level]) => `GRANT ${PRIVILEGES[level]} ON TABLE ${table} TO ${role}`),
+  );
   return [
     `DO $$ BEGIN
        IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = '${LEGACY_ROLE}') THEN
@@ -64,22 +100,10 @@ export function appRoleStatements(passwords: RolePasswords, database: string): s
      END $$`,
 
     ...loginRole(WEB_ROLE, passwords.web, database),
-    `GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA public TO ${WEB_ROLE}`,
-    `GRANT USAGE, SELECT ON ALL SEQUENCES IN SCHEMA public TO ${WEB_ROLE}`,
-
     ...loginRole(WORKER_ROLE, passwords.worker, database),
-    `REVOKE ALL ON ALL TABLES IN SCHEMA public FROM ${WORKER_ROLE}`,
-    `GRANT SELECT ON ALL TABLES IN SCHEMA public TO ${WORKER_ROLE}`,
-    `REVOKE ALL ON TABLE ${WORKER_HIDDEN.join(', ')} FROM ${WORKER_ROLE}`,
-    `GRANT INSERT, UPDATE ON TABLE ${WORKER_WRITES.join(', ')} TO ${WORKER_ROLE}`,
-    `GRANT INSERT ON TABLE audit_log TO ${WORKER_ROLE}`,
-    `GRANT USAGE, SELECT ON ALL SEQUENCES IN SCHEMA public TO ${WORKER_ROLE}`,
-
-    `DO $$ BEGIN
-       IF to_regclass('_prisma_migrations') IS NOT NULL THEN
-         REVOKE ALL ON TABLE _prisma_migrations FROM ${WEB_ROLE}, ${WORKER_ROLE};
-       END IF;
-     END $$`,
-    `REVOKE UPDATE, DELETE, TRUNCATE ON TABLE ${ledgers} FROM ${WEB_ROLE}, ${WORKER_ROLE}`,
+    // Start from nothing (this also drops grants a table lost since the last deploy), then grant per table.
+    `REVOKE ALL ON ALL TABLES IN SCHEMA public FROM ${WEB_ROLE}, ${WORKER_ROLE}`,
+    ...grants,
+    `GRANT USAGE, SELECT ON ALL SEQUENCES IN SCHEMA public TO ${WEB_ROLE}, ${WORKER_ROLE}`,
   ];
 }

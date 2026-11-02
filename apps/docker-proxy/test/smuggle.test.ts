@@ -1,7 +1,7 @@
 /**
- * Regression for audit N1: nothing may reach the daemon behind an attach upgrade until the daemon
- * has answered 101. Uses a fake daemon that behaves like dockerd 29 on a refused upgrade (400 and
- * keep-alive, so the next bytes would parse as a new request). Needs no Docker.
+ * Proxy behaviour against a fake daemon (no Docker needed). N1: nothing may reach the daemon behind
+ * an attach upgrade until it has answered 101; the fake behaves like dockerd 29 on a refused upgrade
+ * (400 and keep-alive). R1: an abandoned wait removes its container. R2: refused upgrades close fully.
  */
 import assert from 'node:assert/strict';
 import { mkdtempSync, rmSync } from 'node:fs';
@@ -22,9 +22,12 @@ let upgradeStatus = 400;
 let daemon: net.Server;
 let proxy: ReturnType<typeof createProxy>;
 let port = 0;
+const daemonConns = new Set<net.Socket>();
 
 before(async () => {
   daemon = net.createServer((conn) => {
+    daemonConns.add(conn);
+    conn.on('close', () => daemonConns.delete(conn));
     let buffer = '';
     conn.on('data', (data) => {
       buffer += data;
@@ -36,6 +39,15 @@ before(async () => {
         buffer = buffer.slice(end + 4 + length);
         const line = head.split('\r\n')[0]!;
         daemonSaw.push(line);
+        if (line.includes('/wait')) {
+          // Like dockerd for a running container: headers at once, the body only when it is removed.
+          conn.write('HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nTransfer-Encoding: chunked\r\n\r\n');
+          continue;
+        }
+        if (line.startsWith('DELETE')) {
+          conn.write('HTTP/1.1 204 No Content\r\n\r\n');
+          continue;
+        }
         if (line.includes('/attach')) {
           if (upgradeStatus === 101) {
             conn.write('HTTP/1.1 101 UPGRADED\r\nConnection: Upgrade\r\nUpgrade: tcp\r\n\r\n');
@@ -69,7 +81,9 @@ before(async () => {
 });
 
 after(() => {
+  proxy?.closeAllConnections();
   proxy?.close();
+  for (const conn of daemonConns) conn.destroy();
   daemon?.close();
   rmSync(dir, { recursive: true, force: true });
 });
@@ -124,4 +138,30 @@ test('malformed request lines do not take the proxy down', async () => {
   }
   const ping = await fetch(`http://127.0.0.1:${port}/_ping`);
   assert.equal(ping.status, 201, 'still answering (the fake daemon replies 201 to everything else)');
+});
+
+test('an abandoned wait removes the container (re-audit R1)', async () => {
+  daemonSaw.length = 0;
+  const controller = new AbortController();
+  const waiting = fetch(`http://127.0.0.1:${port}/v1.47/containers/${ID}/wait?condition=removed`, {
+    method: 'POST',
+    signal: controller.signal,
+  }).catch(() => null);
+  await new Promise((resolve) => setTimeout(resolve, 200));
+  controller.abort();
+  await waiting;
+  await new Promise((resolve) => setTimeout(resolve, 300));
+  assert.ok(daemonSaw.includes(`DELETE /containers/${ID}?force=1 HTTP/1.1`), daemonSaw.join(' | '));
+});
+
+test('a refused upgrade is closed, not left half-open (re-audit R2)', async () => {
+  const closed = await new Promise<boolean>((resolve) => {
+    const c = net.connect(port, '127.0.0.1', () =>
+      c.write('POST /v1.47/containers/' + 'c'.repeat(64) + '/attach HTTP/1.1\r\nHost: x\r\nConnection: Upgrade\r\nUpgrade: tcp\r\n\r\n'),
+    );
+    c.on('data', () => {});
+    c.on('close', () => resolve(true));
+    setTimeout(() => resolve(false), 3000); // the client never ends its side; the proxy must
+  });
+  assert.ok(closed);
 });

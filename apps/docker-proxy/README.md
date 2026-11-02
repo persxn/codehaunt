@@ -30,5 +30,8 @@ A compromised worker can at most start sandbox containers: no network, read-only
 - Attach (HTTP upgrade): nothing from the client is forwarded until the daemon answers 101; any other answer ends both
   connections with 502. The client's API version is never forwarded (re-audit N1: the daemon keeps a connection open
   after a 400 for an unsupported version, which allowed a smuggled second request).
-- Caps: 32 live sandbox containers, 256 connections, a 64 KiB create body; a half-closed attach stream is ended after
-  10 minutes. Malformed requests are refused, never crash the process (restart would forget owned containers).
+- Caps: 32 live sandboxes and 24 GiB of sandbox memory in total (2 GiB each), 256 connections, a 64 KiB create body.
+  A create reserves its slot before it goes upstream. A sandbox whose `wait` is abandoned (the judge killed an
+  overrunning run, or the worker restarted) is force-removed at once; any sandbox older than 40 minutes (above the
+  judge's worst case, ~36) is removed by the proxy itself. Refused upgrades are closed fully; a half-closed attach
+  stream is ended after 10 minutes. Malformed requests are refused, never crash the process.

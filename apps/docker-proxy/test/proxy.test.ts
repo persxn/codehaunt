@@ -145,6 +145,35 @@ test('an attach with an unsupported API version smuggles nothing (audit N1)', { 
   }
 });
 
+test('an abandoned wait makes the proxy remove the container (re-audit R1)', { skip }, async () => {
+  const name = `cjudge-${crypto.randomUUID()}`;
+  const created = await viaProxy('POST', `/v1.47/containers/create?name=${name}`, {
+    Image: 'codehaunt-runner:1',
+    Cmd: ['python3', '/opt/cjudge/runner.py'],
+    HostConfig: { Memory: 268435456, MemorySwap: 268435456, PidsLimit: 16, NanoCpus: 1e9 },
+  });
+  assert.equal(created.status, 201);
+  try {
+    const { port } = server.address() as AddressInfo;
+    const controller = new AbortController();
+    const waiting = fetch(`http://127.0.0.1:${port}/v1.47/containers/${created.json.Id}/wait?condition=removed`, {
+      method: 'POST',
+      signal: controller.signal,
+    }).catch(() => null);
+    await new Promise((resolve) => setTimeout(resolve, 300));
+    controller.abort();
+    await waiting;
+    let status = 200;
+    for (let i = 0; i < 20 && status !== 404; i++) {
+      await new Promise((resolve) => setTimeout(resolve, 250));
+      status = (await direct('GET', `/containers/${created.json.Id}/json`)).status;
+    }
+    assert.equal(status, 404, 'the container is gone');
+  } finally {
+    await direct('DELETE', `/containers/${created.json.Id}?force=1`);
+  }
+});
+
 test('the Docker CLI gets a clear refusal for anything else', { skip }, async () => {
   const env = { ...process.env, DOCKER_HOST: proxyHost };
   for (const args of [['ps'], ['run', '--rm', 'alpine', 'true'], ['exec', 'x', 'true'], ['image', 'inspect', 'postgres']]) {

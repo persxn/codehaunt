@@ -8,7 +8,6 @@ import net from 'node:net';
 import type { Duplex } from 'node:stream';
 
 import {
-  MAX_LIVE_CONTAINERS,
   Owned,
   parseRoute,
   runnerImages,
@@ -40,6 +39,12 @@ function refuse(res: ServerResponse, status: number, message: string): void {
   res.writeHead(status, { 'content-type': 'application/json' }).end(JSON.stringify({ message }));
 }
 
+/** Ends a refused upgrade completely: a half-closed socket would count against maxConnections (re-audit R2). */
+function refuseUpgrade(client: Duplex, status: string): void {
+  client.end(`HTTP/1.1 ${status}\r\nContent-Length: 0\r\nConnection: close\r\n\r\n`, () => client.destroy());
+  setTimeout(() => client.destroy(), 1000).unref();
+}
+
 function readBody(req: IncomingMessage): Promise<Buffer> {
   return new Promise((resolve, reject) => {
     const chunks: Buffer[] = [];
@@ -66,7 +71,6 @@ export function createProxy(options: ProxyOptions): http.Server {
     if (!route) return 'not an allowed Docker API call';
     if (route.kind === 'image' && !allowedImages.has(route.image)) return 'not a runner image';
     if (route.kind === 'container' && !owned.has(route.ref)) return 'not a container this proxy created';
-    if (route.kind === 'create' && owned.liveCount() >= MAX_LIVE_CONTAINERS) return 'too many sandbox containers';
     return null;
   }
 
@@ -84,6 +88,7 @@ export function createProxy(options: ProxyOptions): http.Server {
   const attached = new Set<Duplex>();
   const closeServer = server.close.bind(server);
   server.close = (callback?: (error?: Error) => void) => {
+    clearInterval(reaper);
     for (const socket of attached) socket.destroy();
     return closeServer(callback);
   };
@@ -102,13 +107,29 @@ export function createProxy(options: ProxyOptions): http.Server {
     try {
       const raw = await readBody(req);
       if (route!.kind === 'create') {
-        body = Buffer.from(JSON.stringify(sandboxCreateBody(JSON.parse(raw.toString('utf8')), allowedImages)));
+        const create = sandboxCreateBody(JSON.parse(raw.toString('utf8')), allowedImages);
+        const memory = (create.HostConfig as { Memory: number }).Memory;
+        if (!owned.reserve(route!.name, memory)) throw new Error('sandbox capacity reached (count or memory)');
+        body = Buffer.from(JSON.stringify(create));
       } else if (raw.length > 0) {
         throw new Error('unexpected request body');
       } else body = raw;
     } catch (error) {
       log({ msg: 'refused', method: req.method, url: req.url, reason: (error as Error).message });
       return refuse(res, 403, `codehaunt docker-proxy: ${(error as Error).message}`);
+    }
+
+    // The CLI dropped a wait (the judge killed an overrunning run, or the worker restarted) before the
+    // container was removed: nobody will collect it, so remove it now and free its slot (re-audit R1).
+    let waitFinished = false;
+    if (route!.kind === 'container' && route!.action === 'wait') {
+      const ref = route!.ref;
+      res.on('close', () => {
+        if (!waitFinished) {
+          upstream.destroy();
+          removeContainer(ref, 'wait abandoned');
+        }
+      });
     }
 
     const upstream = http.request(
@@ -121,6 +142,7 @@ export function createProxy(options: ProxyOptions): http.Server {
         headers: { host: 'docker', 'content-type': 'application/json', 'content-length': body.length },
       },
       (up) => {
+        if (route!.kind === 'create' && up.statusCode !== 201) owned.cancel(route!.name);
         if (route!.kind === 'create' && up.statusCode === 201) {
           const chunks: Buffer[] = [];
           up.on('data', (c: Buffer) => chunks.push(c));
@@ -128,15 +150,22 @@ export function createProxy(options: ProxyOptions): http.Server {
             const text = Buffer.concat(chunks).toString('utf8');
             try {
               const id = (JSON.parse(text) as { Id?: unknown }).Id;
-              if (typeof id === 'string' && /^[0-9a-f]{64}$/.test(id)) owned.add(id, route!.name);
+              if (typeof id === 'string' && /^[0-9a-f]{64}$/.test(id)) owned.confirm(route!.name, id);
+              else owned.cancel(route!.name);
             } catch {
               // An unparsable reply registers nothing, so every later call on it is refused.
+              owned.cancel(route!.name);
             }
             res.writeHead(201, { 'content-type': 'application/json' }).end(text);
           });
           return;
         }
-        if (route!.kind === 'container' && route!.action === 'wait') up.on('end', () => owned.done(route!.ref));
+        if (route!.kind === 'container' && route!.action === 'wait') {
+          up.on('end', () => {
+            waitFinished = true;
+            owned.done(route!.ref);
+          });
+        }
         res.writeHead(up.statusCode ?? 502, up.headers);
         // /wait answers with headers long before its body; the CLI starts the container only once it sees them.
         res.flushHeaders();
@@ -145,11 +174,34 @@ export function createProxy(options: ProxyOptions): http.Server {
     );
     upstream.on('error', (error) => {
       log({ msg: 'upstream error', error: error.message });
+      if (route!.kind === 'create') owned.cancel(route!.name);
       if (!res.headersSent) refuse(res, 502, 'codehaunt docker-proxy: Docker daemon unavailable');
       else res.destroy();
     });
     upstream.end(body);
   }
+
+  /** Force-removes an owned container and frees its slot once the daemon confirms. */
+  function removeContainer(ref: string, why: string): void {
+    const id = owned.idOf(ref);
+    if (!id) return;
+    log({ msg: 'removing container', id, why });
+    const req = http.request(
+      { agent: false, socketPath: options.socketPath, method: 'DELETE', path: `/containers/${id}?force=1`, headers: { host: 'docker' } },
+      (up) => {
+        up.resume();
+        if (up.statusCode === 204 || up.statusCode === 404) owned.done(id);
+      },
+    );
+    req.on('error', (error) => log({ msg: 'remove failed', id, error: error.message }));
+    req.end();
+  }
+
+  // Nothing outlives MAX_RUN_MS, whatever the worker asked for (re-audit R3).
+  const reaper = setInterval(() => {
+    for (const id of owned.overdue()) removeContainer(id, 'exceeded MAX_RUN_MS');
+  }, 30_000);
+  reaper.unref();
 
   /*
    * `docker run -i` attaches stdin/stdout over an HTTP upgrade, then speaks raw bytes. Nothing the
@@ -162,7 +214,7 @@ export function createProxy(options: ProxyOptions): http.Server {
     const reason = denial(route) ?? (route?.kind === 'container' && route.action === 'attach' ? null : 'only attach may upgrade');
     if (reason) {
       log({ msg: 'refused', method: req.method, url: req.url, reason });
-      client.end('HTTP/1.1 403 Forbidden\r\nContent-Length: 0\r\nConnection: close\r\n\r\n');
+      refuseUpgrade(client, '403 Forbidden');
       return;
     }
     client.pause();
@@ -198,7 +250,7 @@ export function createProxy(options: ProxyOptions): http.Server {
       daemon.setTimeout(0);
       if (!/^HTTP\/1\.1 101 /.test(reply.subarray(0, 16).toString('latin1'))) {
         log({ msg: 'refused', url: req.url, reason: 'daemon did not upgrade', status: reply.subarray(0, 12).toString('latin1') });
-        client.end('HTTP/1.1 502 Bad Gateway\r\nContent-Length: 0\r\nConnection: close\r\n\r\n');
+        refuseUpgrade(client, '502 Bad Gateway');
         daemon.destroy();
         return;
       }
