@@ -10,7 +10,7 @@
     "apps/*"
   ],
   "scripts": {
-    "typecheck": "npm run typecheck --workspaces --if-present",
+    "typecheck": "npm run typecheck --workspaces --if-present && tsc --noEmit -p tsconfig.json",
     "test": "npm run test -w @codehaunt/contracts -w @codehaunt/db -w @codehaunt/auth -w @codehaunt/worker -w @codehaunt/web && node scripts/test-judge.mjs",
     "check-readmes": "node scripts/check-readmes.mjs"
   },

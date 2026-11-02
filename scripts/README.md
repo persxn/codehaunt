@@ -7,6 +7,8 @@ Repository tooling: README enforcement, test wrappers, dev seed and CI entry poi
 | `check-readmes.mjs` | fails if a folder lacks `README.md` or its Contents table is out of sync (standards §6) |
 | `check-readmes.test.mjs` | tests for the checker (temp trees, no git needed) |
 | `test-judge.mjs` | runs the vendored judge suite on `codehaunt-runner*` images; skips 2 arch-specific tests on arm64 |
+| `seed.ts` | seeds a demo event, admin and participants for dev; idempotent |
+| `ci.sh` | CI entry point script running lint, tests and typecheck |
 
 ## Affects / depends on
 - Used by: `make check-readmes`, `make test`, `make ci`, root `npm test`.
