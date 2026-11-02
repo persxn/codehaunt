@@ -14,6 +14,10 @@ import { apiError, requestIdOf } from '@/lib/http';
 
 const SAFE_METHODS = new Set(['GET', 'HEAD', 'OPTIONS']);
 
+const SIGN_IN_PAGE =
+  '<!doctype html><meta charset="utf-8"><meta http-equiv="refresh" content="0;url=/login">' +
+  '<title>Sign in</title><p><a href="/login">Sign in</a> to continue.</p>';
+
 /** `null` for an unparsable Origin (including the literal "null"), which then never matches. */
 function hostOf(origin: string): string | null {
   try {
@@ -45,8 +49,12 @@ export async function middleware(request: NextRequest) {
       const message = decision.status === 401 ? 'Sign in first.' : 'Not allowed.';
       return apiError(decision.status, decision.status === 401 ? 'unauthenticated' : 'forbidden', message, requestId);
     }
-    // Pages: show the login form, but keep the 401 status.
-    return NextResponse.rewrite(new URL('/login', request.url), { status: 401, headers: { 'x-request-id': requestId } });
+    // Pages: a real 401 (rewrite() drops the status) that sends the browser to /login.
+    // Relative URL on purpose: the server's own idea of its host is not what the visitor typed.
+    return new NextResponse(SIGN_IN_PAGE, {
+      status: 401,
+      headers: { 'content-type': 'text/html; charset=utf-8', 'x-request-id': requestId },
+    });
   }
 
   const headers = new Headers(request.headers);
