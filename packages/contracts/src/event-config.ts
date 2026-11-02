@@ -52,6 +52,8 @@ export const EventConfig = z.object({
     tokensPerParticipant: z.number().int().min(1000).default(60000),
     contextTokens: z.number().int().min(512).default(8192),
     contextWarnPercent: z.number().int().min(50).max(99).default(80),
+    /** Reply cap per prompt (the gateway also caps it to what is left of the context). */
+    replyTokens: z.number().int().min(64).max(4096).default(1024),
     maxPromptChars: z.number().int().min(100).max(20000).default(4000),
   }).prefault({}),
   model: z.object({

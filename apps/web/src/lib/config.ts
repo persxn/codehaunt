@@ -6,6 +6,10 @@ const WebConfig = z.object({
   NODE_ENV: z.enum(['development', 'production', 'test']).default('development'),
   // Compose passes an unset variable as "" (`${COOKIE_SECURE:-}`): treat that as unset, i.e. Secure in production.
   COOKIE_SECURE: z.preprocess((v) => (v === '' ? undefined : v), z.enum(['true', 'false']).optional()),
+  // Inference gateway (ADR-022). Unset in a dev setup without the cluster: prompts then answer 503.
+  GATEWAY_URL: z.preprocess((v) => (v === '' ? undefined : v), z.url().optional()),
+  GATEWAY_FALLBACK_URL: z.preprocess((v) => (v === '' ? undefined : v), z.url().optional()),
+  GATEWAY_TOKEN: z.preprocess((v) => (v === '' ? undefined : v), z.string().min(32, 'must be at least 32 characters').optional()),
 });
 export type WebConfig = z.infer<typeof WebConfig>;
 

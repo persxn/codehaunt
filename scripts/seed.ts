@@ -75,8 +75,7 @@ try {
     timeLimitMs: 2000,
     memoryLimitMb: 64,
     checker: { kind: 'caseInsensitive' },
-    referenceSolution: 'a,b=map(int,input().split());print(a+b)',
-    referenceLanguage: 'python',
+    solutions: [{ language: 'python', kind: 'REFERENCE', source: 'a,b=map(int,input().split());print(a+b)' }],
     visibleTests: [
       { input: '1 2', expectedOutput: '3' },
       { input: '-5 10', expectedOutput: '5' },
@@ -98,8 +97,9 @@ try {
     timeLimitMs: 3000,
     memoryLimitMb: 128,
     checker: { kind: 'caseInsensitive' },
-    referenceSolution: "import sys;print(' '.join(sys.stdin.read().strip().split()[::-1]))",
-    referenceLanguage: 'python',
+    solutions: [
+      { language: 'python', kind: 'REFERENCE', source: "import sys;print(' '.join(sys.stdin.read().strip().split()[::-1]))" },
+    ],
     visibleTests: [
       { input: 'hello world', expectedOutput: 'world hello' },
       { input: 'a b c', expectedOutput: 'c b a' },
@@ -148,8 +148,10 @@ try {
           timeLimitMs: prob.timeLimitMs,
           memoryLimitMb: prob.memoryLimitMb,
           checker: prob.checker,
-          referenceSolution: prob.referenceSolution ?? null,
-          referenceLanguage: prob.referenceLanguage === 'python' ? 'PYTHON' : null,
+          practice: prob.practice,
+          solutions: {
+            create: prob.solutions.map((s) => ({ language: s.language.toUpperCase() as 'C' | 'CPP' | 'JAVA' | 'PYTHON', kind: s.kind, source: s.source })),
+          },
         },
       });
       // visible tests

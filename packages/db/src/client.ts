@@ -9,6 +9,8 @@ export type * from './generated/models.ts';
 export interface CreateClientOptions {
   url?: string;
   maxConnections?: number;
+  /** Sees every SQL statement and its parameters (tests: query-level checks such as "no hidden tests read"). */
+  onQuery?: (sql: string, params: string) => void;
 }
 
 /** The only way to obtain a client. Uses the pg driver adapter so tests can point it at PGlite. */
@@ -19,7 +21,11 @@ export function createPrismaClient(options: CreateClientOptions = {}): PrismaCli
     connectionString: url,
     ...(options.maxConnections ? { max: options.maxConnections } : {}),
   });
-  return new PrismaClient({ adapter });
+  if (!options.onQuery) return new PrismaClient({ adapter });
+  const client = new PrismaClient({ adapter, log: [{ emit: 'event', level: 'query' }] });
+  const onQuery = options.onQuery;
+  client.$on('query', (e) => onQuery(e.query, e.params));
+  return client;
 }
 
 const globalForPrisma = globalThis as unknown as { codehauntPrisma?: PrismaClient };

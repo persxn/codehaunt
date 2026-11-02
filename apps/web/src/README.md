@@ -6,8 +6,10 @@ Source code for the web frontend.
 | Path | What it does |
 |---|---|
 | `app/` | Next.js route hierarchy (pages, API routes, health checks) |
-| `middleware.ts` | deny-by-default gate on every request (Node runtime): session lookup, 401/403, cross-origin POST refusal |
-| `lib/` | server helpers: config validation, error envelope and request IDs, session lookup |
+| `components/` | shared UI components (ghost mark, buttons, fields, verdict badge, meters, banner) on the design tokens |
+| `middleware.ts` | deny-by-default gate on every request (Node runtime): session lookup, 401/403, cross-origin POST refusal, per-request nonce CSP |
+| `lib/` | server helpers: config validation, error envelope and request IDs, session lookup, the route wrapper, service instances |
+| `server/` | services behind the API routes (participant flow, prompt/gateway, check-in, event editor, staff); framework-free |
 
 ## Affects / depends on
 - Depends on `@codehaunt/auth` for session middleware, and `@codehaunt/db` for Prisma client usage in API routes.

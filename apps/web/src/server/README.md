@@ -1,0 +1,36 @@
+# server
+Framework-free services behind the API routes (standards §2: routes → services → Prisma). Route handlers parse,
+authorise and call one function here; nothing here imports Next.
+
+## Contents
+| Path | What it does |
+|---|---|
+| `errors.ts` | `AppError` and helpers (`notFound`, `forbidden`, `badRequest`, `conflict`, `contestNotRunning`); mapped to `ApiError` in `lib/route.ts` |
+| `contest.ts` | `participantContext` (live event, contest clock, consent gate), `openProblem` (practice before the start, others while running), `visible` |
+| `system-prompt.ts` | `[claude]` junior-developer persona v1 (ADR-018) + session language; `userMessage` wraps the current code |
+| `gateway-client.ts` | `[claude]` `ModelClient` / `GatewayClient`: gateway-a, fallback to gateway-b only before any byte; compact SSE parse; no usage = failure |
+| `prompt-service.ts` | `[claude]` `startPrompt`: reserve → stream → settle (0 without usage) → store reply + extracted code; one prompt in flight per participant; `currentCode` |
+| `participant-service.ts` | contest state (tokens, phase, consent), problem list/statement (visible tests only), workspace, new session, revert, `recordConsent`, `visibleTestIds` |
+| `submission-service.ts` | `createRun` (idempotent, ≤ 2 active per participant) and `runView` (verdict projection only) |
+| `checkin-service.ts` | `[claude]` badges (password + single-use `CH1:` code, only its SHA-256 stored), `checkIn` (cap, activation, token grant, audit), `promoteFromWaitlist` |
+| `event-service.ts` | Event editor: list/get/create/update; after the start only budget and schedule change; a budget change adjusts every checked-in balance |
+| `problem-admin-service.ts` | problems with visible/hidden tests and reference/naive solutions; frozen at the start; calibration runs |
+| `participant-admin-service.ts` | CSV/form import (waitlist beyond the cap), desk list, export, anonymise (ADR-010) |
+| `staff-service.ts` | staff create/remove (organizers: volunteers only), the one `changeRole`, password resets; `AccessGroupSync` (no-op until WP-06) |
+
+## Affects / depends on
+- Used by: `apps/web/src/app/api/**/route.ts`; tested directly by `apps/web/test/*-flow.test.ts`.
+- Depends on: `@codehaunt/db` (Prisma, token ledger), `@codehaunt/auth`, `@codehaunt/core`, `@codehaunt/contracts`;
+  env `GATEWAY_URL`, `GATEWAY_FALLBACK_URL`, `GATEWAY_TOKEN` (via `lib/services.ts`).
+- Changing `participant-service.ts`/`submission-service.ts` changes what participants can see: keep the hidden-test tests green.
+
+## Entry points & how to test
+`npm test -w @codehaunt/web` (PGlite; no server, no gateway: `test/support/fixtures.ts` fakes the model).
+
+## Gotchas
+- Hidden tests: every participant `test_cases` query filters `visibility: 'VISIBLE'`; `participant-flow.test.ts` checks
+  the payloads and the SQL. Admin services (`problem-admin-service.ts`) return hidden tests: admin routes only.
+- Imports between these files are relative with `.ts` so the tests can load them with plain Node.
+- Token ledger invariant: negative deltas only via `reserveTokens`/`adjustTokens` (participant row lock).
+- Check-in, budget changes and problem edits lock the event row; that is what keeps the cap and the budget snapshot right.
+- `inFlight` in `prompt-service.ts` is per process: the web runs as one process (ADR-003).

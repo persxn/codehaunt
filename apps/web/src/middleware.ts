@@ -11,6 +11,7 @@ import { authorize, resolveSession, SESSION_COOKIE } from '@codehaunt/auth';
 import { getPrismaClient } from '@codehaunt/db';
 
 // Relative, not `@/`: the HTTP-level test loads this file with plain Node.
+import { contentSecurityPolicy, newNonce } from './lib/csp.ts';
 import { apiError, requestIdOf } from './lib/http.ts';
 
 const SAFE_METHODS = new Set(['GET', 'HEAD', 'OPTIONS']);
@@ -58,10 +59,14 @@ export async function middleware(request: NextRequest) {
     });
   }
 
+  const csp = contentSecurityPolicy(newNonce(), process.env.NODE_ENV !== 'production');
   const headers = new Headers(request.headers);
   headers.set('x-request-id', requestId);
+  // On the request so Next stamps the nonce on its scripts; on the response so the browser enforces it.
+  headers.set('content-security-policy', csp);
   const response = NextResponse.next({ request: { headers } });
   response.headers.set('x-request-id', requestId);
+  response.headers.set('content-security-policy', csp);
   return response;
 }
 

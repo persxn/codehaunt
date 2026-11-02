@@ -1,0 +1,33 @@
+/* Meter component styles */
+.wrapper {
+  margin-bottom: var(--space-4);
+}
+
+.label {
+  font-weight: 500;
+  margin-bottom: var(--space-1);
+}
+
+.numbers {
+  font-family: var(--font-mono);
+  font-size: var(--text-sm);
+  margin-bottom: var(--space-1);
+}
+
+.barContainer {
+  background: var(--border);
+  border-radius: var(--radius-sm);
+  overflow: hidden;
+  height: var(--space-2);
+}
+
+.bar {
+  height: 100%;
+  transition: width var(--duration-base) var(--ease);
+}
+
+.warning {
+  margin-top: var(--space-1);
+  font-size: var(--text-sm);
+  color: var(--warning);
+}

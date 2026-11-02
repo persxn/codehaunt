@@ -1,0 +1,43 @@
+/* Field component styles */
+.field {
+  margin-bottom: var(--space-4);
+}
+
+.label {
+  display: block;
+  margin-bottom: var(--space-1);
+  font-weight: 500;
+  color: var(--text);
+}
+
+.input {
+  background: var(--raised);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-sm);
+  padding: var(--space-2) var(--space-3);
+  width: 100%;
+  font-family: var(--font-sans);
+  font-size: var(--text-base);
+  line-height: var(--leading-base);
+  color: var(--text);
+}
+
+.hint {
+  margin-top: var(--space-1);
+  font-size: var(--text-sm);
+  color: var(--text-muted);
+}
+
+.error {
+  display: flex;
+  align-items: center;
+  margin-top: var(--space-1);
+  font-size: var(--text-sm);
+  color: var(--danger);
+  gap: var(--space-1);
+}
+
+.errorIcon {
+  width: 1em;
+  height: 1em;
+}

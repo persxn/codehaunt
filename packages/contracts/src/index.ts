@@ -5,3 +5,5 @@ export * from './prompt.ts';
 export * from './submission.ts';
 export * from './auth.ts';
 export * from './gateway.ts';
+export * from './contest.ts';
+export * from './admin.ts';

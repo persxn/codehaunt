@@ -120,15 +120,16 @@ model Problem {
   memoryLimitMb     Int
   /// Checker (zod, @codehaunt/contracts).
   checker           Json
-  /// Organizer-only. Never returned by a participant-facing route.
-  referenceSolution String?
-  referenceLanguage Language?
+  /// Warm-up problem (ADR-007): open only before the contest starts; its tokens and score don't count.
+  practice          Boolean    @default(false)
   createdAt         DateTime   @default(now())
   updatedAt         DateTime   @updatedAt
 
-  testCases    TestCase[]
-  chatSessions ChatSession[]
-  submissions  Submission[]
+  testCases          TestCase[]
+  chatSessions       ChatSession[]
+  submissions        Submission[]
+  solutions          ReferenceSolution[]
+  calibrationRuns    CalibrationRun[]
 
   @@unique([eventId, slug])
   @@index([eventId, ord])
@@ -152,6 +153,48 @@ model TestCase {
 
   @@unique([problemId, visibility, ord])
   @@map("test_cases")
+}
+
+enum SolutionKind {
+  /// Must pass every test (calibration, ADR-005).
+  REFERENCE
+  /// Should fail on memory or time (ADR-018).
+  NAIVE
+}
+
+/// Organizer-only solutions per language. Never returned by a participant-facing route.
+model ReferenceSolution {
+  id        String       @id @default(cuid())
+  problemId String
+  problem   Problem      @relation(fields: [problemId], references: [id], onDelete: Cascade)
+  language  Language
+  kind      SolutionKind
+  source    String
+  updatedAt DateTime     @updatedAt
+
+  @@unique([problemId, language, kind])
+  @@map("reference_solutions")
+}
+
+/// "Calibrate" runs of a reference/naive solution against all tests (queued like submissions, ADR-025).
+model CalibrationRun {
+  id          String           @id @default(cuid())
+  problemId   String
+  problem     Problem          @relation(fields: [problemId], references: [id], onDelete: Cascade)
+  language    Language
+  kind        SolutionKind
+  source      String
+  status      SubmissionStatus @default(QUEUED)
+  attempts    Int              @default(0)
+  requestedBy String
+  /// RunResult (organizer-facing; may contain hidden-test output excerpts).
+  result      Json?
+  createdAt   DateTime         @default(now())
+  startedAt   DateTime?
+  finishedAt  DateTime?
+
+  @@index([status, createdAt])
+  @@map("calibration_runs")
 }
 
 // ---------------------------------------------------------------------------
@@ -179,6 +222,12 @@ model Participant {
   checkInTokenHash String?           @unique
   checkedInAt      DateTime?
   seatLabel        String?
+  /// Consent to logging and judging (ADR-010); required at registration.
+  consentAt        DateTime?
+  /// Optional, off by default: anonymised reuse of transcripts (R8-Q7).
+  reuseConsent     Boolean           @default(false)
+  /// Required only when the event allows minors (ADR-010).
+  guardianConsent  Boolean           @default(false)
   createdAt        DateTime          @default(now())
 
   chatSessions   ChatSession[]
@@ -282,12 +331,16 @@ model Submission {
   kind           SubmissionKind
   status         SubmissionStatus @default(QUEUED)
   idempotencyKey String           @unique
+  /// Claims by the worker (ADR-025): a row left RUNNING is requeued; after 2 attempts it is FAILED.
+  attempts       Int              @default(0)
   createdAt      DateTime         @default(now())
+  startedAt      DateTime?
   finishedAt     DateTime?
 
   verdict Verdict?
 
   @@index([participantId, problemId, createdAt])
+  @@index([status, createdAt])
   @@map("submissions")
 }
 

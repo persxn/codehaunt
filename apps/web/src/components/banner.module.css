@@ -1,0 +1,23 @@
+/* Banner styles */
+.banner {
+  width: 100%;
+  padding: var(--space-2);
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
+}
+
+.info {
+  color: var(--info);
+}
+
+.warning {
+  color: var(--warning);
+}
+
+.muted {
+  color: var(--text-muted);
+}
+
+.danger {
+  color: var(--danger);
+}

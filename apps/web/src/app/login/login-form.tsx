@@ -1,8 +1,9 @@
 'use client';
-
 import { useState, type FormEvent } from 'react';
-
 import type { ApiError, Me } from '@codehaunt/contracts';
+import { Field, inputClass } from '@/components/field';
+import { Button } from '@/components/button';
+import styles from './page.module.css';
 
 /** Staff land on /admin, participants on /contest. */
 function homeFor(user: Me): string {
@@ -33,19 +34,17 @@ export function LoginForm() {
   }
 
   return (
-    <form onSubmit={onSubmit}>
-      <label>
-        Username
-        <input name="username" autoComplete="username" required maxLength={64} />
-      </label>
-      <label>
-        Password
-        <input name="password" type="password" autoComplete="current-password" required maxLength={200} />
-      </label>
-      <button type="submit" disabled={busy}>
+    <form onSubmit={onSubmit} className={styles.form}>
+      <Field label="Username" id="username">
+        <input id="username" className={inputClass} name="username" autoComplete="username" required maxLength={64} />
+      </Field>
+      <Field label="Password" id="password">
+        <input id="password" className={inputClass} name="password" type="password" autoComplete="current-password" required maxLength={200} />
+      </Field>
+      <Button type="submit" variant="primary" busy={busy} className={styles.full}>
         {busy ? 'Signing in…' : 'Sign in'}
-      </button>
-      {error && <p role="alert">{error}</p>}
+      </Button>
+      {error && <p role="alert" className={styles.error}>{error}</p>}
     </form>
   );
 }

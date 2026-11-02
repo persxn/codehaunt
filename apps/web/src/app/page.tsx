@@ -4,5 +4,5 @@ import { currentUser } from '@/lib/session';
 
 export default async function Home() {
   const user = await currentUser();
-  redirect(user?.role === 'PARTICIPANT' ? '/contest' : '/admin');
+  redirect(user?.role === 'PARTICIPANT' ? '/contest' : user?.role === 'VOLUNTEER' ? '/admin/checkin' : '/admin');
 }

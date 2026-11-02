@@ -1,0 +1,82 @@
+/* Design system tokens */
+:root {
+  /* Colors - dark theme (default) */
+  --bg: #14101F;
+  --surface: #1E1930;
+  --raised: #2A2440;
+  --text: #F7F5FB;
+  --text-muted: #B4AAC9;
+  --border: #3A3352;
+  --border-strong: #8C82A8;
+  --accent: #F59E0B;
+  --on-accent: #14101F;
+  --brand: #B79CFF;
+  --success: #4ADE80;
+  --warning: #FBBF24;
+  --danger: #F87171;
+  --info: #60A5FA;
+
+  /* Typography */
+  --font-sans: 'IBM Plex Sans', system-ui, sans-serif;
+  --font-mono: 'JetBrains Mono', ui-monospace, monospace;
+
+  /* Font sizes & line heights */
+  --text-xs: 0.75rem; /* 12px */
+  --leading-xs: 1rem;   /* 16px */
+  --text-sm: 0.875rem; /* 14px */
+  --leading-sm: 1.25rem; /* 20px */
+  --text-base: 1rem;   /* 16px */
+  --leading-base: 1.5rem; /* 24px */
+  --text-lg: 1.125rem; /* 18px */
+  --leading-lg: 1.75rem; /* 28px */
+  --text-xl: 1.5rem;   /* 24px */
+  --leading-xl: 2rem;   /* 32px */
+  --text-display: 3rem; /* 48px */
+  --leading-display: 3.5rem; /* 56px */
+
+  /* Spacing */
+  --space-1: 0.25rem; /* 4px */
+  --space-2: 0.5rem;  /* 8px */
+  --space-3: 0.75rem; /* 12px */
+  --space-4: 1rem;    /* 16px */
+  --space-6: 1.5rem;  /* 24px */
+  --space-8: 2rem;    /* 32px */
+
+  /* Radius */
+  --radius-sm: 0.25rem; /* 4px */
+  --radius-md: 0.5rem;  /* 8px */
+
+  /* Shadow */
+  --shadow-menu: 0 8px 24px rgba(0, 0, 0, 0.4);
+
+  /* Motion */
+  --duration-fast: 120ms;
+  --duration-base: 200ms;
+  --ease: cubic-bezier(0.2,0,0,1);
+}
+
+/* Light theme overrides */
+[data-theme="light"] {
+  --bg: #FFFFFF;
+  --surface: #F5F3FA;
+  --raised: #E9E5F2;
+  --text: #14101F;
+  --text-muted: #4B4563;
+  --border: #D6D0E4;
+  --border-strong: #6B6385;
+  --accent: #B45309;
+  --on-accent: #FFFFFF;
+  --brand: #6D28D9;
+  --success: #15803D;
+  --warning: #854D0E;
+  --danger: #B91C1C;
+  --info: #1D4ED8;
+}
+
+/* Reduced motion */
+@media (prefers-reduced-motion: reduce) {
+  :root {
+    --duration-fast: 0ms;
+    --duration-base: 0ms;
+  }
+}

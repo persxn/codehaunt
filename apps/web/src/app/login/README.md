@@ -7,6 +7,7 @@ Login UI – renders the login form and handles authentication flow.
 |---|---|
 | `page.tsx` | Wrapper page component for login route |
 | `login-form.tsx` | Form component with username/password fields |
+| `page.module.css` | login page layout styles (uses components from `src/components/`) |
 
 ## Affects / depends on
 - Calls `@codehaunt/auth` login API; sets session cookie on success.

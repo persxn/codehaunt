@@ -1,12 +1,13 @@
 /**
- * Worker process. WP-01: config, CodeRunner readiness and health endpoints only;
- * pg-boss consumers (sample runs, judging, LLM review, retention) arrive in WP-03/05/07.
+ * Worker process: health endpoints and the judge queue (ADR-025: sample runs, submissions, calibration runs).
+ * LLM review (WP-07) and retention arrive later.
  */
 import { createServer } from 'node:http';
 
 import { createPrismaClient } from '@codehaunt/db';
 
 import { loadConfig } from './config.ts';
+import { judgeLoop } from './queue.ts';
 import { DockerCodeRunner } from './sandbox/code-runner.ts';
 
 const config = loadConfig();
@@ -36,9 +37,15 @@ server.listen(config.WORKER_HEALTH_PORT, config.WORKER_HEALTH_HOST, () => {
   console.log(JSON.stringify({ level: 'info', msg: 'worker ready', port: config.WORKER_HEALTH_PORT }));
 });
 
+const log = (entry: Record<string, unknown>) => console.log(JSON.stringify(entry));
+const stop = new AbortController();
+const loop = judgeLoop(prisma, runner, { concurrency: config.JUDGE_CONCURRENCY, log }, stop.signal);
+
 for (const signal of ['SIGINT', 'SIGTERM'] as const) {
   process.on(signal, () => {
     server.close();
-    void prisma.$disconnect().finally(() => process.exit(0));
+    stop.abort();
+    // Runs in progress finish first; a run cut off by a hard kill is requeued (RUNNING_TIMEOUT_MS).
+    void loop.finally(() => prisma.$disconnect()).finally(() => process.exit(0));
   });
 }

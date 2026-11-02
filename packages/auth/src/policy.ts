@@ -23,6 +23,8 @@ export const ROUTE_POLICY: ReadonlyArray<readonly [prefix: string, access: Acces
   ['/api/auth/login', 'public'],
   ['/healthz', 'public'],
   ['/readyz', 'public'],
+  // Shared with participants two days before the event (ADR-007): latency and browser check, no data.
+  ['/system-check', 'public'],
   // Next.js build assets: hashed, contain no data.
   ['/_next/static', 'public'],
   ['/favicon.ico', 'public'],
@@ -30,12 +32,24 @@ export const ROUTE_POLICY: ReadonlyArray<readonly [prefix: string, access: Acces
   ['/', ROLES],
   ['/api/auth/logout', ROLES],
   ['/api/auth/me', ROLES],
+  ['/api/account', ROLES],
+  ['/account', ROLES],
 
   ['/contest', ['PARTICIPANT']],
   ['/api/contest', ['PARTICIPANT']],
 
-  ['/admin', STAFF],
+  // Admin console (WP-04). Volunteers reach only the desk and check-in pages (ADR-013).
+  ['/admin', ['ADMIN', 'ORGANIZER']],
+  ['/admin/checkin', STAFF],
+  ['/admin/desk', STAFF],
+  ['/admin/event', ['ADMIN']],
+  ['/admin/problems', ['ADMIN']],
   ['/api/admin', ['ADMIN', 'ORGANIZER']],
+  // Event editor and role changes: admin only.
+  ['/api/admin/events', ['ADMIN']],
+  ['/api/admin/problems', ['ADMIN']],
+  ['/api/admin/roles', ['ADMIN']],
+  ['/api/staff', STAFF],
 ];
 
 export type Decision = { allow: true } | { allow: false; status: 401 | 403 };

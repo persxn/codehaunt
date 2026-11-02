@@ -1,0 +1,39 @@
+/* login page layout styles */
+.page {
+  min-height: 100vh;
+  display: grid;
+  place-items: center;
+  padding: var(--space-4);
+}
+
+.card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  padding: var(--space-8);
+  width: 100%;
+  max-width: 22rem;
+  display: grid;
+  justify-items: center;
+  gap: var(--space-4);
+}
+
+.title {
+  margin: 0;
+  font-size: var(--text-xl);
+}
+
+.form {
+  display: grid;
+  gap: var(--space-4);
+  width: 100%;
+}
+
+.full {
+  width: 100%;
+}
+
+.error {
+  color: var(--danger);
+  margin: 0;
+}

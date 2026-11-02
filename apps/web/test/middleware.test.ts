@@ -45,3 +45,12 @@ test('a cross-site POST is refused before anything else', async () => {
   assert.equal(response.status, 403);
   assert.equal((await response.json()).error.code, 'cross_origin');
 });
+
+test('every passed-through response carries a nonce CSP without unsafe-inline scripts (audit F9)', async () => {
+  const a = (await middleware(request('/login'))).headers.get('content-security-policy') ?? '';
+  const b = (await middleware(request('/login'))).headers.get('content-security-policy') ?? '';
+  const script = a.split('; ').find((d) => d.startsWith('script-src')) ?? '';
+  assert.match(script, /'nonce-[A-Za-z0-9+/=]{20,}' 'strict-dynamic'/);
+  assert.doesNotMatch(script, /unsafe-inline/);
+  assert.notEqual(a, b, 'a fresh nonce per request');
+});

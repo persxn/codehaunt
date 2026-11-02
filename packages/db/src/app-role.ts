@@ -27,6 +27,9 @@ export const TABLE_ACCESS: Readonly<Record<string, { web: Access; worker: Access
   events: { web: 'write', worker: 'read' },
   problems: { web: 'write', worker: 'read' },
   test_cases: { web: 'write', worker: 'read' },
+  // Organizer-only solutions; the worker runs them for calibration.
+  reference_solutions: { web: 'write', worker: 'read' },
+  calibration_runs: { web: 'write', worker: 'update' },
   participants: { web: 'write', worker: 'read' },
   chat_sessions: { web: 'write', worker: 'read' },
   prompt_turns: { web: 'write', worker: 'read' },

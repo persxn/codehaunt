@@ -1,0 +1,8 @@
+/* Spinner animation */
+.spinner {
+  animation: spin var(--duration-fast) linear infinite;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}

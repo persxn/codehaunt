@@ -9,7 +9,7 @@ import type { PrismaClient } from '@codehaunt/db';
 import { COMMON_PASSWORDS } from './common-passwords.ts';
 import { hashPassword, MAX_PASSWORD_LENGTH, MIN_PASSWORD_LENGTH, verifyPassword } from './password.ts';
 import { clearLoginRate, loginDelayMs, recordLoginFailure } from './rate-limit.ts';
-import { createSession, destroyAllSessions, type CreatedSession, type SessionUser } from './session.ts';
+import { createSession, destroyAllSessions, hashSessionToken, type CreatedSession, type SessionUser } from './session.ts';
 
 export interface LoginContext {
   userAgent?: string | undefined;
@@ -158,4 +158,68 @@ export async function setAccountActive(
       },
     });
   });
+}
+
+export type PasswordChangeResult = { ok: true; endedSessions: number } | { ok: false; reason: string };
+
+/**
+ * A person changes their own password (ADR-020): the current password is required, the new one must pass
+ * `checkPasswordStrength`, and every other session of the account ends (the one in use stays).
+ */
+export async function changePassword(
+  prisma: PrismaClient,
+  input: { userId: string; sessionToken: string; currentPassword: string; newPassword: string; requestId?: string | undefined },
+): Promise<PasswordChangeResult> {
+  const user = await prisma.user.findUnique({ where: { id: input.userId } });
+  if (!user || input.currentPassword.length > MAX_PASSWORD_LENGTH || !(await verifyPassword(user.passwordHash, input.currentPassword))) {
+    return { ok: false, reason: 'Your current password is wrong.' };
+  }
+  const strength = checkPasswordStrength(input.newPassword, user.username);
+  if (!strength.ok) return strength;
+  const passwordHash = await hashPassword(input.newPassword);
+  const keep = hashSessionToken(input.sessionToken);
+  const ended = await prisma.$transaction(async (tx) => {
+    await tx.user.update({ where: { id: user.id }, data: { passwordHash } });
+    const { count } = await tx.authSession.deleteMany({ where: { userId: user.id, id: { not: keep } } });
+    await tx.auditLog.create({
+      data: {
+        actorId: user.id,
+        action: 'auth.password_changed',
+        targetType: 'user',
+        targetId: user.id,
+        after: { endedSessions: count },
+        requestId: input.requestId ?? null,
+      },
+    });
+    return count;
+  });
+  return { ok: true, endedSessions: ended };
+}
+
+/** Staff set or reset someone's password (WP-04): same rules, every session of that user ends, audit-logged. */
+export async function setPassword(
+  prisma: PrismaClient,
+  input: { userId: string; newPassword: string; actorId: string; requestId?: string | undefined },
+): Promise<PasswordChangeResult> {
+  const user = await prisma.user.findUnique({ where: { id: input.userId }, select: { id: true, username: true } });
+  if (!user) return { ok: false, reason: 'That account was not found.' };
+  const strength = checkPasswordStrength(input.newPassword, user.username);
+  if (!strength.ok) return strength;
+  const passwordHash = await hashPassword(input.newPassword);
+  const ended = await prisma.$transaction(async (tx) => {
+    await tx.user.update({ where: { id: user.id }, data: { passwordHash } });
+    const count = await destroyAllSessions(tx, user.id);
+    await tx.auditLog.create({
+      data: {
+        actorId: input.actorId,
+        action: 'user.password_reset',
+        targetType: 'user',
+        targetId: user.id,
+        after: { endedSessions: count },
+        requestId: input.requestId ?? null,
+      },
+    });
+    return count;
+  });
+  return { ok: true, endedSessions: ended };
 }

@@ -3,7 +3,7 @@
  * Before a model call the web API reserves tokens under the participant's row lock; after it, one
  * RELEASE returns the unused part (everything, if the call failed). Every reservation fits the
  * balance read under the lock, so the balance never goes negative.
- * Invariant (audit L4): every writer of a negative delta (RESERVE here, admin ADJUSTMENT later) must take the same
+ * Invariant (audit L4): every writer of a negative delta (RESERVE, and ADJUSTMENT in adjustTokens) must take the same
  * participant row lock and check the balance first, or "never negative" no longer holds.
  * Security-critical: Claude-owned.
  */
@@ -135,4 +135,43 @@ async function releaseStale(tx: Tx, participantId: string, now: Date): Promise<v
       },
     });
   }
+}
+
+/**
+ * Staff change a participant's budget (top-up, or a live change of the event's budget; ADR-006). Positive deltas
+ * are added as is; a negative delta takes the participant lock and is clamped so the balance never goes below 0.
+ * Idempotent per key. Returns the delta actually written (0 if the key was used before).
+ */
+export async function adjustTokens(
+  prisma: PrismaClient,
+  input: {
+    eventId: string;
+    participantId: string;
+    kind: 'TOP_UP' | 'ADJUSTMENT' | 'GRANT';
+    delta: number;
+    actorId: string | null;
+    reason: string;
+    idempotencyKey: string;
+  },
+): Promise<number> {
+  if (!Number.isInteger(input.delta)) throw new RangeError('delta must be an integer');
+  if (input.kind !== 'ADJUSTMENT' && input.delta < 0) throw new RangeError(`${input.kind} must not be negative`);
+  return prisma.$transaction(async (tx) => {
+    await tx.$queryRaw`SELECT id FROM participants WHERE id = ${input.participantId} FOR UPDATE`;
+    if (await tx.tokenLedger.findUnique({ where: { idempotencyKey: input.idempotencyKey } })) return 0;
+    const delta = input.delta < 0 ? -Math.min(-input.delta, Math.max(0, await sum(tx, input.participantId))) : input.delta;
+    if (delta === 0) return 0;
+    await tx.tokenLedger.create({
+      data: {
+        eventId: input.eventId,
+        participantId: input.participantId,
+        kind: input.kind,
+        delta,
+        actorId: input.actorId,
+        reason: input.reason,
+        idempotencyKey: input.idempotencyKey,
+      },
+    });
+    return delta;
+  });
 }

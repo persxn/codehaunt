@@ -11,7 +11,8 @@ Next.js route folder – each sub‑folder corresponds to a URL path.
 | `healthz/` | liveness probe (`/healthz`) |
 | `readyz/` | readiness probe (`/readyz`) |
 | `api/` | backend API routes (auth, etc.) |
-| `globals.css` | global stylesheet |
+| `tokens.css` | design tokens (colours, type, spacing, radius, motion) as CSS custom properties; dark default, `[data-theme="light"]` |
+| `globals.css` | base element styles on the design tokens |
 | `layout.tsx` | root layout component |
 | `page.tsx` | root page component |
 

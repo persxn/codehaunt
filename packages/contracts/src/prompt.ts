@@ -37,3 +37,14 @@ export const PromptResponse = z.object({
   usage: PromptUsage,
 });
 export type PromptResponse = z.infer<typeof PromptResponse>;
+
+/**
+ * What `POST /api/contest/prompt` streams, one JSON object per line (NDJSON): reply deltas as they arrive, then
+ * exactly one `done` or `error`. On `error` the streamed text is discarded (no code version; ADR-022).
+ */
+export const PromptStreamEvent = z.discriminatedUnion('type', [
+  z.object({ type: z.literal('delta'), text: z.string() }),
+  z.object({ type: z.literal('done'), response: PromptResponse }),
+  z.object({ type: z.literal('error'), code: z.string(), message: z.string() }),
+]);
+export type PromptStreamEvent = z.infer<typeof PromptStreamEvent>;

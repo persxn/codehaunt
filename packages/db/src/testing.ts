@@ -44,7 +44,7 @@ export interface TestDatabase {
   close: () => Promise<void>;
 }
 
-export async function createTestDatabase(): Promise<TestDatabase> {
+export async function createTestDatabase(options: { onQuery?: (sql: string, params: string) => void } = {}): Promise<TestDatabase> {
   const dataDir = await mkdtemp(join(tmpdir(), 'codehaunt-pglite-'));
   const pglite = await PGlite.create({ dataDir });
   for (const sql of await migrationSql()) await pglite.exec(sql);
@@ -54,6 +54,7 @@ export async function createTestDatabase(): Promise<TestDatabase> {
   const prisma = createPrismaClient({
     url: `postgresql://postgres:postgres@127.0.0.1:${port}/postgres`,
     maxConnections: 1,
+    ...(options.onQuery ? { onQuery: options.onQuery } : {}),
   });
 
   return {
