@@ -10,10 +10,11 @@ Schema modules of `@codehaunt/contracts`, re-exported from `index.ts`.
 | `event-config.ts` | `EventConfig` (ADR-006: schedule, budgets, model, scoring weights, access, consent), `EventStatus`, `LIVE_EDITABLE_KEYS` |
 | `problem.ts` | `ProblemInput` (organizer authoring), `ParticipantProblem` (participant view, strict), `Difficulty` |
 | `prompt.ts` | `PromptRequest`, `PromptResponse`, `PromptUsage` |
+| `gateway.ts` | `GatewayChatRequest` (OpenAI chat + `codehaunt` caps: budgetTokens, contextLimit, sessionId), `GatewayError`, `GatewayUsage` (ADR-022) |
 | `submission.ts` | `SubmissionRequest`, `ParticipantVerdict` (strict), `SubmissionKind`, `SubmissionStatus` |
 
 ## Affects / depends on
-- Used by: `apps/web`, `apps/worker`, `scripts/seed.ts`.
+- Used by: `apps/web`, `apps/worker`, `apps/gateway`, `scripts/seed.ts`.
 - Depends on: zod 4.
 - Changing `EventConfig` changes what the event editor accepts and what stored `events.config` must contain.
 

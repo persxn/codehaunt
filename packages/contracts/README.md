@@ -11,7 +11,7 @@ The single source of truth for validation and types (`z.infer`).
 | `tsconfig.json` | extends the root base config |
 
 ## Affects / depends on
-- Used by: `apps/web` (API routes, login form), `apps/worker` (CodeRunner, jobs), `scripts/seed.ts`.
+- Used by: `apps/web` (API routes, login form), `apps/worker` (CodeRunner, jobs), `apps/gateway` (chat request/error shapes), `scripts/seed.ts`.
 - Depends on: zod 4.
 - Changing a schema changes what every API accepts and returns; DB fields that overlap must match `packages/db/prisma/schema.prisma`.
 

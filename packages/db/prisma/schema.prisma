@@ -352,6 +352,10 @@ enum TokenEntryKind {
   USAGE
   TOP_UP
   ADJUSTMENT
+  /// Held before a model call (negative); settled by one RELEASE (ADR-022).
+  RESERVE
+  /// Returns the unused part of a RESERVE (all of it if the call failed).
+  RELEASE
 }
 
 /// Token budget = SUM(delta) per participant. Usage rows are negative.

@@ -1,0 +1,25 @@
+# Model servers accept traffic only from the gateway and Prometheus; the gateway only from Traefik and Prometheus.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata: {name: model-ingress, namespace: codehaunt}
+spec:
+  podSelector: {matchLabels: {app: model}}
+  policyTypes: [Ingress]
+  ingress:
+  - from: [{podSelector: {matchLabels: {app: gateway}}}]
+    ports: [{port: 8000}]
+  - from: [{namespaceSelector: {matchLabels: {kubernetes.io/metadata.name: monitoring}}}]
+    ports: [{port: 8000}]
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata: {name: gateway-ingress, namespace: codehaunt}
+spec:
+  podSelector: {matchLabels: {app: gateway}}
+  policyTypes: [Ingress]
+  ingress:
+  - from:
+    - namespaceSelector: {matchLabels: {kubernetes.io/metadata.name: kube-system}}
+      podSelector: {matchLabels: {app.kubernetes.io/name: traefik}}
+    - namespaceSelector: {matchLabels: {kubernetes.io/metadata.name: monitoring}}
+    ports: [{port: 8080}]

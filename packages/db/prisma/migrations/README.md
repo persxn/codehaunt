@@ -7,6 +7,7 @@ Database migration history.
 |---|---|
 | `migration_lock.toml` | records the database provider (postgresql); managed by Prisma |
 | `20261102120953_init/` | Initial migration – creates tables and adds triggers for append‑only audit_log and token_ledger |
+| `20261102210000_token_reservations/` | adds `RESERVE` and `RELEASE` to `TokenEntryKind` (ADR-022) |
 
 ## Affects / depends on
 - Applied in order by `prisma migrate deploy`.

@@ -25,7 +25,8 @@ AI‑assisted coding‑contest harness: participants solve problems by prompting
 | `package-lock.json` | lockfile |
 | `tsconfig.base.json` | shared compiler options every workspace extends |
 | `tsconfig.json` | typechecks `scripts/` (part of `npm run typecheck`) |
-| `apps/` | web, worker and docker-proxy services |
+| `apps/` | web, worker, docker-proxy (DGX) and gateway (GPU cluster) services |
+| `deploy/` | deployment manifests outside Docker Compose: the GPU cluster (`deploy/README.md`) |
 | `packages/` | shared libraries (auth, db, judge, …) |
 | `scripts/` | tooling scripts (README checks, CI, seeding) |
 

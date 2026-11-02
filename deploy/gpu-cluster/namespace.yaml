@@ -1,0 +1,5 @@
+# CodeHaunt's namespace on the lab k3s cluster (ADR-016).
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: codehaunt

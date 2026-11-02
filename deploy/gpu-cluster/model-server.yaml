@@ -1,0 +1,98 @@
+# Model servers (ADR-016): one vLLM pod per GPU node, each with a full GPU (gpu-full-mode.sh) and its weights on
+# node-local `scratch` storage. A pod's PVC binds to the node it first lands on, so model-N stays on that node.
+# Model and engine flags come from the WP-02 benchmark (ADR-023); change them in the ConfigMap, then
+# `kubectl -n codehaunt rollout restart statefulset/model`.
+apiVersion: v1
+kind: ConfigMap
+metadata: {name: model-config, namespace: codehaunt}
+data:
+  model: Qwen/Qwen3-4B-Instruct-2507-FP8
+  # Extra vLLM flags for this model (quantisation etc.).
+  extraArgs: --kv-cache-dtype fp8
+  # Read by the gateway; `{}` when the model needs none.
+  chatTemplateKwargs: ''
+---
+apiVersion: v1
+kind: Service
+metadata: {name: model, namespace: codehaunt, labels: {app: model}}
+spec:
+  clusterIP: None
+  selector: {app: model}
+  ports: [{name: http, port: 8000}]
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata: {name: model, namespace: codehaunt}
+spec:
+  serviceName: model
+  replicas: 4
+  podManagementPolicy: Parallel
+  selector: {matchLabels: {app: model}}
+  template:
+    metadata: {labels: {app: model}}
+    spec:
+      runtimeClassName: nvidia
+      nodeSelector: {nvidia.com/device-plugin.config: full}
+      affinity:
+        podAntiAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+          - labelSelector: {matchLabels: {app: model}}
+            topologyKey: kubernetes.io/hostname
+      automountServiceAccountToken: false
+      terminationGracePeriodSeconds: 30
+      initContainers:
+      - name: fetch-weights
+        image: docker.io/vllm/vllm-openai:v0.33.0
+        command: ["bash", "-c", "hf download \"$MODEL\" --quiet"]
+        env:
+        - {name: HF_HOME, value: /models/hf}
+        - {name: MODEL, valueFrom: {configMapKeyRef: {name: model-config, key: model}}}
+        volumeMounts: [{name: models, mountPath: /models}]
+      containers:
+      - name: vllm
+        image: docker.io/vllm/vllm-openai:v0.33.0
+        command: ["bash", "-c"]
+        args:
+        - >-
+          exec vllm serve "$MODEL" --served-model-name junior --host 0.0.0.0 --port 8000
+          --max-model-len 10240 --gpu-memory-utilization 0.90 --max-num-seqs 16 --enable-prefix-caching
+          --disable-log-requests $EXTRA_ARGS
+        env:
+        - {name: HF_HOME, value: /models/hf}
+        - {name: HF_HUB_OFFLINE, value: "1"}
+        - {name: MODEL, valueFrom: {configMapKeyRef: {name: model-config, key: model}}}
+        - {name: EXTRA_ARGS, valueFrom: {configMapKeyRef: {name: model-config, key: extraArgs}}}
+        ports: [{name: http, containerPort: 8000}]
+        startupProbe: {httpGet: {path: /health, port: http}, periodSeconds: 5, failureThreshold: 120}
+        readinessProbe: {httpGet: {path: /health, port: http}, periodSeconds: 5, failureThreshold: 2}
+        livenessProbe: {httpGet: {path: /health, port: http}, periodSeconds: 10, failureThreshold: 6}
+        resources:
+          limits: {nvidia.com/gpu: 1, memory: 20Gi}
+          requests: {cpu: "6", memory: 12Gi}
+        securityContext: {allowPrivilegeEscalation: false}
+        volumeMounts:
+        - {name: models, mountPath: /models}
+        - {name: shm, mountPath: /dev/shm}
+      volumes:
+      - name: shm
+        emptyDir: {medium: Memory, sizeLimit: 4Gi}
+  volumeClaimTemplates:
+  - metadata: {name: models}
+    spec:
+      accessModes: [ReadWriteOnce]
+      storageClassName: scratch
+      resources: {requests: {storage: 60Gi}}
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata: {name: model, namespace: codehaunt}
+spec:
+  maxUnavailable: 1
+  selector: {matchLabels: {app: model}}
+---
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata: {name: model, namespace: codehaunt}
+spec:
+  selector: {matchLabels: {app: model}}
+  endpoints: [{port: http, path: /metrics, interval: 15s}]

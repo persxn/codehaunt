@@ -4,6 +4,7 @@ import { test } from 'node:test';
 
 import {
   EventConfig,
+  GatewayChatRequest,
   LoginRequest,
   MAX_SOURCE_BYTES,
   ParticipantProblem,
@@ -99,4 +100,16 @@ test('RunRequest bounds source size; LoginRequest needs a username', () => {
   };
   assert.equal(RunRequest.safeParse(run).success, false);
   assert.equal(LoginRequest.safeParse({ username: '', password: 'pw' }).success, false);
+});
+
+test('GatewayChatRequest requires the codehaunt caps and rejects unknown fields', () => {
+  const ok = {
+    messages: [{ role: 'user', content: 'hi' }],
+    max_tokens: 100,
+    codehaunt: { budgetTokens: 500, contextLimit: 8192, sessionId: 's1' },
+  };
+  assert.equal(GatewayChatRequest.parse(ok).temperature, 0.2);
+  assert.equal(GatewayChatRequest.safeParse({ ...ok, codehaunt: undefined }).success, false);
+  assert.equal(GatewayChatRequest.safeParse({ ...ok, model: 'other' }).success, false);
+  assert.equal(GatewayChatRequest.safeParse({ ...ok, messages: [{ role: 'tool', content: 'x' }] }).success, false);
 });

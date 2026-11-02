@@ -1,0 +1,122 @@
+# Inference gateway (apps/gateway): two single-replica Deployments on different nodes, each behind its own path.
+# The DGX sends every request to gateway-a and only falls back to gateway-b, so one replica sees all traffic and its
+# per-node slot counts are exact (ADR-015, ADR-016).
+# The token Secret is created by hand (see README); never commit it.
+apiVersion: apps/v1
+kind: Deployment
+metadata: {name: gateway-a, namespace: codehaunt, labels: {app: gateway, gateway: a}}
+spec:
+  replicas: 1
+  selector: {matchLabels: {app: gateway, gateway: a}}
+  template:
+    metadata: {labels: {app: gateway, gateway: a}}
+    spec:
+      affinity:
+        podAntiAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+          - labelSelector: {matchLabels: {app: gateway}}
+            topologyKey: kubernetes.io/hostname
+      automountServiceAccountToken: false
+      securityContext: {runAsNonRoot: true, runAsUser: 1000, seccompProfile: {type: RuntimeDefault}}
+      terminationGracePeriodSeconds: 30
+      containers:
+      - name: gateway
+        image: 50.0.2.102:5000/codehaunt/gateway:0.1.1
+        ports: [{name: http, containerPort: 8080}]
+        env:
+        - {name: GATEWAY_TOKEN, valueFrom: {secretKeyRef: {name: gateway-token, key: token}}}
+        - {name: GATEWAY_MODEL, value: junior}
+        - name: GATEWAY_NODES
+          value: model-0=http://model-0.model:8000,model-1=http://model-1.model:8000,model-2=http://model-2.model:8000,model-3=http://model-3.model:8000
+        - {name: GATEWAY_SLOTS_PER_NODE, value: "14"}
+        # Tokens arrive every ~15 ms; 10 s of silence means the node died mid-reply (drain test: vLLM keeps the
+        # connection open after SIGTERM, so without this the reply hangs for the 30 s default).
+        - {name: GATEWAY_IDLE_TIMEOUT_MS, value: "10000"}
+        - {name: GATEWAY_CHAT_TEMPLATE_KWARGS, valueFrom: {configMapKeyRef: {name: model-config, key: chatTemplateKwargs, optional: true}}}
+        readinessProbe: {httpGet: {path: /readyz, port: http}, periodSeconds: 2, failureThreshold: 2}
+        livenessProbe: {httpGet: {path: /healthz, port: http}, periodSeconds: 10, failureThreshold: 3}
+        resources: {requests: {cpu: 500m, memory: 256Mi}, limits: {memory: 512Mi}}
+        securityContext: {allowPrivilegeEscalation: false, readOnlyRootFilesystem: true, capabilities: {drop: [ALL]}}
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata: {name: gateway-b, namespace: codehaunt, labels: {app: gateway, gateway: b}}
+spec:
+  replicas: 1
+  selector: {matchLabels: {app: gateway, gateway: b}}
+  template:
+    metadata: {labels: {app: gateway, gateway: b}}
+    spec:
+      affinity:
+        podAntiAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+          - labelSelector: {matchLabels: {app: gateway}}
+            topologyKey: kubernetes.io/hostname
+      automountServiceAccountToken: false
+      securityContext: {runAsNonRoot: true, runAsUser: 1000, seccompProfile: {type: RuntimeDefault}}
+      terminationGracePeriodSeconds: 30
+      containers:
+      - name: gateway
+        image: 50.0.2.102:5000/codehaunt/gateway:0.1.1
+        ports: [{name: http, containerPort: 8080}]
+        env:
+        - {name: GATEWAY_TOKEN, valueFrom: {secretKeyRef: {name: gateway-token, key: token}}}
+        - {name: GATEWAY_MODEL, value: junior}
+        - name: GATEWAY_NODES
+          value: model-0=http://model-0.model:8000,model-1=http://model-1.model:8000,model-2=http://model-2.model:8000,model-3=http://model-3.model:8000
+        - {name: GATEWAY_SLOTS_PER_NODE, value: "14"}
+        # Tokens arrive every ~15 ms; 10 s of silence means the node died mid-reply (drain test: vLLM keeps the
+        # connection open after SIGTERM, so without this the reply hangs for the 30 s default).
+        - {name: GATEWAY_IDLE_TIMEOUT_MS, value: "10000"}
+        - {name: GATEWAY_CHAT_TEMPLATE_KWARGS, valueFrom: {configMapKeyRef: {name: model-config, key: chatTemplateKwargs, optional: true}}}
+        readinessProbe: {httpGet: {path: /readyz, port: http}, periodSeconds: 2, failureThreshold: 2}
+        livenessProbe: {httpGet: {path: /healthz, port: http}, periodSeconds: 10, failureThreshold: 3}
+        resources: {requests: {cpu: 500m, memory: 256Mi}, limits: {memory: 512Mi}}
+        securityContext: {allowPrivilegeEscalation: false, readOnlyRootFilesystem: true, capabilities: {drop: [ALL]}}
+---
+apiVersion: v1
+kind: Service
+metadata: {name: gateway-a, namespace: codehaunt, labels: {app: gateway}}
+spec:
+  selector: {app: gateway, gateway: a}
+  ports: [{name: http, port: 8080, targetPort: http}]
+---
+apiVersion: v1
+kind: Service
+metadata: {name: gateway-b, namespace: codehaunt, labels: {app: gateway}}
+spec:
+  selector: {app: gateway, gateway: b}
+  ports: [{name: http, port: 8080, targetPort: http}]
+---
+apiVersion: traefik.io/v1alpha1
+kind: Middleware
+metadata: {name: gateway-strip, namespace: codehaunt}
+spec:
+  stripPrefix: {prefixes: [/codehaunt-gateway-a, /codehaunt-gateway-b]}
+---
+# The DGX calls http(s)://gpu-master.<tailnet>.ts.net/codehaunt-gateway-a/v1/chat/completions (Tailscale Serve on
+# gpu-master proxies to Traefik) and retries .../codehaunt-gateway-b/ when gateway-a is unreachable or not ready.
+# Only /v1/ is routed. Priority 1000 beats other tenants' host-wide `/` ingresses on the same tailnet name. (Traefik's own failover needs health checks, which it allows only on ExternalName services.)
+apiVersion: traefik.io/v1alpha1
+kind: IngressRoute
+metadata: {name: gateway, namespace: codehaunt}
+spec:
+  entryPoints: [web]
+  routes:
+  - match: PathPrefix(`/codehaunt-gateway-a/v1/`)
+    kind: Rule
+    priority: 1000
+    middlewares: [{name: gateway-strip}]
+    services: [{name: gateway-a, port: 8080}]
+  - match: PathPrefix(`/codehaunt-gateway-b/v1/`)
+    kind: Rule
+    priority: 1000
+    middlewares: [{name: gateway-strip}]
+    services: [{name: gateway-b, port: 8080}]
+---
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata: {name: gateway, namespace: codehaunt}
+spec:
+  selector: {matchLabels: {app: gateway}}
+  endpoints: [{port: http, path: /metrics, interval: 15s}]
