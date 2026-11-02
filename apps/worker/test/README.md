@@ -15,4 +15,5 @@ Tests for the worker sandbox runner.
 - Run `npm test -w @codehaunt/worker`.
 
 ## Gotchas
-- Tests will fail if the runner images are missing or the host Docker socket is inaccessible.
+- Tests will fail if the runner images are missing or the host Docker socket is inaccessible (they use it directly,
+  not through `docker-proxy`; the proxy has its own end-to-end test).

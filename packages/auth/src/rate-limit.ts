@@ -2,7 +2,10 @@
  * Ported from JojoCode packages/db/src/auth/rate-limit.ts @ a8f4056 (ADR-001). "Class"/"school"
  * below read as "venue": participants share NATs and hotspots just as a classroom does.
  *
- * Login throttling.
+ * Login throttling. CodeHaunt change (ADR-020): no bucket ever refuses, they only slow attempts
+ * down. JojoCode's per-username and per-IP refusals let anyone who knows a username lock that
+ * account out, or lock out a whole venue behind one NAT; every CodeHaunt password is generated
+ * (~70 bits), so a slowed-down guesser gains nothing. The original reasoning follows.
  *
  * The threat here is guessing, and the constraint that shapes everything is
  * that a whole class shares one NAT address. Throttle mainly on IP and the
@@ -25,46 +28,25 @@
 
 const WINDOW_MS = 15 * 60 * 1000;
 
-/** One account, one person: a strict ceiling that cannot affect anybody else. */
+/** Failures on one username before its attempts are slowed. */
 export const MAX_USERNAME_FAILURES = 8;
 
-/** A shared classroom address. Loose on purpose — see the note above. */
+/** Failures from one address before its attempts are slowed. Loose: a venue shares one NAT. */
 export const MAX_IP_FAILURES = 60;
 
-/**
- * Failures across the whole school in one minute, whoever they came from.
- *
- * The third bucket, and the one that catches the attack the other two cannot.
- * Spraying is one attempt against each of a hundred usernames: it never touches
- * the per-username ceiling of eight, and the per-address ceiling is defeated by
- * a rotated `X-Forwarded-For`, which nothing here can verify — the app is
- * behind a tunnel that connects over loopback, so every request carries the
- * proxy's address and the header is the only thing that claims otherwise.
- *
- * This bucket needs no identity at all, which is exactly why it holds. A
- * hundred and nine accounts on one site produce nowhere near forty failed
- * sign-ins a minute in ordinary use — a whole class arriving at nine o'clock
- * and fumbling new passwords is a handful a minute — and a wordlist produces
- * far more.
- *
- * ── Why this slows attempts down rather than refusing them ────────────────
- *
- * The first version of this refused every sign-in while the bucket was hot,
- * and the QA suite locked itself out inside a second — which is exactly what
- * would happen to a class if somebody sprayed the site during a test. A bucket
- * with no identity in it cannot refuse selectively, so refusing at all turns a
- * failed attack into a successful denial of service against ninety students.
- *
- * A delay has neither problem. Somebody who types their password correctly
- * still gets in, a second or two later and probably without noticing. Somebody
- * working through a wordlist has their throughput cut by a factor of ten and
- * gains nothing, because the delay is applied before the password is checked
- * and is the same whether the guess was close or nonsense.
- */
+/** Failures across the whole site in one minute before every attempt is slowed. */
 export const MAX_GLOBAL_FAILURES_PER_MINUTE = 40;
 const GLOBAL_WINDOW_MS = 60 * 1000;
 
-/** How long an attempt waits while the school-wide failure rate is anomalous. */
+/**
+ * How long an attempt waits while a bucket it falls in is hot. Applied before the password is
+ * checked and the same for every guess, so it only costs throughput. A person typing the right
+ * password still gets in, a couple of seconds later.
+ */
+export const USERNAME_SLOWDOWN_MS = 2_000;
+/** People may choose their passwords (ADR-020), so the per-username wait grows: +2 s per 8 failures. */
+export const MAX_USERNAME_SLOWDOWN_MS = 10_000;
+export const IP_SLOWDOWN_MS = 1_500;
 export const GLOBAL_SLOWDOWN_MS = 1_500;
 
 interface Bucket {
@@ -80,7 +62,7 @@ function prune(bucket: Bucket, now: number): number[] {
   return bucket.failures;
 }
 
-/** Drops empty buckets so a term of logins cannot grow the maps without bound. */
+/** Drops empty buckets so a day of logins cannot grow the maps without bound. */
 function sweep(map: Map<string, Bucket>, now: number): void {
   for (const [key, bucket] of map) {
     if (prune(bucket, now).length === 0) map.delete(key);
@@ -89,63 +71,27 @@ function sweep(map: Map<string, Bucket>, now: number): void {
 
 let lastSweep = 0;
 
-export interface RateVerdict {
-  allowed: boolean;
-  /** Seconds until the caller may try again. Only meaningful when blocked. */
-  retryAfterSeconds: number;
-  reason?: 'username' | 'ip';
-  /**
-   * Milliseconds this attempt should wait before the password is checked.
-   *
-   * Non-zero only while the school-wide failure rate is anomalous. Never a
-   * refusal — see the note on `MAX_GLOBAL_FAILURES_PER_MINUTE`.
-   */
-  delayMs: number;
+function failuresIn(map: Map<string, Bucket>, key: string, now: number): number {
+  const bucket = map.get(key);
+  return bucket ? prune(bucket, now).length : 0;
 }
 
-export function checkLoginRate(username: string, ip?: string | undefined): RateVerdict {
+/** Milliseconds this attempt should wait before the password is checked. Never a refusal. */
+export function loginDelayMs(username: string, ip?: string | undefined): number {
   const now = Date.now();
-
   if (now - lastSweep > WINDOW_MS) {
     sweep(byUsername, now);
     sweep(byIp, now);
     lastSweep = now;
   }
-
-  const key = username.trim().toLowerCase();
-  const userBucket = byUsername.get(key);
-  const userFailures = userBucket ? prune(userBucket, now) : [];
-
-  if (userFailures.length >= MAX_USERNAME_FAILURES) {
-    const oldest = userFailures[0]!;
-    return {
-      allowed: false,
-      retryAfterSeconds: Math.max(1, Math.ceil((WINDOW_MS - (now - oldest)) / 1000)),
-      reason: 'username',
-      delayMs: 0,
-    };
-  }
-
-  if (ip) {
-    const ipBucket = byIp.get(ip);
-    const ipFailures = ipBucket ? prune(ipBucket, now) : [];
-    if (ipFailures.length >= MAX_IP_FAILURES) {
-      const oldest = ipFailures[0]!;
-      return {
-        allowed: false,
-        retryAfterSeconds: Math.max(1, Math.ceil((WINDOW_MS - (now - oldest)) / 1000)),
-        reason: 'ip',
-        delayMs: 0,
-      };
-    }
-  }
-
-  // The bucket with no identity in it. It slows every attempt down while it is
-  // hot and refuses none of them.
   global.failures = global.failures.filter((at) => now - at < GLOBAL_WINDOW_MS);
-  const hot = global.failures.length >= MAX_GLOBAL_FAILURES_PER_MINUTE;
 
-  return { allowed: true, retryAfterSeconds: 0, delayMs: hot ? GLOBAL_SLOWDOWN_MS : 0 };
+  let delay = 0;
+  const steps = Math.floor(failuresIn(byUsername, username.trim().toLowerCase(), now) / MAX_USERNAME_FAILURES);
+  if (steps > 0) delay = Math.max(delay, Math.min(steps * USERNAME_SLOWDOWN_MS, MAX_USERNAME_SLOWDOWN_MS));
+  if (ip && failuresIn(byIp, ip, now) >= MAX_IP_FAILURES) delay = Math.max(delay, IP_SLOWDOWN_MS);
+  if (global.failures.length >= MAX_GLOBAL_FAILURES_PER_MINUTE) delay = Math.max(delay, GLOBAL_SLOWDOWN_MS);
+  return delay;
 }
 
 export function recordLoginFailure(username: string, ip?: string | undefined): void {
@@ -166,23 +112,10 @@ export function recordLoginFailure(username: string, ip?: string | undefined): v
   global.failures.push(now);
 }
 
-/**
- * Clears the counters after a successful sign-in.
- *
- * The IP counter is cleared too: somebody signing in proves the address is not
- * purely hostile, and it stops a class being throttled by whoever mistyped
- * their password four times before getting it right.
- */
+/** Clears the username and IP counters after a successful sign-in. */
 export function clearLoginRate(username: string, ip?: string | undefined): void {
   byUsername.delete(username.trim().toLowerCase());
   if (ip) byIp.delete(ip);
-}
-
-/** Wording for a blocked attempt. Vague on purpose — no account enumeration. */
-export function rateLimitMessage(verdict: RateVerdict): string {
-  const minutes = Math.ceil(verdict.retryAfterSeconds / 60);
-  const wait = minutes <= 1 ? 'a minute' : `${minutes} minutes`;
-  return `Too many failed sign-in attempts. Try again in ${wait}, or ask an organizer at the desk.`;
 }
 
 /** Test-only reset. */

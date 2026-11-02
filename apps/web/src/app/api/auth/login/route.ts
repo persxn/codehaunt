@@ -18,11 +18,6 @@ export async function POST(request: NextRequest) {
   });
 
   if (!result.ok) {
-    if (result.reason === 'rate_limited') {
-      return apiError(429, 'rate_limited', result.message ?? 'Too many attempts.', requestId, {
-        headers: { 'retry-after': String(result.retryAfterSeconds ?? 60) },
-      });
-    }
     if (result.reason === 'account_inactive') {
       return apiError(403, 'account_inactive', 'Your account is not active yet. Check in at the desk first.', requestId);
     }

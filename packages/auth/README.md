@@ -6,7 +6,7 @@ deny-by-default route policy. Ported from JojoCode @ a8f4056 (see `/VENDORED.md`
 | Path | What it does |
 |---|---|
 | `src/` | password, session, login, rate-limit, policy (details in `src/README.md`) |
-| `test/` | policy unit tests and login/session tests on PGlite (`test/README.md`) |
+| `test/` | policy unit tests, login/session tests on PGlite, concurrent-login test on Postgres (`test/README.md`) |
 | `package.json` | `@codehaunt/auth`; exports `.` and `./policy` |
 | `tsconfig.json` | extends the root base config |
 
@@ -21,4 +21,4 @@ deny-by-default route policy. Ported from JojoCode @ a8f4056 (see `/VENDORED.md`
 ## Gotchas
 - A route missing from `ROUTE_POLICY` is denied (401 without a session, 403 with one). Add a row when you add a route.
 - One active session per participant: a new login ends the old one and writes `auth.session_replaced` to `audit_log`.
-- Throttling state is in process memory; it resets on restart and is per web instance.
+- Throttling state is in process memory; it resets on restart and is per web instance. It delays, never refuses (ADR-020).

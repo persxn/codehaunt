@@ -1,6 +1,16 @@
 # Canonical way to run CodeHaunt (ADR-017). Profiles: core (this WP); inference, monitoring, tunnel come later.
-# core services: migrate, web, worker
+# core services: migrate, web, worker, docker-proxy
+#
+# Networks (ADR-019): `db` and `sandbox` are internal (no route out of Docker). The worker sits only on those two,
+# so even a compromised worker cannot reach the tailnet, gpu-master or the internet. Only the docker-proxy holds
+# the host Docker socket. web and worker connect to Postgres as codehaunt_app, never as the owner (audit F2).
 name: codehaunt
+
+x-hardened: &hardened
+  read_only: true
+  cap_drop: [ALL]
+  security_opt: [no-new-privileges:true]
+  tmpfs: [/tmp]
 
 services:
   postgres:
@@ -12,6 +22,7 @@ services:
       POSTGRES_DB: ${POSTGRES_DB:-codehaunt}
     ports:
       - "127.0.0.1:${POSTGRES_PORT:-5434}:5432"
+    networks: [db, edge]
     volumes:
       - pgdata:/var/lib/postgresql/data
     healthcheck:
@@ -22,51 +33,85 @@ services:
     restart: unless-stopped
 
   migrate:
+    <<: *hardened
     profiles: [core]
     build:
       context: .
       dockerfile: packages/db/Dockerfile.migrate
     image: codehaunt-migrate:dev
     environment:
+      # Owner credentials: the only service that holds them.
       DATABASE_URL: postgresql://${POSTGRES_USER:-codehaunt}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-codehaunt}
+      APP_DB_PASSWORD: ${APP_DB_PASSWORD:?set APP_DB_PASSWORD in .env}
+    tmpfs: [/tmp, /home/node]
+    networks: [db]
     depends_on:
       postgres:
         condition: service_healthy
     restart: "no"
 
   web:
+    <<: *hardened
     profiles: [core]
     build:
       context: .
       dockerfile: apps/web/Dockerfile
     image: codehaunt-web:dev
     environment:
-      DATABASE_URL: postgresql://${POSTGRES_USER:-codehaunt}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-codehaunt}
+      DATABASE_URL: postgresql://codehaunt_app:${APP_DB_PASSWORD}@postgres:5432/${POSTGRES_DB:-codehaunt}
       COOKIE_SECURE: ${COOKIE_SECURE:-}
+    tmpfs: [/tmp, /app/apps/web/.next/cache]
     ports:
       - "127.0.0.1:${WEB_PORT:-3100}:3100"
+    networks: [db, edge]
     depends_on:
       migrate:
         condition: service_completed_successfully
     restart: unless-stopped
 
   worker:
+    <<: *hardened
     profiles: [core]
     build:
       context: .
       dockerfile: apps/worker/Dockerfile
     image: codehaunt-worker:dev
     environment:
-      DATABASE_URL: postgresql://${POSTGRES_USER:-codehaunt}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-codehaunt}
+      DATABASE_URL: postgresql://codehaunt_app:${APP_DB_PASSWORD}@postgres:5432/${POSTGRES_DB:-codehaunt}
       RUNNER_IMAGE: ${RUNNER_IMAGE:-codehaunt-runner:1}
-    volumes:
-      - "/var/run/docker.sock:/var/run/docker.sock" # grants control of the host Docker daemon; used by vendored judge to start sandbox containers
-    group_add:
-      - "${DOCKER_GID:-999}"
+      DOCKER_HOST: tcp://docker-proxy:2375
+    tmpfs: [/tmp, /home/node]
+    networks: [db, sandbox]
     depends_on:
       migrate:
         condition: service_completed_successfully
+      docker-proxy:
+        condition: service_healthy
     restart: unless-stopped
+
+  docker-proxy:
+    <<: *hardened
+    profiles: [core]
+    build:
+      context: .
+      dockerfile: apps/docker-proxy/Dockerfile
+    image: codehaunt-docker-proxy:dev
+    environment:
+      RUNNER_IMAGE: ${RUNNER_IMAGE:-codehaunt-runner:1}
+    volumes:
+      # Root-equivalent. Only this service mounts it; it rebuilds every create from the sandbox template.
+      - "/var/run/docker.sock:/var/run/docker.sock"
+    group_add:
+      - "${DOCKER_GID:-999}"
+    networks: [sandbox]
+    restart: unless-stopped
+
+networks:
+  db:
+    internal: true
+  sandbox:
+    internal: true
+  edge: {}
 
 volumes:
   pgdata:

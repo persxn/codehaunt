@@ -36,6 +36,7 @@ test('token_ledger refuses UPDATE and DELETE; the budget is the sum of deltas', 
 
   await expectDbError(db.prisma, db.prisma.$executeRaw`UPDATE token_ledger SET delta = 0 WHERE id = ${usage.id}`, /append-only/);
   await expectDbError(db.prisma, db.prisma.$executeRaw`DELETE FROM token_ledger`, /append-only/);
+  await expectDbError(db.prisma, db.prisma.$executeRaw`TRUNCATE token_ledger`, /append-only/);
 
   const sum = await db.prisma.tokenLedger.aggregate({ where: { participantId: participant.id }, _sum: { delta: true } });
   assert.equal(sum._sum.delta, 750);

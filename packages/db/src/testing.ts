@@ -2,6 +2,7 @@
  * In-process Postgres (PGlite) for tests, with every shipped migration applied in order.
  * Ported from JojoCode packages/db/test/harness.ts @ a8f4056. Test-only: imports devDependencies.
  */
+import { randomBytes } from 'node:crypto';
 import { mkdtemp, readdir, readFile, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -9,6 +10,7 @@ import { fileURLToPath } from 'node:url';
 
 import { PGlite } from '@electric-sql/pglite';
 import { PGLiteSocketServer } from '@electric-sql/pglite-socket';
+import pg from 'pg';
 
 import { createPrismaClient, type PrismaClient } from './client.ts';
 
@@ -37,6 +39,8 @@ async function startServer(pglite: PGlite): Promise<{ server: PGLiteSocketServer
 
 export interface TestDatabase {
   prisma: PrismaClient;
+  /** Direct handle, for tests that need SQL outside Prisma (roles, SET ROLE). */
+  pglite: PGlite;
   close: () => Promise<void>;
 }
 
@@ -54,11 +58,44 @@ export async function createTestDatabase(): Promise<TestDatabase> {
 
   return {
     prisma,
+    pglite,
     close: async () => {
       await prisma.$disconnect().catch(() => {});
       await server.stop().catch(() => {});
       await pglite.close().catch(() => {});
       await rm(dataDir, { recursive: true, force: true });
+    },
+  };
+}
+
+/**
+ * A throwaway database on a real Postgres, for what PGlite cannot show: concurrency (it serves
+ * one connection at a time). `adminUrl` must be allowed to CREATE/DROP DATABASE; the database is
+ * dropped on close. Tests gate on TEST_POSTGRES_URL, which `scripts/ci.sh` sets when Postgres is up.
+ */
+export async function createPostgresTestDatabase(adminUrl: string): Promise<Omit<TestDatabase, 'pglite'>> {
+  const name = `codehaunt_test_${randomBytes(6).toString('hex')}`;
+  const admin = new pg.Client({ connectionString: adminUrl });
+  await admin.connect();
+  await admin.query(`CREATE DATABASE ${name}`);
+  await admin.end();
+
+  const url = new URL(adminUrl);
+  url.pathname = `/${name}`;
+  const setup = new pg.Client({ connectionString: url.toString() });
+  await setup.connect();
+  for (const sql of await migrationSql()) await setup.query(sql);
+  await setup.end();
+
+  const prisma = createPrismaClient({ url: url.toString(), maxConnections: 10 });
+  return {
+    prisma,
+    close: async () => {
+      await prisma.$disconnect().catch(() => {});
+      const dropper = new pg.Client({ connectionString: adminUrl });
+      await dropper.connect();
+      await dropper.query(`DROP DATABASE IF EXISTS ${name} WITH (FORCE)`);
+      await dropper.end();
     },
   };
 }

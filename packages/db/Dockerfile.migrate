@@ -3,6 +3,7 @@ WORKDIR /app
 COPY package.json package-lock.json ./
 COPY apps/web/package.json ./apps/web/
 COPY apps/worker/package.json ./apps/worker/
+COPY apps/docker-proxy/package.json ./apps/docker-proxy/
 COPY packages/auth/package.json ./packages/auth/
 COPY packages/contracts/package.json ./packages/contracts/
 COPY packages/judge/package.json ./packages/judge/
@@ -13,5 +14,5 @@ RUN npm ci
 COPY packages/db ./packages/db
 WORKDIR /app/packages/db
 USER node
-# One-shot: applies pending migrations and exits.
-CMD ["npx", "prisma", "migrate", "deploy"]
+# One-shot: applies pending migrations, (re)provisions the app role (audit F2), and exits.
+CMD ["sh", "-c", "../../node_modules/.bin/prisma migrate deploy && node --experimental-strip-types scripts/provision-app-role.ts"]

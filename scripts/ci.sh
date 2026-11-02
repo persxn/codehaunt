@@ -16,4 +16,12 @@ npm run typecheck
 
 echo "=== test ==="
 export CJUDGE_RUNNER_IMAGE=codehaunt-runner:1
+# Concurrency tests need real Postgres (PGlite serialises connections): the compose one, via the owner URL.
+if [ -f .env ]; then
+  docker compose --profile db up -d --wait
+  TEST_POSTGRES_URL="$(grep -E '^DATABASE_URL=' .env | cut -d= -f2-)"
+  export TEST_POSTGRES_URL
+else
+  echo "no .env: Postgres concurrency tests will be skipped" >&2
+fi
 npm test

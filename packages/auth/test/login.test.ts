@@ -6,12 +6,23 @@ import { createTestDatabase, type TestDatabase } from '@codehaunt/db/testing';
 import {
   generatePassword,
   hashPassword,
+  checkPasswordStrength,
   login,
   resetLoginRateLimits,
   resolveSession,
   setAccountActive,
   verifyPassword,
 } from '../src/index.ts';
+import {
+  GLOBAL_SLOWDOWN_MS,
+  IP_SLOWDOWN_MS,
+  loginDelayMs,
+  MAX_IP_FAILURES,
+  MAX_USERNAME_FAILURES,
+  MAX_USERNAME_SLOWDOWN_MS,
+  recordLoginFailure,
+  USERNAME_SLOWDOWN_MS,
+} from '../src/rate-limit.ts';
 
 let db: TestDatabase;
 const PASSWORD = 'correct-horse-9';
@@ -89,19 +100,48 @@ test('staff may hold several sessions', async () => {
 test('deactivating an account ends its sessions immediately', async () => {
   const result = await login(db.prisma, 'org', PASSWORD);
   assert.ok(result.ok);
-  await setAccountActive(db.prisma, result.user.id, false);
+  await setAccountActive(db.prisma, result.user.id, false, { actorId: result.user.id, requestId: 'req-deact' });
   assert.equal(await resolveSession(db.prisma, result.session.token), null);
-  await setAccountActive(db.prisma, result.user.id, true);
+  const entry = await db.prisma.auditLog.findFirst({ where: { action: 'user.deactivated', requestId: 'req-deact' } });
+  assert.equal(entry?.targetId, result.user.id);
+  await setAccountActive(db.prisma, result.user.id, true, { actorId: result.user.id });
 });
 
-test('repeated failures for one username are throttled', async () => {
-  for (let i = 0; i < 8; i++) await login(db.prisma, 'p1', 'wrong');
+test('failures for one username slow it down but never lock its owner out', async () => {
+  for (let i = 0; i < MAX_USERNAME_FAILURES; i++) await login(db.prisma, 'p1', 'wrong');
+  assert.equal(loginDelayMs('p1'), USERNAME_SLOWDOWN_MS);
+  assert.equal(loginDelayMs('P1 '), USERNAME_SLOWDOWN_MS, 'case and spacing do not open a fresh bucket');
+  const started = Date.now();
   const result = await login(db.prisma, 'p1', PASSWORD);
-  assert.equal(result.ok, false);
-  assert.equal(!result.ok && result.reason, 'rate_limited');
+  assert.ok(result.ok, 'the right password still gets in');
+  assert.ok(Date.now() - started >= USERNAME_SLOWDOWN_MS);
+  assert.equal(loginDelayMs('p1'), 0, 'a success clears the bucket');
+});
+
+test('the per-username wait grows with failures, up to a ceiling', () => {
+  for (let i = 0; i < MAX_USERNAME_FAILURES * 2; i++) recordLoginFailure('target');
+  assert.equal(loginDelayMs('target'), 2 * USERNAME_SLOWDOWN_MS);
+  for (let i = 0; i < MAX_USERNAME_FAILURES * 20; i++) recordLoginFailure('target');
+  assert.equal(loginDelayMs('target'), MAX_USERNAME_SLOWDOWN_MS);
+});
+
+test('a hot venue address slows every login from it without refusing any', async () => {
+  for (let i = 0; i < MAX_IP_FAILURES; i++) recordLoginFailure(`user${i}`, '203.0.113.7');
+  assert.equal(loginDelayMs('p1', '203.0.113.7'), IP_SLOWDOWN_MS);
+  assert.equal(loginDelayMs('p1', '203.0.113.8'), GLOBAL_SLOWDOWN_MS, 'the site-wide bucket is hot too');
 });
 
 test('unknown and empty tokens resolve to null', async () => {
   assert.equal(await resolveSession(db.prisma, undefined), null);
   assert.equal(await resolveSession(db.prisma, 'not-a-token'), null);
+});
+
+test('chosen passwords: long, not common, not the username', () => {
+  assert.equal(checkPasswordStrength('short-1A').ok, false);
+  assert.equal(checkPasswordStrength('Password2024!!').ok, false, 'a common word padded with digits');
+  assert.equal(checkPasswordStrength('aaaaaaaaaaaa1').ok, false, 'too little variety');
+  assert.equal(checkPasswordStrength('enrol-2026-0042xyz', 'enrol-2026-0042').ok, false);
+  assert.equal(checkPasswordStrength('my codehaunt pass').ok, false);
+  assert.equal(checkPasswordStrength('violet tram ladder 9', 'p1').ok, true);
+  assert.equal(checkPasswordStrength(generatePassword()).ok, true, 'generated passwords always pass');
 });

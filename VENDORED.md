@@ -6,7 +6,8 @@ Code copied from other repositories at a pinned commit (ADR-001). Upstream fixes
 |---|---|---|---|---|
 | `packages/judge/` | JojoCode `packages/judge/` (`@cjudge/judge`) | `a8f4056` | MIT (`packages/judge/LICENSE`) | none in `src/` or `test/` (see below) |
 | `packages/judge/docker/` | JojoCode `docker/runner/` | `a8f4056` | MIT | `build.sh`: runner path is `../src/runner/runner.py`; default image `codehaunt-runner:1` |
-| `packages/auth/src/rate-limit.ts` | JojoCode `packages/db/src/auth/rate-limit.ts` | `a8f4056` | MIT | header note; lockout message says "organizer at the desk" |
+| `packages/auth/src/rate-limit.ts` | JojoCode `packages/db/src/auth/rate-limit.ts` | `a8f4056` | MIT | delays only, never refuses (ADR-020): refusal branches and `rateLimitMessage` removed, per-username wait escalates |
+| `packages/auth/src/common-passwords.ts` | SecLists `Passwords/Common-Credentials/10k-most-common.txt` | `913b327` | MIT (Daniel Miessler) | lowercased, de-duplicated, wrapped in a TS module |
 | `packages/auth/src/{password,session,login}.ts` | JojoCode `packages/db/src/auth/{password,session,auth}.ts` | `a8f4056` | MIT | ported, not copied: CodeHaunt roles, single participant session, audit entry on replacement |
 | `packages/db/src/testing.ts` | JojoCode `packages/db/test/harness.ts` | `a8f4056` | MIT | slimmed; `expectDbError` added |
 

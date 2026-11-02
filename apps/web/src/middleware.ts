@@ -10,7 +10,8 @@ import { NextResponse, type NextRequest } from 'next/server';
 import { authorize, resolveSession, SESSION_COOKIE } from '@codehaunt/auth';
 import { getPrismaClient } from '@codehaunt/db';
 
-import { apiError, requestIdOf } from '@/lib/http';
+// Relative, not `@/`: the HTTP-level test loads this file with plain Node.
+import { apiError, requestIdOf } from './lib/http.ts';
 
 const SAFE_METHODS = new Set(['GET', 'HEAD', 'OPTIONS']);
 

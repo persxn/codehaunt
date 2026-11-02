@@ -16,7 +16,10 @@ export function apiError(status: number, code: string, message: string, requestI
   return NextResponse.json(body, { ...init, status, headers: { ...init?.headers, 'x-request-id': requestId } });
 }
 
-/** First hop as seen by the tunnel (Cloudflare sets cf-connecting-ip); never trusted for authorization. */
+/**
+ * The visitor's address as Cloudflare saw it (it overwrites cf-connecting-ip at the edge). Not
+ * x-forwarded-for: a client can append to that freely. Only used to throttle, never to authorize.
+ */
 export function clientIp(headers: Headers): string | undefined {
-  return headers.get('cf-connecting-ip') ?? headers.get('x-forwarded-for')?.split(',')[0]?.trim() ?? undefined;
+  return headers.get('cf-connecting-ip') ?? undefined;
 }

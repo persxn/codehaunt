@@ -4,6 +4,7 @@ WORKDIR /app
 COPY package.json package-lock.json ./
 COPY apps/web/package.json ./apps/web/
 COPY apps/worker/package.json ./apps/worker/
+COPY apps/docker-proxy/package.json ./apps/docker-proxy/
 COPY packages/auth/package.json ./packages/auth/
 COPY packages/contracts/package.json ./packages/contracts/
 COPY packages/judge/package.json ./packages/judge/

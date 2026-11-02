@@ -8,7 +8,8 @@ Sandbox runner implementation that executes untrusted participant code.
 | `code-runner.ts` | `CodeRunner` interface and `DockerCodeRunner`: validates `RunRequest`, runs the vendored judge (Docker backend only), returns `RunResult`; `missingImages()` for readiness |
 
 ## Affects / depends on
-- Depends on the vendored `@cjudge/judge` (Docker backend) and the host Docker socket.
+- Depends on the vendored `@cjudge/judge` (Docker backend) and a Docker endpoint: `docker-proxy` in compose
+  (`DOCKER_HOST`), the host socket in local tests.
 - Changing this file changes all verdicts produced by the platform.
 
 ## Entry points & how to test

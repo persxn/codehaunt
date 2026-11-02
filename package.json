@@ -11,7 +11,7 @@
   ],
   "scripts": {
     "typecheck": "npm run typecheck --workspaces --if-present && tsc --noEmit -p tsconfig.json",
-    "test": "npm run test -w @codehaunt/contracts -w @codehaunt/db -w @codehaunt/auth -w @codehaunt/worker -w @codehaunt/web && node scripts/test-judge.mjs",
+    "test": "npm run test -w @codehaunt/contracts -w @codehaunt/db -w @codehaunt/auth -w @codehaunt/worker -w @codehaunt/docker-proxy -w @codehaunt/web && node scripts/test-judge.mjs",
     "check-readmes": "node scripts/check-readmes.mjs"
   },
   "engines": {
@@ -20,5 +20,8 @@
   "devDependencies": {
     "@types/node": "^22.10.0",
     "typescript": "^5.9.0"
+  },
+  "overrides": {
+    "postcss": "8.5.32"
   }
 }

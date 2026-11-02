@@ -5,9 +5,10 @@ Database client source files.
 ## Contents
 | Path | What it does |
 |---|---|
-| `client.ts` | Instantiates Prisma client (singleton) |
+| `client.ts` | `createPrismaClient` (pg driver adapter) and the process-wide `getPrismaClient` |
 | `index.ts` | Re‑exports client and helper utilities |
-| `testing.ts` | Test helpers, including `expectDbError` for PGlite connection‑drop behavior |
+| `app-role.ts` | SQL for `codehaunt_app`, the non-owner, non-superuser role web/worker use; ledgers insert/select only (`@codehaunt/db/app-role`) |
+| `testing.ts` | test databases: PGlite (`createTestDatabase`), throwaway real Postgres (`createPostgresTestDatabase`), `expectDbError` |
 
 ## Affects / depends on
 - Depends on generated Prisma client (`@prisma/client`).

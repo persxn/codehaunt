@@ -123,7 +123,7 @@ export async function destroySession(prisma: PrismaClient, token: string): Promi
 }
 
 /** Ends every session of a user (password change, deactivation, disqualification). */
-export async function destroyAllSessions(prisma: PrismaClient, userId: string): Promise<number> {
+export async function destroyAllSessions(prisma: Pick<PrismaClient, 'authSession'>, userId: string): Promise<number> {
   const { count } = await prisma.authSession.deleteMany({ where: { userId } });
   return count;
 }

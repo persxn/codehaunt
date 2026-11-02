@@ -1,17 +1,21 @@
 # lib
 
-Utility library for the web app.
+Server-side helpers for the web app.
 
 ## Contents
 | Path | What it does |
 |---|---|
-| `config.ts` | Reads environment config (e.g., API base URL) |
-| `http.ts` | Wrapper around fetch with auth cookie handling |
+| `config.ts` | validates `DATABASE_URL`, `NODE_ENV`, `COOKIE_SECURE` at startup; exits naming the bad key |
+| `http.ts` | request IDs (`cf-ray` or UUID), `apiError` (the one `ApiError` envelope), `clientIp` (`cf-connecting-ip` only) |
 | `session.ts` | `currentUser()`: resolves the session cookie to a user on the server (route handlers, pages) |
 
 ## Affects / depends on
-- Depends on `@codehaunt/auth` policy for protected calls.
-- Used by many pages and API clients.
+- `http.ts` is used by `middleware.ts` and every `/api` route; changing `apiError` changes every error response.
+- `session.ts` depends on `@codehaunt/auth` and `@codehaunt/db`.
 
 ## Entry points & how to test
-- Imported by components; unit tests reside in `apps/web/test/` (none specific).
+- Covered through `apps/web/test/middleware.test.ts` (error envelope, request IDs).
+
+## Gotchas
+- `clientIp` trusts only Cloudflare's header: `x-forwarded-for` is client-controlled. It feeds throttling, never authorization.
+- `middleware.ts` imports `./lib/http.ts` by relative path so the tests can load it with plain Node.

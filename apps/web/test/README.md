@@ -1,19 +1,19 @@
 # test
 
-Integration tests for the web application routes.
+Tests for the web app's access control. No server and no database: they call the policy and the middleware directly.
 
 ## Contents
 | Path | What it does |
 |---|---|
-| `routes.test.ts` | walks every page/route under `src/app` and asserts it is 401 without a session unless allowlisted as public |
+| `routes.test.ts` | walks every page/route under `src/app` and asserts the policy gives 401 without a session unless public |
+| `middleware.test.ts` | the real `middleware()` on real `NextRequest`s: 401s, public pass-through, path tricks, cross-site POST 403 |
+| `support/` | Node resolve hook so plain Node can load Next's `next/server` (`support/README.md`) |
 
 ## Affects / depends on
-- Depends on the running API server (started by test harness) and the DB (via migrations).
-- Relies on `@codehaunt/auth` policy definitions.
+- Depends on `@codehaunt/auth` (policy) and `src/middleware.ts`.
 
 ## Entry points & how to test
-- Run `npm test -w @codehaunt/web`.
-- Tests spin up the app in a test environment, hit `/healthz`, `/readyz`, `/api/auth/*` etc.
+- `npm test -w @codehaunt/web` (loads `support/next-resolve.mjs` via `--import`).
 
 ## Gotchas
-- Middleware deny‑by‑default means any new route must be added to `ROUTE_POLICY` or tests will fail.
+- A new route must get a `ROUTE_POLICY` row, or these tests (and the route) deny it.

@@ -1,6 +1,6 @@
 // Dev seed: one demo event, 2 problems, an admin and 3 participants (p1 checked in). Idempotent; refuses production.
 import { createPrismaClient } from '@codehaunt/db';
-import { hashPassword } from '@codehaunt/auth';
+import { generatePassword, hashPassword } from '@codehaunt/auth';
 import { EventConfig, ProblemInput } from '@codehaunt/contracts';
 
 if (process.env.NODE_ENV === 'production') {
@@ -16,7 +16,13 @@ try {
     process.exit(0);
   }
 
-  const password = process.env.SEED_PASSWORD ?? 'codehaunt-dev';
+  // Never a published default: a dev seed run against the event volume must not plant a known admin login.
+  const password = process.env.SEED_PASSWORD || generatePassword(16);
+  if (password === 'codehaunt-dev') {
+    console.error('seed: SEED_PASSWORD is the old published default; pick another or leave it unset');
+    process.exit(1);
+  }
+  if (!process.env.SEED_PASSWORD) console.log(`seed: generated password for admin, p1, p2, p3 (shown once): ${password}`);
   const passwordHash = await hashPassword(password);
 
   // Helper to build ISO strings with +05:30 offset for tomorrow 09:00 and 10:00

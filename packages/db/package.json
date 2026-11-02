@@ -7,13 +7,15 @@
   "types": "./src/index.ts",
   "exports": {
     ".": "./src/index.ts",
-    "./testing": "./src/testing.ts"
+    "./testing": "./src/testing.ts",
+    "./app-role": "./src/app-role.ts"
   },
   "scripts": {
     "generate": "prisma generate",
     "postinstall": "prisma generate",
     "migrate:dev": "prisma migrate dev",
     "migrate:deploy": "prisma migrate deploy",
+    "provision-app-role": "node --experimental-strip-types scripts/provision-app-role.ts",
     "typecheck": "tsc --noEmit -p tsconfig.json",
     "test": "npm run typecheck && node --test --experimental-strip-types test/*.test.ts"
   },

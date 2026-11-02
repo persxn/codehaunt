@@ -18,7 +18,8 @@ const ARGON2_OPTIONS = {
   parallelism: 1,
 } as const;
 
-export const MIN_PASSWORD_LENGTH = 8;
+/** For passwords people choose (ADR-020). Generated ones are 12 random characters. */
+export const MIN_PASSWORD_LENGTH = 12;
 export const MAX_PASSWORD_LENGTH = 200;
 
 export async function hashPassword(password: string): Promise<string> {
