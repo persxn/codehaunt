@@ -1,0 +1,27 @@
+{
+  "name": "@cjudge/judge",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "main": "./src/index.ts",
+  "types": "./src/index.ts",
+  "exports": {
+    ".": "./src/index.ts",
+    "./restrictions.ts": "./src/restrictions.ts",
+    "./comparator.ts": "./src/comparator.ts",
+    "./types.ts": "./src/types.ts"
+  },
+  "bin": {
+    "cjudge": "./dist/cli.js"
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.json && node scripts/copy-runner.mjs",
+    "typecheck": "tsc --noEmit -p tsconfig.json",
+    "test": "npm run typecheck && node --test --experimental-strip-types test/*.test.ts",
+    "test:load": "node --test --experimental-strip-types test/load.test.ts"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.0",
+    "typescript": "^5.7.0"
+  }
+}

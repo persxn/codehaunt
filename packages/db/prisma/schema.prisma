@@ -1,0 +1,393 @@
+// CodeHaunt core schema. Every participant, prompt, submission and score belongs to one Event.
+// Event-specific settings live in Event.config, validated by EventConfig in @codehaunt/contracts.
+// Append-only tables (audit_log, token_ledger) are protected by triggers in the first migration.
+
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated"
+}
+
+// Prisma 7 takes the connection URL from prisma.config.ts (migrations) and from the
+// driver adapter at runtime (src/client.ts).
+datasource db {
+  provider = "postgresql"
+}
+
+// ---------------------------------------------------------------------------
+// Accounts and sessions
+// ---------------------------------------------------------------------------
+
+enum Role {
+  ADMIN
+  ORGANIZER
+  VOLUNTEER
+  PARTICIPANT
+}
+
+model User {
+  id           String    @id @default(cuid())
+  /// Lower-case login handle. Participants use their enrolment number.
+  username     String    @unique
+  name         String
+  email        String?   @unique
+  role         Role
+  passwordHash String
+  /// Participants stay inactive until their QR is scanned at check-in (ADR-013).
+  active       Boolean   @default(false)
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+  lastLoginAt  DateTime?
+
+  sessions     AuthSession[]
+  participants Participant[]
+  auditEntries AuditLog[]    @relation("AuditActor")
+
+  @@map("users")
+}
+
+/// Login session. `id` is the SHA-256 of the cookie token; the token itself is never stored.
+model AuthSession {
+  id        String   @id
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+  expiresAt DateTime
+  ipAddress String?
+  userAgent String?
+
+  @@index([userId])
+  @@index([expiresAt])
+  @@map("auth_sessions")
+}
+
+// ---------------------------------------------------------------------------
+// Event, problems, tests
+// ---------------------------------------------------------------------------
+
+enum EventStatus {
+  DRAFT
+  CHECK_IN
+  RUNNING
+  PAUSED
+  ENDED
+  JUDGING
+  PUBLISHED
+}
+
+model Event {
+  id        String      @id @default(cuid())
+  slug      String      @unique
+  name      String
+  status    EventStatus @default(DRAFT)
+  /// EventConfig (zod, @codehaunt/contracts): schedule, budgets, languages, weights, model, rubric.
+  config    Json
+  /// Set when the contest starts; problems and scoring weights are frozen from then on (ADR-006).
+  lockedAt  DateTime?
+  createdAt DateTime    @default(now())
+  updatedAt DateTime    @updatedAt
+
+  problems     Problem[]
+  participants Participant[]
+  tokenLedger  TokenLedger[]
+
+  @@map("events")
+}
+
+enum Difficulty {
+  EASY
+  MEDIUM
+  HARD
+}
+
+enum Language {
+  C
+  CPP
+  JAVA
+  PYTHON
+}
+
+model Problem {
+  id                String     @id @default(cuid())
+  eventId           String
+  event             Event      @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  slug              String
+  title             String
+  /// Markdown statement shown to participants.
+  statement         String
+  difficulty        Difficulty
+  ord               Int
+  timeLimitMs       Int
+  memoryLimitMb     Int
+  /// Checker (zod, @codehaunt/contracts).
+  checker           Json
+  /// Organizer-only. Never returned by a participant-facing route.
+  referenceSolution String?
+  referenceLanguage Language?
+  createdAt         DateTime   @default(now())
+  updatedAt         DateTime   @updatedAt
+
+  testCases    TestCase[]
+  chatSessions ChatSession[]
+  submissions  Submission[]
+
+  @@unique([eventId, slug])
+  @@index([eventId, ord])
+  @@map("problems")
+}
+
+enum TestVisibility {
+  VISIBLE
+  HIDDEN
+}
+
+/// HIDDEN rows are read only by the worker's judging path (engineering standards §2).
+model TestCase {
+  id             String         @id @default(cuid())
+  problemId      String
+  problem        Problem        @relation(fields: [problemId], references: [id], onDelete: Cascade)
+  visibility     TestVisibility
+  ord            Int
+  input          String
+  expectedOutput String
+
+  @@unique([problemId, visibility, ord])
+  @@map("test_cases")
+}
+
+// ---------------------------------------------------------------------------
+// Participants
+// ---------------------------------------------------------------------------
+
+enum ParticipantStatus {
+  REGISTERED
+  WAITLISTED
+  CHECKED_IN
+  DISQUALIFIED
+}
+
+/// A user's entry in one event. Seat is a label recorded at check-in.
+model Participant {
+  id               String            @id @default(cuid())
+  eventId          String
+  event            Event             @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  userId           String
+  user             User              @relation(fields: [userId], references: [id], onDelete: Restrict)
+  enrolmentNo      String
+  phone            String?
+  status           ParticipantStatus @default(REGISTERED)
+  /// SHA-256 of the single-use check-in QR token; cleared once used.
+  checkInTokenHash String?           @unique
+  checkedInAt      DateTime?
+  seatLabel        String?
+  createdAt        DateTime          @default(now())
+
+  chatSessions   ChatSession[]
+  submissions    Submission[]
+  tokenLedger    TokenLedger[]
+  judgeReviews   JudgeReview[]
+  scoreOverrides ScoreOverride[]
+
+  @@unique([eventId, userId])
+  @@unique([eventId, enrolmentNo])
+  @@map("participants")
+}
+
+// ---------------------------------------------------------------------------
+// Prompting
+// ---------------------------------------------------------------------------
+
+/// One model conversation (context window) of a participant on a problem.
+model ChatSession {
+  id            String      @id @default(cuid())
+  participantId String
+  participant   Participant @relation(fields: [participantId], references: [id], onDelete: Cascade)
+  problemId     String
+  problem       Problem     @relation(fields: [problemId], references: [id], onDelete: Cascade)
+  language      Language
+  createdAt     DateTime    @default(now())
+  /// Set when the participant resets the context; a new ChatSession starts.
+  closedAt      DateTime?
+
+  turns        PromptTurn[]
+  codeVersions CodeVersion[]
+
+  @@index([participantId, problemId])
+  @@map("chat_sessions")
+}
+
+/// One prompt and the model's reply. Participant text and model output are untrusted.
+model PromptTurn {
+  id               String      @id @default(cuid())
+  chatSessionId    String
+  chatSession      ChatSession @relation(fields: [chatSessionId], references: [id], onDelete: Cascade)
+  ord              Int
+  idempotencyKey   String      @unique
+  prompt           String
+  reply            String?
+  model            String
+  node             String?
+  promptTokens     Int         @default(0)
+  completionTokens Int         @default(0)
+  latencyMs        Int?
+  createdAt        DateTime    @default(now())
+
+  codeVersions CodeVersion[]
+  tokenEntries TokenLedger[]
+
+  @@unique([chatSessionId, ord])
+  @@map("prompt_turns")
+}
+
+/// Code extracted from a model reply (participants cannot type code).
+model CodeVersion {
+  id            String      @id @default(cuid())
+  chatSessionId String
+  chatSession   ChatSession @relation(fields: [chatSessionId], references: [id], onDelete: Cascade)
+  promptTurnId  String?
+  promptTurn    PromptTurn? @relation(fields: [promptTurnId], references: [id], onDelete: SetNull)
+  language      Language
+  source        String
+  createdAt     DateTime    @default(now())
+
+  submissions Submission[]
+
+  @@index([chatSessionId, createdAt])
+  @@map("code_versions")
+}
+
+// ---------------------------------------------------------------------------
+// Judging and scoring
+// ---------------------------------------------------------------------------
+
+enum SubmissionKind {
+  SAMPLE
+  SUBMIT
+}
+
+enum SubmissionStatus {
+  QUEUED
+  RUNNING
+  DONE
+  FAILED
+}
+
+model Submission {
+  id             String           @id @default(cuid())
+  participantId  String
+  participant    Participant      @relation(fields: [participantId], references: [id], onDelete: Cascade)
+  problemId      String
+  problem        Problem          @relation(fields: [problemId], references: [id], onDelete: Cascade)
+  codeVersionId  String
+  codeVersion    CodeVersion      @relation(fields: [codeVersionId], references: [id], onDelete: Restrict)
+  kind           SubmissionKind
+  status         SubmissionStatus @default(QUEUED)
+  idempotencyKey String           @unique
+  createdAt      DateTime         @default(now())
+  finishedAt     DateTime?
+
+  verdict Verdict?
+
+  @@index([participantId, problemId, createdAt])
+  @@map("submissions")
+}
+
+model Verdict {
+  id           String     @id @default(cuid())
+  submissionId String     @unique
+  submission   Submission @relation(fields: [submissionId], references: [id], onDelete: Cascade)
+  /// AC, WA, TLE, MLE, RE, CE, OLE, IE (contracts Verdict).
+  verdict      String
+  testsPassed  Int
+  testsTotal   Int
+  maxTimeMs    Int
+  maxMemoryKb  Int
+  compileLog   String
+  /// Per-test RunTestResult[]. For SUBMIT this covers hidden tests: never return it raw to participants.
+  results      Json
+  createdAt    DateTime   @default(now())
+
+  @@map("verdicts")
+}
+
+/// LLM process review (batch after the contest). Rationale and flags are organizer-facing.
+model JudgeReview {
+  id             String      @id @default(cuid())
+  participantId  String
+  participant    Participant @relation(fields: [participantId], references: [id], onDelete: Cascade)
+  problemId      String?
+  rubricVersion  String
+  model          String
+  score          Float
+  rationale      String
+  injectionFlag  Boolean     @default(false)
+  /// Schema-validated raw judge output.
+  raw            Json
+  createdAt      DateTime    @default(now())
+
+  @@index([participantId])
+  @@map("judge_reviews")
+}
+
+model ScoreOverride {
+  id            String      @id @default(cuid())
+  participantId String
+  participant   Participant @relation(fields: [participantId], references: [id], onDelete: Cascade)
+  problemId     String?
+  component     String
+  value         Float
+  reason        String
+  actorId       String
+  createdAt     DateTime    @default(now())
+
+  @@index([participantId])
+  @@map("score_overrides")
+}
+
+// ---------------------------------------------------------------------------
+// Append-only ledgers (UPDATE/DELETE blocked by trigger)
+// ---------------------------------------------------------------------------
+
+enum TokenEntryKind {
+  GRANT
+  USAGE
+  TOP_UP
+  ADJUSTMENT
+}
+
+/// Token budget = SUM(delta) per participant. Usage rows are negative.
+model TokenLedger {
+  id             BigInt         @id @default(autoincrement())
+  eventId        String
+  event          Event          @relation(fields: [eventId], references: [id], onDelete: Restrict)
+  participantId  String
+  participant    Participant    @relation(fields: [participantId], references: [id], onDelete: Restrict)
+  kind           TokenEntryKind
+  delta          Int
+  promptTurnId   String?
+  promptTurn     PromptTurn?    @relation(fields: [promptTurnId], references: [id], onDelete: Restrict)
+  actorId        String?
+  reason         String?
+  idempotencyKey String         @unique
+  createdAt      DateTime       @default(now())
+
+  @@index([participantId])
+  @@map("token_ledger")
+}
+
+model AuditLog {
+  id         BigInt   @id @default(autoincrement())
+  actorId    String?
+  actor      User?    @relation("AuditActor", fields: [actorId], references: [id], onDelete: Restrict)
+  action     String
+  targetType String
+  targetId   String?
+  before     Json?
+  after      Json?
+  reason     String?
+  requestId  String?
+  createdAt  DateTime @default(now())
+
+  @@index([targetType, targetId])
+  @@index([createdAt])
+  @@map("audit_log")
+}

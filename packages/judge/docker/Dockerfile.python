@@ -1,0 +1,19 @@
+# Sandbox image for judging Python submissions.
+#
+# Thin, like the C one: an interpreter and nothing else. No pip, no
+# site-packages — a student's program can import the standard library and
+# nothing beyond it, which is the same promise the C image makes about headers.
+FROM python:3.12-alpine
+
+# The runner execs an absolute path. The official python image puts the
+# interpreter under /usr/local, so this link is real rather than circular — see
+# the Java image for what happens when it is not.
+RUN ln -sf /usr/local/bin/python3 /usr/bin/python3 \
+ && /usr/bin/python3 --version
+
+COPY runner.py /opt/cjudge/runner.py
+RUN chmod 0555 /opt/cjudge/runner.py
+
+USER 65534:65534
+WORKDIR /box
+ENTRYPOINT ["python3", "/opt/cjudge/runner.py"]
