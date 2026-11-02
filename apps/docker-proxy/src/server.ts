@@ -18,6 +18,10 @@ import {
 
 const MAX_BODY_BYTES = 64 * 1024;
 const MAX_CONNECTIONS = 256;
+/** Time a client gets to send its request head (idle connections must not hold slots; run-3/4). */
+const HEADERS_TIMEOUT_MS = 10_000;
+/** Time the daemon gets to answer anything but a wait. */
+const UPSTREAM_TIMEOUT_MS = 60_000;
 /** How long the daemon gets to accept an attach before the proxy gives up. */
 const UPGRADE_TIMEOUT_MS = 10_000;
 /**
@@ -83,6 +87,8 @@ export function createProxy(options: ProxyOptions): http.Server {
     });
   });
   server.maxConnections = MAX_CONNECTIONS;
+  server.headersTimeout = HEADERS_TIMEOUT_MS;
+  server.requestTimeout = 2 * HEADERS_TIMEOUT_MS;
 
   // Upgraded attach streams leave the HTTP server's bookkeeping; close() must end them too.
   const attached = new Set<Duplex>();
@@ -108,8 +114,8 @@ export function createProxy(options: ProxyOptions): http.Server {
       const raw = await readBody(req);
       if (route!.kind === 'create') {
         const create = sandboxCreateBody(JSON.parse(raw.toString('utf8')), allowedImages);
-        const memory = (create.HostConfig as { Memory: number }).Memory;
-        if (!owned.reserve(route!.name, memory)) throw new Error('sandbox capacity reached (count or memory)');
+        const { Memory, NanoCpus } = create.HostConfig as { Memory: number; NanoCpus: number };
+        if (!owned.reserve(route!.name, Memory, NanoCpus)) throw new Error('sandbox capacity reached (count, memory or CPU)');
         body = Buffer.from(JSON.stringify(create));
       } else if (raw.length > 0) {
         throw new Error('unexpected request body');
@@ -142,6 +148,13 @@ export function createProxy(options: ProxyOptions): http.Server {
         headers: { host: 'docker', 'content-type': 'application/json', 'content-length': body.length },
       },
       (up) => {
+        if (route!.kind === 'create') {
+          // The daemon cut the reply off: no ID, so give the slot back and fail the call (run-4 R5).
+          up.on('aborted', () => {
+            owned.cancel(route!.name);
+            res.destroy();
+          });
+        }
         if (route!.kind === 'create' && up.statusCode !== 201) owned.cancel(route!.name);
         if (route!.kind === 'create' && up.statusCode === 201) {
           const chunks: Buffer[] = [];
@@ -172,6 +185,10 @@ export function createProxy(options: ProxyOptions): http.Server {
         up.pipe(res);
       },
     );
+    // Everything but wait answers promptly; a hung daemon must not hold the call (or a create's slot) forever.
+    if (!(route!.kind === 'container' && route!.action === 'wait')) {
+      upstream.setTimeout(UPSTREAM_TIMEOUT_MS, () => upstream.destroy(new Error('Docker daemon did not answer in time')));
+    }
     upstream.on('error', (error) => {
       log({ msg: 'upstream error', error: error.message });
       if (route!.kind === 'create') owned.cancel(route!.name);
@@ -190,7 +207,8 @@ export function createProxy(options: ProxyOptions): http.Server {
       { agent: false, socketPath: options.socketPath, method: 'DELETE', path: `/containers/${id}?force=1`, headers: { host: 'docker' } },
       (up) => {
         up.resume();
-        if (up.statusCode === 204 || up.statusCode === 404) owned.done(id);
+        // 409: the daemon is already removing it (e.g. AutoRemove raced us). Gone either way (run-4 R6).
+        if (up.statusCode === 204 || up.statusCode === 404 || up.statusCode === 409) owned.done(id);
       },
     );
     req.on('error', (error) => log({ msg: 'remove failed', id, error: error.message }));
@@ -200,6 +218,7 @@ export function createProxy(options: ProxyOptions): http.Server {
   // Nothing outlives MAX_RUN_MS, whatever the worker asked for (re-audit R3).
   const reaper = setInterval(() => {
     for (const id of owned.overdue()) removeContainer(id, 'exceeded MAX_RUN_MS');
+    for (const name of owned.releaseStale()) log({ msg: 'released stale reservation', name });
   }, 30_000);
   reaper.unref();
 

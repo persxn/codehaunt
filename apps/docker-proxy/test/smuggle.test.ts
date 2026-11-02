@@ -2,6 +2,7 @@
  * Proxy behaviour against a fake daemon (no Docker needed). N1: nothing may reach the daemon behind
  * an attach upgrade until it has answered 101; the fake behaves like dockerd 29 on a refused upgrade
  * (400 and keep-alive). R1: an abandoned wait removes its container. R2: refused upgrades close fully.
+ * R5: a create the daemon never answers gives its slot back.
  */
 import assert from 'node:assert/strict';
 import { mkdtempSync, rmSync } from 'node:fs';
@@ -19,6 +20,7 @@ const dir = mkdtempSync(join(tmpdir(), 'codehaunt-proxy-'));
 const socketPath = join(dir, 'docker.sock');
 const daemonSaw: string[] = [];
 let upgradeStatus = 400;
+let dropNextCreate = false;
 let daemon: net.Server;
 let proxy: ReturnType<typeof createProxy>;
 let port = 0;
@@ -39,6 +41,11 @@ before(async () => {
         buffer = buffer.slice(end + 4 + length);
         const line = head.split('\r\n')[0]!;
         daemonSaw.push(line);
+        if (line.includes('name=cjudge-dddddddd') && dropNextCreate) {
+          dropNextCreate = false;
+          conn.destroy(); // dockerd crashing mid-create
+          return;
+        }
         if (line.includes('/wait')) {
           // Like dockerd for a running container: headers at once, the body only when it is removed.
           conn.write('HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nTransfer-Encoding: chunked\r\n\r\n');
@@ -164,4 +171,22 @@ test('a refused upgrade is closed, not left half-open (re-audit R2)', async () =
     setTimeout(() => resolve(false), 3000); // the client never ends its side; the proxy must
   });
   assert.ok(closed);
+});
+
+test('a create the daemon drops gives its slot back (run-4 R5)', async () => {
+  const name = 'cjudge-dddddddd-2222-3333-4444-555555555555';
+  const body = JSON.stringify({
+    Image: 'codehaunt-runner:1',
+    Cmd: ['python3', '/opt/cjudge/runner.py'],
+    HostConfig: { Memory: 1 << 28, MemorySwap: 1 << 28, PidsLimit: 64, NanoCpus: 1e9 },
+  });
+  const create = () =>
+    fetch(`http://127.0.0.1:${port}/v1.47/containers/create?name=${name}`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body,
+    }).then((r) => r.status, () => 'failed');
+  dropNextCreate = true;
+  assert.notEqual(await create(), 201, 'the dropped create fails');
+  assert.equal(await create(), 201, 'the same name can be created again: the reservation was released');
 });

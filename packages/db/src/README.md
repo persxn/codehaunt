@@ -7,7 +7,7 @@ Database client source files.
 |---|---|
 | `client.ts` | `createPrismaClient` (pg driver adapter) and the process-wide `getPrismaClient` |
 | `index.ts` | Re‑exports client and helper utilities |
-| `app-role.ts` | `TABLE_ACCESS` (per-table access for `codehaunt_web` and `codehaunt_worker`) and the SQL that applies it; neither role is superuser or owner; ledgers append-only (`@codehaunt/db/app-role`) |
+| `app-role.ts` | `TABLE_ACCESS` (per-table access none/read/append/update/write for `codehaunt_web` and `codehaunt_worker`) and the SQL that applies it; neither role is superuser or owner; ledgers append-only (`@codehaunt/db/app-role`) |
 | `testing.ts` | test databases: PGlite (`createTestDatabase`), throwaway real Postgres (`createPostgresTestDatabase`), `expectDbError` |
 
 ## Affects / depends on

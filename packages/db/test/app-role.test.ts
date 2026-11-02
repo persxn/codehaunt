@@ -59,6 +59,7 @@ test('the worker cannot read accounts or sessions, and writes only judging table
   assert.match((await as(WORKER_ROLE, 'UPDATE events SET name = name')) ?? '', /permission denied/);
   assert.equal(await as(WORKER_ROLE, 'SELECT count(*) FROM test_cases'), null, 'judging reads hidden tests');
   assert.equal(await as(WORKER_ROLE, 'UPDATE verdicts SET id = id'), null);
+  assert.match((await as(WORKER_ROLE, 'DELETE FROM verdicts')) ?? '', /permission denied/, 'results are never deleted by the worker');
 });
 
 test('the web role keeps read/write on ordinary tables', async () => {

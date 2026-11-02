@@ -5,6 +5,7 @@ import {
   MAX_LIVE_CONTAINERS,
   MAX_RUN_MS,
   Owned,
+  RESERVATION_TIMEOUT_MS,
   parseRoute,
   runnerImages,
   SANDBOX_MEMORY_BUDGET_BYTES,
@@ -130,6 +131,17 @@ test('the count and memory caps hold, including for concurrent creates', () => {
   assert.equal(mem.reserve('b', 2 * GIB), false, 'memory cap, while the first is only reserved');
   mem.cancel('a');
   assert.ok(mem.reserve('b', 2 * GIB), 'a failed create gives its slot back');
+});
+
+test('the CPU budget holds, and unanswered reservations are released', () => {
+  const owned = new Owned();
+  for (let i = 0; i < 8; i++) assert.ok(owned.reserve(`c${i}`, 1, 2e9), `slot ${i}`);
+  assert.equal(owned.reserve('c8', 1, 1e9), false, '16 CPUs taken');
+  const stale = new Owned();
+  stale.reserve('lost', GIB, 1e9, 0);
+  assert.deepEqual(stale.releaseStale(RESERVATION_TIMEOUT_MS), []);
+  assert.deepEqual(stale.releaseStale(RESERVATION_TIMEOUT_MS + 1), ['lost']);
+  assert.equal(stale.liveCount(), 0);
 });
 
 test('containers past MAX_RUN_MS are reported for removal', () => {

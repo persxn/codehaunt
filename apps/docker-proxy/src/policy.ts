@@ -16,7 +16,7 @@ const SANDBOX_TMPFS = {
 /** One sandbox's cgroup ceiling: the contract's 1 GiB run limit plus compile and runner headroom. */
 const MAX_MEMORY_BYTES = 2 * 1024 ** 3;
 const MAX_PIDS = 256;
-const MAX_NANO_CPUS = 4e9;
+const MAX_NANO_CPUS = 2e9;
 
 const VERSION = String.raw`(?:/v1\.\d{1,3})?`;
 const NAME = String.raw`cjudge-[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}`;
@@ -136,6 +136,10 @@ export function sandboxCreateBody(input: unknown, allowedImages: ReadonlySet<str
  */
 export const MAX_LIVE_CONTAINERS = 32;
 export const SANDBOX_MEMORY_BUDGET_BYTES = 24 * 1024 ** 3;
+/** CPUs all sandboxes may claim together (Docker NanoCpus); the DGX has 20 cores (run-4). */
+export const SANDBOX_CPU_BUDGET_NANOS = 16e9;
+/** A reservation whose create never got an answer from the daemon is released after this (run-4 R5). */
+export const RESERVATION_TIMEOUT_MS = 2 * 60 * 1000;
 /**
  * Longest a sandbox may live. The judge's own worst case is 200 tests x (10 s + 0.5 s) plus compile,
  * about 36 minutes; past this the proxy removes the container itself.
@@ -145,6 +149,7 @@ export const MAX_RUN_MS = 40 * 60 * 1000;
 interface Entry {
   id: string;
   memory: number;
+  cpus: number;
   created: number;
   live: boolean;
 }
@@ -170,9 +175,9 @@ export class Owned {
    * Claims a slot before the create goes upstream, so concurrent creates cannot all pass the caps.
    * False when it does not fit.
    */
-  reserve(name: string, memory: number, now = Date.now()): boolean {
-    if (this.byRef.has(name) || !this.fits(memory)) return false;
-    this.byRef.set(name, { id: '', memory, created: now, live: true });
+  reserve(name: string, memory: number, cpus = 0, now = Date.now()): boolean {
+    if (this.byRef.has(name) || !this.fits(memory, cpus)) return false;
+    this.byRef.set(name, { id: '', memory, cpus, created: now, live: true });
     return true;
   }
 
@@ -190,7 +195,7 @@ export class Owned {
   }
 
   add(id: string, name: string, memory: number, now = Date.now()): void {
-    if (this.reserve(name, memory, now)) this.confirm(name, id);
+    if (this.reserve(name, memory, 0, now)) this.confirm(name, id);
   }
 
   has(ref: string, now = Date.now()): boolean {
@@ -212,10 +217,14 @@ export class Owned {
     return [...new Set([...this.byRef.values()].filter((e) => e.live))];
   }
 
-  /** Whether one more sandbox of `memory` bytes fits under both caps. */
-  fits(memory: number): boolean {
+  /** Whether one more sandbox fits under the count, memory and CPU caps. */
+  fits(memory: number, cpus = 0): boolean {
     const live = this.live();
-    return live.length < MAX_LIVE_CONTAINERS && live.reduce((sum, e) => sum + e.memory, memory) <= SANDBOX_MEMORY_BUDGET_BYTES;
+    return (
+      live.length < MAX_LIVE_CONTAINERS &&
+      live.reduce((sum, e) => sum + e.memory, memory) <= SANDBOX_MEMORY_BUDGET_BYTES &&
+      live.reduce((sum, e) => sum + e.cpus, cpus) <= SANDBOX_CPU_BUDGET_NANOS
+    );
   }
 
   liveCount(): number {
@@ -225,5 +234,17 @@ export class Owned {
   /** Live containers older than MAX_RUN_MS: the proxy removes these itself. */
   overdue(now = Date.now()): string[] {
     return this.live().filter((e) => e.id && now - e.created > MAX_RUN_MS).map((e) => e.id);
+  }
+
+  /** Releases reservations the daemon never answered (it crashed or hung mid-create). Returns their names. */
+  releaseStale(now = Date.now()): string[] {
+    const stale: string[] = [];
+    for (const [key, entry] of this.byRef) {
+      if (!entry.id && now - entry.created > RESERVATION_TIMEOUT_MS) {
+        this.byRef.delete(key);
+        stale.push(key);
+      }
+    }
+    return stale;
   }
 }

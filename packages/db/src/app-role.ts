@@ -12,8 +12,8 @@ export const WORKER_ROLE = 'codehaunt_worker';
 /** Replaced by the two roles above; dropped on the next provisioning run. */
 const LEGACY_ROLE = 'codehaunt_app';
 
-/** none · read · append (read + insert; ledgers) · write (read, insert, update, delete). */
-export type Access = 'none' | 'read' | 'append' | 'write';
+/** none · read · append (read + insert; ledgers) · update (append + update, no delete) · write (everything). */
+export type Access = 'none' | 'read' | 'append' | 'update' | 'write';
 
 /**
  * Who may do what, per table. web serves participants and the admin console, so it edits problems,
@@ -31,9 +31,9 @@ export const TABLE_ACCESS: Readonly<Record<string, { web: Access; worker: Access
   chat_sessions: { web: 'write', worker: 'read' },
   prompt_turns: { web: 'write', worker: 'read' },
   code_versions: { web: 'write', worker: 'read' },
-  submissions: { web: 'write', worker: 'write' },
-  verdicts: { web: 'write', worker: 'write' },
-  judge_reviews: { web: 'write', worker: 'write' },
+  submissions: { web: 'write', worker: 'update' },
+  verdicts: { web: 'write', worker: 'update' },
+  judge_reviews: { web: 'write', worker: 'update' },
   score_overrides: { web: 'write', worker: 'read' },
   // Ledgers: append-only for everyone; the triggers are the second wall, these grants the first.
   token_ledger: { web: 'append', worker: 'read' },
@@ -44,6 +44,7 @@ const PRIVILEGES: Record<Access, string | null> = {
   none: null,
   read: 'SELECT',
   append: 'SELECT, INSERT',
+  update: 'SELECT, INSERT, UPDATE',
   write: 'SELECT, INSERT, UPDATE, DELETE',
 };
 

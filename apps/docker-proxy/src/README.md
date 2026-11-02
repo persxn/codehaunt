@@ -4,7 +4,7 @@ Implementation of the Docker socket proxy.
 ## Contents
 | Path | What it does |
 |---|---|
-| `policy.ts` | pure rules: route parsing (never throws), fixed unversioned upstream paths, runner-image allowlist, create-body template, owned-container registry with count/memory caps, reservations and overdue list |
+| `policy.ts` | pure rules: route parsing (never throws), fixed unversioned upstream paths, runner-image allowlist, create-body template, owned-container registry with count/memory/CPU caps, reservations (released if unanswered) and overdue list |
 | `server.ts` | HTTP server: refuses, rebuilds, forwards over a fresh unix-socket connection per request; `attach` upgrade forwarded only after the daemon's 101; removes abandoned and overdue sandboxes |
 | `main.ts` | reads env and listens (default `0.0.0.0:2375`) |
 
