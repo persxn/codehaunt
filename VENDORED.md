@@ -17,6 +17,11 @@ Code copied from other repositories at a pinned commit (ADR-001). Upstream fixes
   per-language multiplier (ADR-005) is what applies.
 - Only the Docker backend is used. The vendored `LocalBackend` has no filesystem isolation and is never constructed.
 
+## Known differences on arm64 (the DGX)
+The upstream suite was written on x86. On arm64, 2 of 78 upstream tests fail (`npm test -w @cjudge/judge`); containment holds in both:
+- Integer divide by zero doesn't trap (ARM `sdiv` returns 0), so a C/C++ program dividing by zero gets **WA**, not RE.
+- An output flood hits the time limit before the output cap: verdict **TLE**, not OLE. The excerpt is still bounded.
+
 ## Updating
 1. Diff upstream `packages/judge` against the pinned commit; read every change to `backends/` and `runner/`.
 2. Copy, run `npm test -w @cjudge/judge` and `npm test -w @codehaunt/worker`, rebuild the runner images.
