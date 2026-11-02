@@ -4,7 +4,7 @@
  * Not JWTs: organizers must be able to end a session immediately (deactivate, disqualify,
  * reset), and that has to take effect on the next request, not at token expiry.
  */
-import { createHash, randomBytes, timingSafeEqual } from 'node:crypto';
+import { createHash, randomBytes } from 'node:crypto';
 
 import type { PrismaClient, Role } from '@codehaunt/db';
 
@@ -131,12 +131,4 @@ export async function destroyAllSessions(prisma: PrismaClient, userId: string): 
 export async function pruneExpiredSessions(prisma: PrismaClient): Promise<number> {
   const { count } = await prisma.authSession.deleteMany({ where: { expiresAt: { lte: new Date() } } });
   return count;
-}
-
-/** Constant-time token comparison. Length is not a secret worth protecting here. */
-export function safeTokenEquals(a: string, b: string): boolean {
-  const bufferA = Buffer.from(a);
-  const bufferB = Buffer.from(b);
-  if (bufferA.length !== bufferB.length) return false;
-  return timingSafeEqual(bufferA, bufferB);
 }

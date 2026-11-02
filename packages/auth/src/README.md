@@ -21,4 +21,6 @@ Implementation of `@codehaunt/auth`.
 
 ## Gotchas
 - Inactive accounts are reported only after a correct password, so guessing can't tell them apart.
+- Login's transaction updates the user row first: that row lock is what keeps one session per participant under
+  concurrent logins (PGlite tests can't show the race; it was verified on Postgres).
 - `authorize()` denies paths with `..`, backslashes or encoded slashes; pass Next's normalised pathname.

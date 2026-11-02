@@ -81,6 +81,9 @@ export async function login(
   // One active session per participant: a new login ends the old one and is audit-logged
   // so the console can flag it (credential sharing). Staff may hold several (phone + laptop).
   const { session, replacedSessions } = await prisma.$transaction(async (tx) => {
+    // First statement on purpose: the row lock serialises concurrent logins of one user, so
+    // the second waits, then its deleteMany sees (and ends) the first's session.
+    await tx.user.update({ where: { id: user.id }, data: { lastLoginAt: new Date() } });
     const replaced =
       user.role === 'PARTICIPANT'
         ? (await tx.authSession.deleteMany({ where: { userId: user.id } })).count
@@ -90,7 +93,6 @@ export async function login(
       userAgent: context.userAgent,
       ipAddress: context.ipAddress,
     });
-    await tx.user.update({ where: { id: user.id }, data: { lastLoginAt: new Date() } });
     if (replaced > 0) {
       await tx.auditLog.create({
         data: {
