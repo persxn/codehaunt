@@ -12,6 +12,8 @@ let cached: WebConfig | null = null;
 
 export function loadConfig(env: NodeJS.ProcessEnv = process.env): WebConfig {
   if (cached) return cached;
+  // `next build` evaluates modules without runtime secrets; validate at server start instead.
+  if (env.NEXT_PHASE === 'phase-production-build') return WebConfig.parse({ DATABASE_URL: 'postgresql://build' });
   const parsed = WebConfig.safeParse(env);
   if (!parsed.success) {
     for (const issue of parsed.error.issues) console.error(`config: ${issue.path.join('.')}: ${issue.message}`);
