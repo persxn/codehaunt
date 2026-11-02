@@ -7,7 +7,7 @@ Inference tier on the lab k3s cluster (ADR-016): one vLLM model server per RTX 5
 |---|---|
 | `namespace.yaml` | namespace `codehaunt` |
 | `gpu-full-mode.sh` | `apply` / `revert` / `status`: full (unshared) GPUs on the 4 nodes for event week, back to `mps-3` after |
-| `model-server.yaml` | `model-config` ConfigMap (model, pinned revision, vLLM flags), headless Service, StatefulSet `model` (4 pods, one per node, non-root, API key, weights on `scratch`), PDB, ServiceMonitor |
+| `model-server.yaml` | `model-config` ConfigMap (model, pinned revision, vLLM flags), `model-auth` ConfigMap (key-check middleware), headless Service, StatefulSet `model` (4 pods, one per node, non-root, API key, weights on `scratch`), PDB, ServiceMonitor |
 | `gateway.yaml` | `gateway-a` + `gateway-b` Deployments on different nodes, one IngressRoute path each (`/codehaunt-gateway-a/v1/`, `-b/v1/`, priority 1000), ServiceMonitor |
 | `network-policy.yaml` | model pods: only the gateway and Prometheus; gateway: only Traefik and Prometheus |
 
@@ -35,7 +35,8 @@ Load test from the DGX: `apps/gateway/load/README.md`.
 - Secrets are never committed; the DGX `.env` holds the gateway token, only the cluster holds the model key.
 - Images are pinned by digest (the lab registry is plain HTTP). After rebuilding the gateway, push it and update the
   digest in `gateway.yaml`.
-- vLLM runs as uid 1000 with no capabilities and needs `VLLM_API_KEY` on `/v1/*`; the weights' commit is pinned in
+- vLLM runs as uid 1000 with no capabilities. Its own `VLLM_API_KEY` covers only `/v1/*`, so the `model-auth`
+  middleware (`codehaunt_auth.RequireKey`) requires the key on every path except `/health` and `/metrics`; the weights' commit is pinned in
   `model-config` and fetched only if missing, so a pod restart never downloads during the event.
 - A model pod's PVC binds to the node it first ran on; deleting the PVC re-downloads the weights (~5 GB).
 - The vLLM image (9.7 GB) comes from Docker Hub; pre-pull it on every node (`crictl pull`) before applying, so a

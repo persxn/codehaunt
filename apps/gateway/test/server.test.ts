@@ -77,7 +77,11 @@ async function gateway(nodes: FakeNode[], env: Record<string, string> = {}) {
   await new Promise<void>((r) => server.listen(0, '127.0.0.1', r));
   cleanup.push(() => {
     server.close();
-    for (const n of nodes) n.server.close();
+    server.closeAllConnections();
+    for (const n of nodes) {
+      n.server.close();
+      n.server.closeAllConnections(); // a stalled fake reply would keep the test process alive
+    }
   });
   return { url: `http://127.0.0.1:${(server.address() as AddressInfo).port}`, router, health, logs };
 }
@@ -302,6 +306,42 @@ test('a client that disconnects under backpressure frees the slot and is logged 
     await new Promise((r) => setTimeout(r, 20));
   }
   assert.equal(gw.router.nodes.get('n0')!.inflight, 0);
+  assert.equal(gw.logs[0]!.outcome, 'client_closed'); // not counted as a node failure (run-6 N2)
+});
+
+test('a node that sends tokenize headers and then stalls is abandoned (audit run-6 N1)', async () => {
+  const stall = await fakeNode();
+  stall.server.removeAllListeners('request');
+  stall.server.on('request', (req, res) => {
+    req.resume();
+    req.on('end', () => {
+      if (req.url === '/health') return res.end('ok');
+      res.writeHead(200, { 'content-type': 'application/json' });
+      res.write('{"count":'); // never finished
+    });
+  });
+  const good = await fakeNode();
+  const gw = await gateway([stall, good], { GATEWAY_FIRST_BYTE_TIMEOUT_MS: '1000' });
+  gw.router.setHealthy('n1', false); // force the first attempt onto the stalling node
+  setTimeout(() => gw.router.setHealthy('n1', true), 100);
+  const res = await post(gw.url, chat('hi'));
+  assert.equal(res.status, 200);
+  await res.text();
+  assert.equal(gw.logs[0]!.attempts, 2);
+  assert.equal(gw.router.nodes.get('n0')!.healthy, false);
+});
+
+test('an unauthenticated request is answered and closed without reading its body (audit run-6 L2)', async () => {
+  const gw = await gateway([await fakeNode()]);
+  const socket = net.connect(Number(new URL(gw.url).port), '127.0.0.1');
+  let reply = '';
+  socket.on('data', (c) => (reply += c));
+  const closed = new Promise<void>((r) => socket.on('close', () => r()));
+  socket.write('POST /v1/chat/completions HTTP/1.1\r\nhost: x\r\ncontent-length: 100000\r\n\r\n{'); // body never completes
+  const t0 = Date.now();
+  await closed;
+  assert.ok(Date.now() - t0 < 2000);
+  assert.match(reply, /401/);
 });
 
 test('a prompt exactly at the context limit is context_exceeded (audit L5)', async () => {

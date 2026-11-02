@@ -53,4 +53,8 @@ load: `GATEWAY_URL=… GATEWAY_TOKEN=… node --experimental-strip-types apps/ga
   socket buffer or in the queue. A request body must arrive within 10 s.
 - A prompt of `contextLimit` tokens or more is `context_exceeded` (413); one that leaves no room in the reservation
   is `budget_exceeded` (402).
-- `/metrics`, `/healthz`, `/readyz` are unauthenticated; Traefik routes only `/v1/` from outside the pod.
+- `/metrics`, `/healthz`, `/readyz` are unauthenticated; Traefik routes only `/v1/` from outside the pod. A 401 closes
+  the connection without reading the body.
+- Request log `outcome`: `ok`, an error code, or `client_closed` (the client left; not counted as a node failure).
+- SIGTERM: stops accepting, lets running replies finish for up to 50 s (pod grace 60 s, preStop 5 s). Don't restart
+  the gateways during the event.

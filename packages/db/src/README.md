@@ -16,4 +16,7 @@ Database client source files.
 - Used by all services (`apps/web`, `apps/worker`) for DB access.
 
 ## Gotchas
+- Token ledger invariant: every writer of a negative delta (`reserveTokens` now, any admin ADJUSTMENT later) must take
+  the participant row lock (`SELECT … FOR UPDATE` on `participants`) and check the balance first, or "the balance
+  never goes negative" no longer holds.
 - `testing.ts` includes `expectDbError` because PGlite's socket server drops the connection after any error raised through Prisma.

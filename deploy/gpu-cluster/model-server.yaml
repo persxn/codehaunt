@@ -7,12 +7,48 @@ kind: ConfigMap
 metadata: {name: model-config, namespace: codehaunt}
 data:
   model: Qwen/Qwen3-4B-Instruct-2507-FP8
-  # Pinned Hugging Face commit: weights are fetched once per node and never re-fetched while present (audit L3).
+  # Pinned Hugging Face commit. Weights are fetched once per node; a marker written after a complete download
+  # stops re-fetching (an interrupted download is resumed on the next start, audit run-6 N3).
   revision: 8591804019c8b22094c3b5b4454e0edc05dffc98
   # Extra vLLM flags for this model (quantisation etc.).
   extraArgs: --kv-cache-dtype fp8
   # Read by the gateway; `{}` when the model needs none.
   chatTemplateKwargs: ''
+---
+# vLLM checks VLLM_API_KEY only on /v1, /v2, /inference and /cohere; /invocations and /tokenize generate or count
+# without it (audit run-6 M3). This ASGI middleware requires the key on every HTTP and WebSocket path except the
+# probe and scrape endpoints.
+apiVersion: v1
+kind: ConfigMap
+metadata: {name: model-auth, namespace: codehaunt}
+data:
+  codehaunt_auth.py: |
+    import hmac
+    import os
+
+    _EXPECTED = b"Bearer " + os.environ["CODEHAUNT_MODEL_KEY"].encode()
+    _OPEN = {"/health", "/metrics"}
+
+
+    class RequireKey:
+        def __init__(self, app):
+            self.app = app
+
+        async def __call__(self, scope, receive, send):
+            if scope["type"] in ("http", "websocket") and scope["path"] not in _OPEN:
+                given = b""
+                for name, value in scope["headers"]:
+                    if name == b"authorization":
+                        given = value
+                if not hmac.compare_digest(given, _EXPECTED):
+                    if scope["type"] == "http":
+                        await send({"type": "http.response.start", "status": 401,
+                                    "headers": [(b"content-type", b"application/json")]})
+                        await send({"type": "http.response.body", "body": b'{"error":"unauthorized"}'})
+                    else:
+                        await send({"type": "websocket.close", "code": 1008})
+                    return
+            await self.app(scope, receive, send)
 ---
 apiVersion: v1
 kind: Service
@@ -58,8 +94,8 @@ spec:
         command: ["bash", "-c"]
         args:
         - >-
-          [ -d "/models/hf/hub/models--${MODEL//\//--}/snapshots/$REVISION" ]
-          || hf download "$MODEL" --revision "$REVISION" --quiet
+          M="/models/.complete-${MODEL//\//--}-$REVISION";
+          [ -f "$M" ] || { hf download "$MODEL" --revision "$REVISION" --quiet && touch "$M"; }
         env:
         - {name: HF_HOME, value: /models/hf}
         - {name: HOME, value: /models/home}
@@ -75,13 +111,15 @@ spec:
         - >-
           exec vllm serve "$MODEL" --revision "$REVISION" --served-model-name junior --host 0.0.0.0 --port 8000
           --max-model-len 10240 --gpu-memory-utilization 0.90 --max-num-seqs 16 --enable-prefix-caching
-          --disable-log-requests $EXTRA_ARGS
+          --disable-log-requests --middleware codehaunt_auth.RequireKey $EXTRA_ARGS
         env:
         - {name: HF_HOME, value: /models/hf}
         - {name: HF_HUB_OFFLINE, value: "1"}
         - {name: HOME, value: /models/home}
         # Only the gateway holds this key; without it a shell on a GPU node could use the model unmetered (audit M3).
         - {name: VLLM_API_KEY, valueFrom: {secretKeyRef: {name: model-api-key, key: key}}}
+        - {name: CODEHAUNT_MODEL_KEY, valueFrom: {secretKeyRef: {name: model-api-key, key: key}}}
+        - {name: PYTHONPATH, value: /opt/codehaunt}
         - {name: MODEL, valueFrom: {configMapKeyRef: {name: model-config, key: model}}}
         - {name: REVISION, valueFrom: {configMapKeyRef: {name: model-config, key: revision}}}
         - {name: EXTRA_ARGS, valueFrom: {configMapKeyRef: {name: model-config, key: extraArgs}}}
@@ -97,7 +135,10 @@ spec:
         - {name: models, mountPath: /models}
         - {name: shm, mountPath: /dev/shm}
         - {name: tmp, mountPath: /tmp}
+        - {name: auth, mountPath: /opt/codehaunt, readOnly: true}
       volumes:
+      - name: auth
+        configMap: {name: model-auth}
       - name: shm
         emptyDir: {medium: Memory, sizeLimit: 4Gi}
       - name: tmp

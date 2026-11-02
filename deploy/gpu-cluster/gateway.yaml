@@ -18,10 +18,10 @@ spec:
             topologyKey: kubernetes.io/hostname
       automountServiceAccountToken: false
       securityContext: {runAsNonRoot: true, runAsUser: 1000, seccompProfile: {type: RuntimeDefault}}
-      terminationGracePeriodSeconds: 30
+      terminationGracePeriodSeconds: 60
       containers:
       - name: gateway
-        image: 50.0.2.102:5000/codehaunt/gateway:0.1.2@sha256:9c413628627c56f25b2246a92053717683af47fd29208c5addd1da5c4f7287b3
+        image: 50.0.2.102:5000/codehaunt/gateway:0.1.3@sha256:db1715f3e3290c571ef6fd3012397f422347a166d694534a8388cff717bca7a5
         ports: [{name: http, containerPort: 8080}]
         env:
         - {name: GATEWAY_TOKEN, valueFrom: {secretKeyRef: {name: gateway-token, key: token}}}
@@ -57,10 +57,10 @@ spec:
             topologyKey: kubernetes.io/hostname
       automountServiceAccountToken: false
       securityContext: {runAsNonRoot: true, runAsUser: 1000, seccompProfile: {type: RuntimeDefault}}
-      terminationGracePeriodSeconds: 30
+      terminationGracePeriodSeconds: 60
       containers:
       - name: gateway
-        image: 50.0.2.102:5000/codehaunt/gateway:0.1.2@sha256:9c413628627c56f25b2246a92053717683af47fd29208c5addd1da5c4f7287b3
+        image: 50.0.2.102:5000/codehaunt/gateway:0.1.3@sha256:db1715f3e3290c571ef6fd3012397f422347a166d694534a8388cff717bca7a5
         ports: [{name: http, containerPort: 8080}]
         env:
         - {name: GATEWAY_TOKEN, valueFrom: {secretKeyRef: {name: gateway-token, key: token}}}

@@ -28,6 +28,7 @@ for (const sig of ['SIGTERM', 'SIGINT'] as const) {
   process.on(sig, () => {
     health.stop();
     server.close(() => process.exit(0));
-    setTimeout(() => process.exit(0), 25_000).unref();
+    // Below the pod's 60 s grace period minus the 5 s preStop: running replies get ~50 s to finish.
+    setTimeout(() => process.exit(0), 50_000).unref();
   });
 }

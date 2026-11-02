@@ -2,8 +2,7 @@
  * In-process Prometheus metrics registry for the gateway.
  * Implements the {@link GatewayMetrics} interface used by the server.
  */
-import type { GatewayErrorCode } from '@codehaunt/contracts';
-import type { GatewayMetrics } from './server.ts';
+import type { GatewayMetrics, Outcome } from './server.ts';
 import type { Router } from './router.ts';
 
 /** Escape Prometheus label values (\, ", \n). */
@@ -31,7 +30,7 @@ export function createMetrics(): GatewayMetrics {
   const bucketBounds = [0.1, 0.25, 0.5, 1, 2, 4, 8, 16, 32, Infinity];
   const bucketLabels = bucketBounds.map((b) => (b === Infinity ? '+Inf' : b.toString()));
 
-  const request = (outcome: 'ok' | GatewayErrorCode, node: string | undefined): void => {
+  const request = (outcome: Outcome, node: string | undefined): void => {
     const nodeLabel = node ?? 'none';
     const key = `${outcome}|${nodeLabel}`;
     requestCounts.set(key, (requestCounts.get(key) ?? 0) + 1);

@@ -31,9 +31,12 @@ const STATUS: Record<GatewayErrorCode, number> = {
   not_found: 404,
 };
 
+/** How a request ended: OK, an error code sent to the client, or the client left first. */
+export type Outcome = 'ok' | 'client_closed' | GatewayErrorCode;
+
 /** Implemented by metrics.ts; the server only reports events. */
 export interface GatewayMetrics {
-  request(outcome: 'ok' | GatewayErrorCode, node: string | undefined): void;
+  request(outcome: Outcome, node: string | undefined): void;
   ttft(node: string, seconds: number): void;
   tokens(prompt: number, completion: number): void;
   retry(node: string): void;
@@ -45,7 +48,7 @@ export interface RequestLog {
   sessionId?: string;
   node?: string;
   attempts: number;
-  outcome: 'ok' | GatewayErrorCode;
+  outcome: Outcome;
   promptTokens?: number;
   completionTokens?: number;
   ttftMs?: number;
@@ -73,6 +76,16 @@ class Refusal extends Error {
 class NodeFailure extends Error {}
 
 const digest = (s: string) => createHash('sha256').update(s).digest();
+
+function withTimeout<T>(p: Promise<T>, ms: number): Promise<T> {
+  let timer: NodeJS.Timeout | undefined;
+  return Promise.race([
+    p,
+    new Promise<never>((_, reject) => {
+      timer = setTimeout(() => reject(new Error(`no complete body within ${ms} ms`)), ms);
+    }),
+  ]).finally(() => clearTimeout(timer));
+}
 
 function sendError(res: ServerResponse, code: GatewayErrorCode, message: string, requestId: string): void {
   if (res.headersSent) {
@@ -141,8 +154,10 @@ export function createGateway(deps: ServerDeps): http.Server {
     }
     if (!authorized(req)) {
       metrics.request('unauthorized', undefined);
+      // Don't read an unauthenticated body: close the connection once the 401 is sent (audit run-6 L2).
+      res.setHeader('connection', 'close');
+      res.on('finish', () => req.destroy());
       sendError(res, 'unauthorized', 'missing or wrong gateway token', requestId);
-      req.resume();
       return;
     }
     await handleChat(req, res, requestId);
@@ -192,7 +207,8 @@ export function createGateway(deps: ServerDeps): http.Server {
         entry.detail ??= err.message;
         sendError(res, err.code, err.message, requestId);
       } else {
-        entry.outcome = 'upstream_failed';
+        // A client that left is not a node failure (audit run-6 N2).
+        entry.outcome = clientGone.signal.aborted || res.destroyed ? 'client_closed' : 'upstream_failed';
         entry.detail = err instanceof Error ? err.message : String(err);
         sendError(res, 'upstream_failed', 'the model node failed', requestId);
       }
@@ -239,17 +255,24 @@ export function createGateway(deps: ServerDeps): http.Server {
     };
 
     // Count the prompt with the node's tokenizer (CPU only, no generation).
+    const tokenizeTimeoutMs = Math.min(10_000, config.firstByteTimeoutMs);
     const tok = await call('/tokenize', {
       model: config.model,
       messages: chat.messages,
       add_generation_prompt: true,
       ...(config.chatTemplateKwargs && { chat_template_kwargs: config.chatTemplateKwargs }),
-    }, 10_000);
+    }, tokenizeTimeoutMs);
     if (!tok.ok) {
       await tok.body?.cancel();
       throw new NodeFailure(`${node}/tokenize: HTTP ${tok.status}`);
     }
-    const count = Number(((await tok.json()) as { count?: unknown }).count);
+    // Headers alone don't prove the node is alive: the body read is bounded too (audit run-6 N1).
+    const tokBody = await withTimeout(tok.json(), tokenizeTimeoutMs).catch(async (err) => {
+      await tok.body?.cancel().catch(() => {});
+      deps.health.markDown(node);
+      throw new NodeFailure(`${node}/tokenize: ${(err as Error).message}`);
+    });
+    const count = Number((tokBody as { count?: unknown }).count);
     if (!Number.isInteger(count) || count < 0) throw new NodeFailure(`${node}/tokenize: no count`);
     entry.promptTokens = count;
     const { budgetTokens, contextLimit } = chat.codehaunt;
@@ -267,7 +290,10 @@ export function createGateway(deps: ServerDeps): http.Server {
       ...(config.chatTemplateKwargs && { chat_template_kwargs: config.chatTemplateKwargs }),
     }, config.firstByteTimeoutMs);
     if (!upstream.ok || !upstream.body) {
-      const text = await upstream.text().catch(() => '');
+      const text = await withTimeout(upstream.text(), 5_000).catch(async () => {
+        await upstream.body?.cancel().catch(() => {});
+        return '';
+      });
       // A 4xx is our request's fault: another node would refuse it too.
       if (upstream.status >= 400 && upstream.status < 500) throw new Refusal('upstream_failed', `model refused: HTTP ${upstream.status} ${text.slice(0, 200)}`);
       throw new NodeFailure(`${node}: HTTP ${upstream.status}`);
@@ -288,9 +314,14 @@ export function createGateway(deps: ServerDeps): http.Server {
     const send = async (chunk: string) => {
       if (res.destroyed) throw new Error('client closed the connection');
       if (!res.write(chunk) && !res.destroyed) {
-        await new Promise((r) => {
-          res.once('drain', r);
-          res.once('close', r);
+        await new Promise<void>((resolve) => {
+          const done = () => {
+            res.off('drain', done);
+            res.off('close', done);
+            resolve();
+          };
+          res.once('drain', done);
+          res.once('close', done);
         });
       }
       if (res.destroyed) throw new Error('client closed the connection');
