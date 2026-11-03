@@ -40,22 +40,11 @@
   gap: clamp(24px, 4vw, 64px);
   margin-top: var(--s8);
 }
-.half {
-  display: grid;
-  grid-template-columns: minmax(150px, 210px) minmax(0, 1fr);
-  gap: var(--s6);
-  align-items: center;
-}
-.posterArch {
-  width: 100%;
-  height: auto;
-  transition: transform var(--t-slow) var(--ease);
-}
-.half:hover .posterArch { transform: translateY(-6px) rotate(-1deg); }
-/* Clip to the poster's own frame shapes so no black corners show: the competition panel is round at the bottom,
-   the talk panel is an arch. */
-.half:nth-child(1) .posterArch { border-radius: 8px 8px 999px 999px; }
-.half:nth-child(2) .posterArch { border-radius: 999px 999px 8px 8px; }
+.half { display: grid; gap: var(--s5); align-content: start; }
+/* Equal arches, the picture filling each one; the hover lifts the frame like the step cards. */
+.halfArch { aspect-ratio: 4 / 5; max-height: 560px; background: var(--ink); }
+.halfArch img.halfImg { inset: 0; width: 100%; height: 100%; object-fit: cover; object-position: 50% 62%; }
+.half:hover .halfArch { border-color: var(--bone); box-shadow: var(--lift); transform: translateY(-4px); }
 .halfTitle {
   margin: 0;
   font-family: var(--display);
@@ -64,7 +53,7 @@
   line-height: 1.02;
   color: var(--bone);
 }
-.halfText { margin: var(--s3) 0 0; color: var(--muted); max-width: 38ch; }
+.halfText { margin: var(--s3) 0 0; color: var(--muted); max-width: 44ch; }
 
 /* ---------- The day: a five-stop track ---------- */
 .track {
@@ -108,7 +97,7 @@
   .head { grid-template-columns: 1fr; gap: var(--s3); align-items: start; }
   .stepTitle { font-size: 32px; }
   .halves { grid-template-columns: 1fr; gap: var(--s7); }
-  .half { grid-template-columns: 140px minmax(0, 1fr); }
+  .half { grid-template-columns: 180px minmax(0, 1fr); align-items: center; }
   .center { text-align: left; }
   .track { grid-template-columns: 1fr; gap: var(--s5); }
   .track::before { top: 28px; bottom: 28px; left: 27px; right: auto; width: 2px; height: auto;
@@ -122,5 +111,5 @@
   .step { grid-template-columns: 130px 1fr; column-gap: var(--s5); align-items: center; }
   .stepArch { grid-row: span 2; }
   .stepTitle { margin-top: 0; align-self: end; }
-  .half { grid-template-columns: 110px minmax(0, 1fr); gap: var(--s4); }
+  .half { grid-template-columns: 120px minmax(0, 1fr); gap: var(--s4); }
 }

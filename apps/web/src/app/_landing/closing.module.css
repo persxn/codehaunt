@@ -70,20 +70,35 @@
 .divider { display: block; width: min(720px, 90%); height: auto; margin: 0 auto; }
 .footRow {
   display: grid;
-  grid-template-columns: 1.4fr 1fr 1fr;
+  grid-template-columns: minmax(0, 1.3fr) minmax(0, 1fr) minmax(0, 1.2fr);
   gap: var(--s6);
   align-items: start;
   padding-top: var(--s7);
 }
-.footBrand { display: flex; gap: var(--s3); align-items: center; }
-.footName { margin: 0; font-family: var(--display); font-size: 30px; line-height: 1; }
-.footMeta { margin: var(--s1) 0 0; font-size: var(--fs-small); color: var(--muted); line-height: 1.6; }
-.socials { margin: 0; padding: 0; list-style: none; display: grid; grid-template-columns: 1fr 1fr; gap: var(--s2) var(--s5); font-size: var(--fs-small); color: var(--bone); font-weight: 600; }
-.socials span { display: block; font-weight: 400; color: var(--muted); }
+.footBrand { display: flex; gap: var(--s3); align-items: flex-start; }
+.footBrand img { flex: none; }
+.footName { margin: 4px 0 0; font-family: var(--display); font-size: 30px; line-height: 1; }
+.footMeta { margin: var(--s2) 0 0; max-width: 26ch; font-size: var(--fs-small); color: var(--muted); line-height: 1.5; }
+.footLabel { margin: 0 0 var(--s2); font-size: var(--fs-small); font-weight: 700; color: var(--pumpkin); }
+.footText { margin: 0; font-size: 15px; line-height: 1.6; color: var(--bone); }
+.socials {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, max-content));
+  gap: var(--s2) var(--s6);
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--bone);
+}
+.socials span { display: block; font-size: 13px; font-weight: 400; color: var(--muted); }
+/* The name fits the container's width at every size (Creepster "CodeHaunt" measures 4.05 em wide), cropped only along
+   the bottom edge. */
 .bigName {
   margin: var(--s7) 0 0;
   font-family: var(--display);
-  font-size: clamp(96px, 19vw, 300px);
+  font-size: min(289px, calc((100vw - 2 * var(--gutter)) / 4.15));
   line-height: 0.8;
   white-space: nowrap;
   color: var(--violet);
@@ -100,7 +115,10 @@
   .faqArch { grid-column: 2; grid-row: 1 / span 2; width: 100%; margin: 0; }
   .q { font-size: 17px; padding: var(--s3) var(--s4); }
   .a { padding: 0 var(--s4) var(--s4); }
-  .footRow { grid-template-columns: 1fr; }
+  .footRow { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--s6) var(--s5); padding-top: var(--s6); }
+  .footBrand { grid-column: 1 / -1; align-items: center; }
+  .footMeta { max-width: none; }
+  .socials { grid-template-columns: 1fr; }
 }
 @media (max-width: 480px) {
   .ctaActions a { flex: 1 1 100%; }

@@ -72,24 +72,33 @@ export function Footer() {
       <img className={styles.divider} src={divider.src} width={divider.width} height={divider.height} alt="" loading="lazy" />
       <div className={`${ui.container} ${styles.footRow}`}>
         <div className={styles.footBrand}>
-          <img src={hood.src} width={44} height={44} alt="" />
+          <img src={hood.src} width={48} height={48} alt="" />
           <div>
             <p className={styles.footName}>CodeHaunt</p>
             <p className={styles.footMeta}>Presented by the {EVENT.organiser}</p>
           </div>
         </div>
-        <p className={styles.footMeta}>
-          {EVENT.dateLabel}
-          <br />
-          {EVENT.venue}
-        </p>
-        <ul className={styles.socials} aria-label="CSI UEM Kolkata on social media">
-          {EVENT.socials.map((s) => (
-            <li key={s.network}>
-              <span>{s.network}</span> {s.handle}
-            </li>
-          ))}
-        </ul>
+        <div className={styles.footCol}>
+          <h2 className={styles.footLabel}>When &amp; where</h2>
+          <p className={styles.footText}>
+            {EVENT.dateLabel}
+            <br />
+            {EVENT.timeLabel}
+            <br />
+            {EVENT.venue}
+          </p>
+        </div>
+        <div className={styles.footCol}>
+          <h2 className={styles.footLabel}>Follow CSI UEM Kolkata</h2>
+          <ul className={styles.socials}>
+            {EVENT.socials.map((s) => (
+              <li key={s.network}>
+                <span>{s.network}</span>
+                {s.handle}
+              </li>
+            ))}
+          </ul>
+        </div>
       </div>
       <div className={ui.container} aria-hidden>
         <p className={styles.bigName}>CodeHaunt</p>

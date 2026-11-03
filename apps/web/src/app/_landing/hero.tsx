@@ -10,10 +10,6 @@ import styles from './hero.module.css';
 export function Hero({ calendar }: { calendar: string }) {
   return (
     <section className={styles.hero} aria-labelledby="hero-title">
-      <picture className={styles.art}>
-        <source media="(max-width: 699px)" srcSet={heroPhone.src} width={heroPhone.width} height={heroPhone.height} />
-        <img src={heroLab.src} width={heroLab.width} height={heroLab.height} alt="" fetchPriority="high" />
-      </picture>
       <div className={styles.bats} aria-hidden>
         {[0, 1, 2, 3].map((i) => (
           <img key={i} src={bat.src} width={bat.width} height={bat.height} alt="" />
@@ -23,7 +19,8 @@ export function Hero({ calendar }: { calendar: string }) {
         Dare to break the code, unleash the chaos
       </p>
 
-      <div className={`${ui.container} ${styles.content}`}>
+      <div className={`${ui.container} ${styles.layout}`}>
+      <div className={styles.content}>
         <h1 id="hero-title" className={styles.wordmark}>
           <span className={styles.line1}>Code</span>
           <span className={styles.line2}>Haunt</span>
@@ -60,6 +57,17 @@ export function Hero({ calendar }: { calendar: string }) {
             <ArrowDownIcon />
           </a>
         </div>
+      </div>
+      <picture className={styles.art}>
+        <source media="(max-width: 899px)" srcSet={heroPhone.src} width={heroPhone.width} height={heroPhone.height} />
+        <img
+          src={heroLab.src}
+          width={heroLab.width}
+          height={heroLab.height}
+          alt="The hooded skeleton coder at his laptop in a candlelit gothic computer lab under an orange moon"
+          fetchPriority="high"
+        />
+      </picture>
       </div>
     </section>
   );

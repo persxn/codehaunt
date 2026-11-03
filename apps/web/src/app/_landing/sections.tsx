@@ -56,7 +56,9 @@ export function Halves() {
         <div className={styles.halves}>
           {halves.map((h) => (
             <article key={h.title} className={styles.half} data-reveal>
-              <img className={styles.posterArch} src={h.art.src} width={h.art.width} height={h.art.height} alt={h.alt} loading="lazy" />
+              <div className={`${ui.arch} ${styles.halfArch}`}>
+                <img className={styles.halfImg} src={h.art.src} width={h.art.width} height={h.art.height} alt={h.alt} loading="lazy" />
+              </div>
               <div>
                 <h3 className={styles.halfTitle}>{h.title}</h3>
                 <p className={styles.halfText}>{h.text}</p>
