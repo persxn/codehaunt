@@ -81,7 +81,7 @@ const summary = (input: ProblemInputT) => ({
 
 export async function createProblem(prisma: PrismaClient, eventId: string, input: ProblemInputT, actor: Actor) {
   return prisma.$transaction(async (tx) => {
-    await tx.$queryRaw`SELECT id FROM events WHERE id = ${eventId} FOR UPDATE`;
+    await tx.$queryRaw`SELECT id FROM events WHERE id = ${eventId} FOR NO KEY UPDATE`;
     await assertEditable(tx, eventId);
     if (await tx.problem.findUnique({ where: { eventId_slug: { eventId, slug: input.slug } } })) {
       throw conflict('slug_taken', 'A problem with that short name exists in this event.');
@@ -100,7 +100,7 @@ export async function updateProblem(prisma: PrismaClient, id: string, input: Pro
   return prisma.$transaction(async (tx) => {
     const existing = await tx.problem.findUnique({ where: { id } });
     if (!existing) throw notFound('That problem');
-    await tx.$queryRaw`SELECT id FROM events WHERE id = ${existing.eventId} FOR UPDATE`;
+    await tx.$queryRaw`SELECT id FROM events WHERE id = ${existing.eventId} FOR NO KEY UPDATE`;
     await assertEditable(tx, existing.eventId);
     // Code versions and submissions point at the problem, not at tests, so replacing tests is safe before the start.
     await tx.problem.update({ where: { id }, data: fields(input) });

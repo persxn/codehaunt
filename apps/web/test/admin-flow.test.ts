@@ -205,6 +205,13 @@ test('audit run-10: check-in only while the event is checking in or running; act
   const badges = await issueBadges(db.prisma, { eventId: id, actorId: a.id, requestId: 'r' });
   await db.prisma.event.update({ where: { id }, data: { status: 'ENDED' } });
   await assert.rejects(checkIn(db.prisma, { code: badges[0]!.checkInCode, seatLabel: 'S', actorId: a.id, requestId: 'r' }), (e) => code(e, 'event_not_checking_in'));
+  // A draft event opens for check-in by itself at its configured check-in time (run-11 R11-1).
+  const ev = await getEvent(db.prisma, id);
+  const later = { ...ev.config, schedule: { ...ev.config.schedule, checkInAt: new Date(Date.now() + 3_600_000).toISOString() } };
+  await db.prisma.event.update({ where: { id }, data: { status: 'DRAFT', config: later } });
+  await assert.rejects(checkIn(db.prisma, { code: badges[0]!.checkInCode, seatLabel: 'S', actorId: a.id, requestId: 'r' }), (e) => code(e, 'event_not_checking_in'));
+  await db.prisma.event.update({ where: { id }, data: { config: { ...later, schedule: { ...later.schedule, checkInAt: new Date(Date.now() - 1000).toISOString() } } } });
+  await checkIn(db.prisma, { code: badges[1]!.checkInCode, seatLabel: 'S2', actorId: a.id, requestId: 'r' });
   await db.prisma.event.update({ where: { id }, data: { status: 'CHECK_IN' } });
   await checkIn(db.prisma, { code: badges[0]!.checkInCode, seatLabel: 'S', actorId: a.id, requestId: 'r' });
   const user = await db.prisma.participant.findUniqueOrThrow({ where: { id: badges[0]!.participantId }, select: { userId: true } });

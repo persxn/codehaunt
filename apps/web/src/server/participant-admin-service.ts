@@ -24,7 +24,7 @@ export async function importParticipants(prisma: PrismaClient, input: Participan
   const created: string[] = [];
   const skipped: Array<{ enrolmentNo: string; reason: string }> = [];
   await prisma.$transaction(async (tx) => {
-    await tx.$queryRaw`SELECT id FROM events WHERE id = ${event.id} FOR UPDATE`;
+    await tx.$queryRaw`SELECT id FROM events WHERE id = ${event.id} FOR NO KEY UPDATE`;
     let registered = await tx.participant.count({ where: { eventId: event.id, status: { in: ['REGISTERED', 'CHECKED_IN'] } } });
     for (const row of input.rows) {
       const username = row.enrolmentNo.toLowerCase();
@@ -42,6 +42,15 @@ export async function importParticipants(prisma: PrismaClient, input: Participan
         continue;
       }
       if (existing) {
+        const live = await tx.participant.findFirst({
+          where: { userId: existing.id, status: 'CHECKED_IN', event: { status: { in: ['CHECK_IN', 'RUNNING', 'PAUSED'] } } },
+          select: { id: true },
+        });
+        if (live) {
+          // Signing them out would end their contest elsewhere (audit run-11 R11-3).
+          skipped.push({ enrolmentNo: row.enrolmentNo, reason: 'checked in at another live event' });
+          continue;
+        }
         // Re-imported from an earlier event: inactive again until scanned at this event's desk (audit L4).
         await tx.user.update({ where: { id: existing.id }, data: { active: false } });
         await tx.authSession.deleteMany({ where: { userId: existing.id } });

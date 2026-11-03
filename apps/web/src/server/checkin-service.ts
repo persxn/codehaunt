@@ -80,6 +80,15 @@ export async function issueBadges(
   }));
 }
 
+/**
+ * Check-in is open while the event checks in or runs, and also for a draft event once its configured check-in time
+ * has passed, so the desk works on the day even before anyone presses a button (audit run-11 R11-1).
+ */
+export function checkInOpen(status: string, config: EventConfig, now: Date): boolean {
+  if (['CHECK_IN', 'RUNNING', 'PAUSED'].includes(status)) return true;
+  return status === 'DRAFT' && new Date(config.schedule.checkInAt).getTime() <= now.getTime();
+}
+
 export interface CheckInResult {
   participantId: string;
   name: string;
@@ -98,18 +107,18 @@ export async function checkIn(
     const found = await tx.participant.findUnique({ where: { checkInTokenHash: tokenHash }, select: { id: true, eventId: true } });
     if (!found) throw usedCode();
     // Event row lock: concurrent scans see each other's check-ins, so the cap holds.
-    await tx.$queryRaw`SELECT id FROM events WHERE id = ${found.eventId} FOR UPDATE`;
+    await tx.$queryRaw`SELECT id FROM events WHERE id = ${found.eventId} FOR NO KEY UPDATE`;
     const p = await tx.participant.findUniqueOrThrow({
       where: { id: found.id },
       include: { user: { select: { id: true, name: true } }, event: { select: { config: true, status: true } } },
     });
     if (p.checkInTokenHash !== tokenHash) throw usedCode();
-    if (!['CHECK_IN', 'RUNNING', 'PAUSED'].includes(p.event.status)) {
-      throw conflict('event_not_checking_in', `Check-in is not open for this event (status: ${p.event.status.toLowerCase()}).`);
+    const config = EventConfig.parse(p.event.config);
+    if (!checkInOpen(p.event.status, config, new Date())) {
+      throw conflict('event_not_checking_in', `Check-in is not open for this event yet (it opens ${new Date(config.schedule.checkInAt).toLocaleString('en-IN')}).`);
     }
     if (p.status === 'WAITLISTED') throw conflict('waitlisted', 'This person is on the waitlist. Promote them at the desk first.');
     if (p.status !== 'REGISTERED') throw conflict('not_registered', 'This person cannot be checked in (status: ' + p.status.toLowerCase() + ').');
-    const config = EventConfig.parse(p.event.config);
     const checkedIn = await tx.participant.count({ where: { eventId: p.eventId, status: 'CHECKED_IN' } });
     if (checkedIn >= config.access.checkInCap) throw conflict('at_capacity', `The event is full (${config.access.checkInCap} checked in).`);
 

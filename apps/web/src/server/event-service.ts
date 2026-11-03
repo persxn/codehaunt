@@ -49,7 +49,9 @@ export async function createEvent(prisma: PrismaClient, input: EventCreateReques
 
 export async function updateEvent(prisma: PrismaClient, id: string, input: EventUpdateRequest, actor: { id: string; requestId: string }) {
   await prisma.$transaction(async (tx) => {
-    await tx.$queryRaw`SELECT id FROM events WHERE id = ${id} FOR UPDATE`;
+    // NO KEY UPDATE, not UPDATE: token_ledger inserts take KEY SHARE on the event (foreign key) while holding a
+    // participant lock; FOR UPDATE here would deadlock with them while this loop takes participant locks (R11-2).
+    await tx.$queryRaw`SELECT id FROM events WHERE id = ${id} FOR NO KEY UPDATE`;
     const event = await tx.event.findUnique({ where: { id } });
     if (!event) throw notFound('That event');
     const before = EventConfig.parse(event.config);
