@@ -11,6 +11,7 @@ Tests for the web app: access control (policy, middleware, CSP) without a server
 | `support/` | Node resolve hook for `next/server`, and test fixtures (`support/README.md`) |
 | `participant-flow.test.ts` | prompt → code with exact settlement; failures uncharged and discarded; budget exhausted; practice; consent; sessions/revert; runs; hidden-test payload scan and SQL-level check |
 | `admin-flow.test.ts` | import + waitlist, badges, single-use check-in, cap, live budget change, event lock, problems, staff rules, role change, anonymise |
+| `gateway-client.test.ts` | `GatewayClient` with a fake fetch: split SSE chunks, usage required, b only on connection failure or Traefik text 502/503/504, no retry after a timeout or a JSON error |
 | `role-writes.test.ts` | static: only `changeRole` in `server/staff-service.ts` updates `users.role` |
 
 ## Affects / depends on

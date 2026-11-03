@@ -27,7 +27,14 @@ export async function createRun(prisma: PrismaClient, ctx: ParticipantContext, i
   if (!version) throw notFound('That code version');
 
   const id = await prisma.$transaction(async (tx) => {
+    // Concurrent retries with one key serialise on the participant lock, then find the row the first one created.
+
     await tx.$queryRaw`SELECT id FROM participants WHERE id = ${ctx.participantId} FOR UPDATE`;
+    const again = await tx.submission.findUnique({ where: { idempotencyKey: input.idempotencyKey }, select: { id: true, participantId: true } });
+    if (again) {
+      if (again.participantId !== ctx.participantId) throw conflict('idempotency_conflict', 'Try again.');
+      return again.id;
+    }
     const active = await tx.submission.count({ where: { participantId: ctx.participantId, status: { in: ['QUEUED', 'RUNNING'] } } });
     if (active >= MAX_ACTIVE_RUNS) throw new AppError(429, 'too_many_runs', 'Wait for your current runs to finish.');
     const created = await tx.submission.create({

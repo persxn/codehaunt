@@ -18,5 +18,9 @@ Database migration history.
 `make migrate` (`prisma migrate deploy`). Every migration is applied to PGlite by `npm test -w @codehaunt/db`.
 
 ## Gotchas
+- Rolling back `20261103090000_participant_flow`: re-add `problems."referenceSolution" TEXT` and
+  `"referenceLanguage" "Language"`, copy one REFERENCE row per problem back from `reference_solutions`, then drop
+  `reference_solutions`, `calibration_runs`, the new columns and the `SolutionKind` type. Applied migrations are
+  checksummed by Prisma: put notes here, never in the SQL.
 - The init migration appends triggers that raise errors on UPDATE/DELETE/TRUNCATE for `audit_log` and `token_ledger`. Retention must anonymise users/participants rather than delete rows.
 - Migrations are generated with `prisma migrate dev --create-only` then reviewed before committing.

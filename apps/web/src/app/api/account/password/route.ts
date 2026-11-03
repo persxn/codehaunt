@@ -3,6 +3,7 @@ import { ChangePasswordRequest } from '@codehaunt/contracts';
 import { getPrismaClient } from '@codehaunt/db';
 
 import { body, route } from '@/lib/route';
+import { clientIp } from '@/lib/http';
 import { badRequest } from '@/server/errors';
 
 /** Anyone signed in changes their own password; their other sessions end (ADR-020). */
@@ -14,6 +15,7 @@ export const POST = route(ROLES, async ({ request, user, sessionToken, requestId
     currentPassword: input.currentPassword,
     newPassword: input.newPassword,
     requestId,
+    ipAddress: clientIp(request.headers),
   });
   if (!result.ok) throw badRequest(result.reason);
   return { ok: true, endedSessions: result.endedSessions };

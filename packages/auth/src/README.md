@@ -7,7 +7,7 @@ Implementation of `@codehaunt/auth`.
 | `index.ts` | barrel |
 | `password.ts` | argon2id hash/verify (OWASP params), random password generator, length limits (12–200) |
 | `session.ts` | create/resolve/destroy DB sessions; only SHA-256 of the token is stored; cookie options |
-| `login.ts` | login (timing-safe, throttled), single participant session, `checkPasswordStrength`, audit-logged `setAccountActive` |
+| `login.ts` | login (timing-safe, throttled), single participant session, `checkPasswordStrength`, audit-logged `setAccountActive`, `changePassword` (current password throttled like a login, one at a time per account), `setPassword` (staff reset) |
 | `rate-limit.ts` | in-memory login throttling per username, per IP and globally; slows down, never refuses (ADR-020) |
 | `common-passwords.ts` | generated: SecLists 10k common passwords, lowercased (see `/VENDORED.md`) |
 | `policy.ts` | route → roles table and `authorize()`; pure, no Node imports (`@codehaunt/auth/policy`) |

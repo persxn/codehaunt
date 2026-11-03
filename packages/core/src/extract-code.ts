@@ -59,7 +59,7 @@ export function extractCode(reply: string, language: Language): Extraction {
     const bodyLines = closingIdx !== null ? lines.slice(i + 1, closingIdx) : lines.slice(i + 1);
     // Join body and trim trailing whitespace (including newlines).
     let body = bodyLines.join('\n');
-    body = body.replace(/[ \t\r\n]+$/g, '');
+    body = body.trimEnd();
     // Skip empty bodies.
     if (body === '') {
       // Advance i to after the closing fence if present to avoid nested detection.

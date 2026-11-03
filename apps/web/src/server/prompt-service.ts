@@ -133,13 +133,15 @@ export async function startPrompt(
           emit({ type: 'error', code: 'model_failed', message: FAILURE_MESSAGES[outcome.code] ?? GENERIC_FAILURE });
           return;
         }
+        // From here on the participant has seen the whole reply: it is charged even if storing it fails (audit M1).
         used = outcome.usage.prompt_tokens + outcome.usage.completion_tokens;
-        const extracted = extractCode(outcome.text, language);
+        const text = outcome.text.replaceAll('\u0000', '');
+        const extracted = extractCode(text, language);
         await prisma.$transaction([
           prisma.promptTurn.update({
             where: { id: turn.id },
             data: {
-              reply: outcome.text,
+              reply: text,
               node: outcome.node,
               promptTokens: outcome.usage.prompt_tokens,
               completionTokens: outcome.usage.completion_tokens,
@@ -154,8 +156,7 @@ export async function startPrompt(
         ]);
       } catch (error) {
         console.error(JSON.stringify({ level: 'error', msg: 'prompt failed', requestId: deps.requestId, error: String(error) }));
-        emit({ type: 'error', code: 'model_failed', message: GENERIC_FAILURE });
-        used = 0;
+        emit({ type: 'error', code: 'model_failed', message: used ? 'The reply could not be saved. Send the prompt again.' : GENERIC_FAILURE });
         return;
       } finally {
         inFlight.delete(ctx.participantId);
@@ -166,7 +167,11 @@ export async function startPrompt(
           });
         }
       }
-      emit({ type: 'done', response: await responseFor(prisma, ctx, turn.id) });
+      try {
+        emit({ type: 'done', response: await responseFor(prisma, ctx, turn.id) });
+      } catch {
+        emit({ type: 'error', code: 'reload', message: 'The reply was saved; reload to see it.' });
+      }
     };
     return { run };
   } catch (error) {

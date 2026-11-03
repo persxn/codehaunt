@@ -10,8 +10,11 @@ import type { PrismaClient } from '@codehaunt/db';
 import type { CodeRunner } from './sandbox/code-runner.ts';
 
 export const MAX_ATTEMPTS = 2;
-/** Longer than the slowest possible run (200 tests × 10 s is capped by the judge far below this). */
-export const RUNNING_TIMEOUT_MS = 15 * 60 * 1000;
+/**
+ * A row RUNNING longer than this belongs to a dead worker. Above the judge's own worst case (~38 min with 200 tests at
+ * the 10 s cap, audit run-9) and the docker-proxy's 40-minute sandbox reaper, so a live run is never judged twice.
+ */
+export const RUNNING_TIMEOUT_MS = 45 * 60 * 1000;
 /** RunLimits allows at most 10 s per test, whatever the multiplier. */
 const MAX_TIME_LIMIT_MS = 10_000;
 

@@ -14,10 +14,16 @@ const run = (kind: StoredRun['kind'], verdict: string, extra: Partial<NonNullabl
   verdict: { verdict, testsPassed: 1, testsTotal: 2, maxTimeMs: 4.4, maxMemoryKb: 900, compileLog: 'gcc: ok', results, ...extra },
 });
 
-test('a submission shows counts, time and memory, never per-test output', () => {
+test('a failed submission shows the verdict and counts only (time/memory are a side channel, ADR-027)', () => {
   const v = toParticipantVerdict(run('SUBMIT', 'WA'), new Set(['v1', 'h1']));
-  assert.deepEqual(v, { submissionId: 's1', status: 'DONE', verdict: 'WA', testsPassed: 1, testsTotal: 2, maxTimeMs: 4, maxMemoryKb: 900 });
+  assert.deepEqual(v, { submissionId: 's1', status: 'DONE', verdict: 'WA', testsPassed: 1, testsTotal: 2 });
   assert.doesNotMatch(JSON.stringify(v), /SECRET/);
+  for (const verdict of ['TLE', 'MLE', 'RE', 'IE']) assert.equal(toParticipantVerdict(run('SUBMIT', verdict), new Set()).maxMemoryKb, undefined);
+});
+
+test('an accepted submission and every sample run show time and memory', () => {
+  assert.deepEqual(toParticipantVerdict(run('SUBMIT', 'AC'), new Set()), { submissionId: 's1', status: 'DONE', verdict: 'AC', testsPassed: 1, testsTotal: 2, maxTimeMs: 4, maxMemoryKb: 900 });
+  assert.equal(toParticipantVerdict(run('SAMPLE', 'WA'), new Set()).maxTimeMs, 4);
 });
 
 test('a sample run shows only the tests the caller lists as visible', () => {

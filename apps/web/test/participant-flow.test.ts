@@ -185,3 +185,13 @@ test('participant services never query hidden test rows (SQL level)', async () =
     assert.doesNotMatch(q.params, /HIDDEN/);
   }
 });
+
+test('a reply with a NUL character is stored without it and charged (audit M1)', async () => {
+  const f = await setup(db.prisma);
+  await newSession(db.prisma, await f.ctx(), { problemId: f.problem.id, language: 'python' });
+  const events = await prompt(f, fakeModel({ text: 'ok\u0000\n```python\nprint(1)\n```' }).model);
+  assert.equal(events.at(-1)?.type, 'done');
+  assert.equal(await tokenBalance(db.prisma, f.participant.id), 20_000 - 340);
+  const turn = await db.prisma.promptTurn.findFirstOrThrow({ where: { chatSession: { participantId: f.participant.id } } });
+  assert.doesNotMatch(turn.reply ?? '', /\u0000/);
+});

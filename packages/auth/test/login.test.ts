@@ -145,3 +145,21 @@ test('chosen passwords: long, not common, not the username', () => {
   assert.equal(checkPasswordStrength('violet tram ladder 9', 'p1').ok, true);
   assert.equal(checkPasswordStrength(generatePassword()).ok, true, 'generated passwords always pass');
 });
+
+test('changing a password: wrong current passwords count like failed logins; one change at a time (audit M3)', async () => {
+  resetLoginRateLimits();
+  const { changePassword } = await import('../src/index.ts');
+  const { loginDelayMs } = await import('../src/rate-limit.ts');
+  const user = await db.prisma.user.create({ data: { username: 'chg-m3', name: 'C', role: 'PARTICIPANT', passwordHash: await hashPassword('right horse battery'), active: true } });
+  for (let i = 0; i < 8; i++) {
+    const r = await changePassword(db.prisma, { userId: user.id, sessionToken: 'x', currentPassword: `wrong-${i}`, newPassword: 'amber kettle 19 fox' });
+    assert.equal(r.ok, false);
+  }
+  assert.ok(loginDelayMs('chg-m3') > 0, 'failures now slow down both logins and further checks');
+  const [a, b] = await Promise.all([
+    changePassword(db.prisma, { userId: user.id, sessionToken: 'x', currentPassword: 'right horse battery', newPassword: 'amber kettle 19 fox' }),
+    changePassword(db.prisma, { userId: user.id, sessionToken: 'x', currentPassword: 'right horse battery', newPassword: 'amber kettle 19 fox' }),
+  ]);
+  assert.deepEqual([a.ok, b.ok].sort(), [false, true]);
+  resetLoginRateLimits();
+});

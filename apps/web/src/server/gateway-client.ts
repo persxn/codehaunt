@@ -58,7 +58,8 @@ export class GatewayClient implements ModelClient {
         });
       } catch {
         idle.stop();
-        if (last) return { ok: false, code: 'unreachable', partial: '' };
+        // Retry only a connection failure; a timeout means gateway-a may still be working on it (audit run-9).
+        if (last || idle.signal.aborted) return { ok: false, code: 'unreachable', partial: '' };
         continue;
       }
       const isJson = (response.headers.get('content-type') ?? '').includes('application/json');

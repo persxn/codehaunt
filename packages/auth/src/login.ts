@@ -162,16 +162,40 @@ export async function setAccountActive(
 
 export type PasswordChangeResult = { ok: true; endedSessions: number } | { ok: false; reason: string };
 
+/** One current-password check in flight per account: parallel requests can't multiply guesses or argon2 work. */
+const changing = new Set<string>();
+
 /**
  * A person changes their own password (ADR-020): the current password is required, the new one must pass
- * `checkPasswordStrength`, and every other session of the account ends (the one in use stays).
+ * `checkPasswordStrength`, and every other session of the account ends (the one in use stays). The current-password
+ * check is throttled exactly like a login for that username (WP-03 audit M3): same delay, wrong guesses count.
  */
 export async function changePassword(
   prisma: PrismaClient,
-  input: { userId: string; sessionToken: string; currentPassword: string; newPassword: string; requestId?: string | undefined },
+  input: {
+    userId: string; sessionToken: string; currentPassword: string; newPassword: string;
+    requestId?: string | undefined; ipAddress?: string | undefined;
+  },
+): Promise<PasswordChangeResult> {
+  if (changing.has(input.userId)) return { ok: false, reason: 'A password change is already in progress. Wait a moment.' };
+  changing.add(input.userId);
+  try {
+    return await changePasswordNow(prisma, input);
+  } finally {
+    changing.delete(input.userId);
+  }
+}
+
+async function changePasswordNow(
+  prisma: PrismaClient,
+  input: Parameters<typeof changePassword>[1],
 ): Promise<PasswordChangeResult> {
   const user = await prisma.user.findUnique({ where: { id: input.userId } });
-  if (!user || input.currentPassword.length > MAX_PASSWORD_LENGTH || !(await verifyPassword(user.passwordHash, input.currentPassword))) {
+  if (!user) return { ok: false, reason: 'Your current password is wrong.' };
+  const delayMs = loginDelayMs(user.username, input.ipAddress);
+  if (delayMs > 0) await new Promise((resolve) => setTimeout(resolve, delayMs));
+  if (input.currentPassword.length > MAX_PASSWORD_LENGTH || !(await verifyPassword(user.passwordHash, input.currentPassword))) {
+    recordLoginFailure(user.username, input.ipAddress);
     return { ok: false, reason: 'Your current password is wrong.' };
   }
   const strength = checkPasswordStrength(input.newPassword, user.username);
