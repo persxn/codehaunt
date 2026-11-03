@@ -9,6 +9,9 @@ import styles from './admin.module.css';
 
 const LINKS: Array<{ href: string; label: string; roles: Role[] }> = [
   { href: '/admin', label: 'Overview', roles: ['ADMIN', 'ORGANIZER'] },
+  { href: '/admin/contest', label: 'Contest', roles: ['ADMIN', 'ORGANIZER'] },
+  { href: '/admin/leaderboard', label: 'Leaderboard', roles: ['ADMIN', 'ORGANIZER'] },
+  { href: '/admin/incidents', label: 'Incidents', roles: ['ADMIN', 'ORGANIZER'] },
   { href: '/admin/event', label: 'Event', roles: ['ADMIN'] },
   { href: '/admin/problems', label: 'Problems', roles: ['ADMIN'] },
   { href: '/admin/participants', label: 'Participants', roles: ['ADMIN', 'ORGANIZER'] },

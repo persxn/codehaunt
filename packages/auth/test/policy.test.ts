@@ -54,3 +54,15 @@ test('WP-04: volunteers reach only check-in and the desk; organizers cannot edit
   for (const path of ['/api/staff/checkin', '/admin/checkin', '/api/admin/events']) assert.equal(allowed(path, 'PARTICIPANT'), false, path);
   assert.equal(allowed('/api/account/password', 'PARTICIPANT'), true);
 });
+
+test('WP-05: contest ops for admins and organizers only; the projector is public, its neighbours are not', () => {
+  const allowed = (path: string, role: Parameters<typeof authorize>[1]) => authorize(path, role).allow;
+  for (const path of ['/api/admin/ops/events/x', '/api/admin/ops/participants/x/topup', '/api/admin/ops/incidents/x', '/admin/contest', '/admin/leaderboard', '/admin/incidents', '/admin/log']) {
+    assert.equal(allowed(path, 'ADMIN'), true, path);
+    assert.equal(allowed(path, 'ORGANIZER'), true, path);
+    assert.equal(allowed(path, 'VOLUNTEER'), false, path);
+    assert.equal(allowed(path, 'PARTICIPANT'), false, path);
+  }
+  for (const path of ['/projector/abc', '/api/projector/abc']) assert.deepEqual(authorize(path, null), { allow: true }, path);
+  for (const path of ['/projectors', '/api/projectorx']) assert.deepEqual(authorize(path, null), { allow: false, status: 401 }, path);
+});

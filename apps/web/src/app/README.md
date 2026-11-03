@@ -7,6 +7,7 @@ Next.js route folder – each sub‑folder corresponds to a URL path.
 |---|---|
 | `admin/` | admin console and desk (WP-04; details in `admin/README.md`) |
 | `contest/` | participant contest screen (WP-03; details in `contest/README.md`) |
+| `projector/` | public projector board (ADR-008, WP-05; `projector/README.md`) |
 | `system-check/` | public pre-event system check (SEB, latency, screen) |
 | `account/` | change your own password (every role) |
 | `login/` | login UI |
@@ -27,4 +28,5 @@ Next.js route folder – each sub‑folder corresponds to a URL path.
 - Tests in `apps/web/test/routes.test.ts` cover each route.
 
 ## Gotchas
+- `/projector/<token>` is public: the token is the key; it shows rank, name, solved only.
 - `middleware.ts` denies all routes unless listed in `packages/auth/src/policy.ts` (`ROUTE_POLICY`).

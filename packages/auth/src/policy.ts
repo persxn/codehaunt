@@ -27,6 +27,9 @@ export const ROUTE_POLICY: ReadonlyArray<readonly [prefix: string, access: Acces
   ['/system-check', 'public'],
   // Next.js build assets: hashed, contain no data.
   ['/_next/static', 'public'],
+  // Projector (ADR-008, ADR-028): no login; the unguessable token in the path is the key. Rank, name, solved only.
+  ['/projector', 'public'],
+  ['/api/projector', 'public'],
   ['/favicon.ico', 'public'],
 
   ['/', ROLES],

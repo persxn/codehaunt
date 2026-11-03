@@ -8,7 +8,7 @@ import { after, before, test } from 'node:test';
 import type { RunRequest, RunResult } from '@codehaunt/contracts';
 import { createTestDatabase, type TestDatabase } from '@codehaunt/db/testing';
 
-import { claim, judgeLoop, judgeSubmission, MAX_ATTEMPTS, requeueStuck, RETRY_DELAY_MS, RUNNING_TIMEOUT_MS, runCalibration } from '../src/queue.ts';
+import { claim, judgeLoop, PROXY_REFUSAL_MARKER, judgeSubmission, MAX_ATTEMPTS, requeueStuck, RETRY_DELAY_MS, RUNNING_TIMEOUT_MS, runCalibration } from '../src/queue.ts';
 import type { CodeRunner } from '../src/sandbox/code-runner.ts';
 
 let db: TestDatabase;
@@ -21,12 +21,16 @@ after(async () => {
 
 const silent = () => {};
 
-function fakeRunner(behaviour: 'ok' | 'throw' = 'ok') {
+function fakeRunner(behaviour: 'ok' | 'throw' | 'ie' | 'refused' = 'ok') {
   const seen: RunRequest[] = [];
   const runner: CodeRunner = {
     async run(request) {
       seen.push(request);
       if (behaviour === 'throw') throw new Error('docker-proxy refused');
+      if (behaviour === 'ie' || behaviour === 'refused') {
+        const internalError = behaviour === 'ie' ? 'unparseable runner reply: {"forged"' : 'runner produced no output (exit 125): Error response from daemon: codehaunt docker-proxy: refused';
+        return { verdict: 'IE', testsPassed: 0, testsTotal: request.tests.length, maxTimeMs: 0, maxMemoryKb: 0, compileLog: '', results: [], internalError };
+      }
       const result: RunResult = {
         verdict: 'AC', testsPassed: request.tests.length, testsTotal: request.tests.length, maxTimeMs: 12.6, maxMemoryKb: 2048.4,
         compileLog: '', results: request.tests.map((t) => ({ testId: t.id, verdict: 'AC', timeMs: 1, memoryKb: 1, outputExcerpt: t.expectedOutput })),
@@ -144,4 +148,56 @@ test('the loop judges queued work and stops cleanly', async () => {
   stop.abort();
   await loop;
   assert.equal(await db.prisma.submission.count({ where: { id: { in: [a.sub.id, b.sub.id] }, status: 'DONE' } }), 2);
+});
+
+async function claimAfterDelay(id: string) {
+  await db.prisma.submission.update({ where: { id }, data: { startedAt: new Date(Date.now() - RETRY_DELAY_MS - 1000) } });
+  return claim(db.prisma, 'submissions');
+}
+
+test('a submit judged IE is re-checked once; the second IE is its verdict and opens a JUDGE_IE incident', async () => {
+  await drain();
+  const { runner, seen } = fakeRunner('ie');
+  const { sub } = await queued('SUBMIT');
+  await judgeSubmission(db.prisma, runner, (await claim(db.prisma, 'submissions'))!, silent);
+  let row = await db.prisma.submission.findUniqueOrThrow({ where: { id: sub.id }, include: { verdict: true } });
+  assert.deepEqual([row.status, row.attempts, row.verdict], ['QUEUED', 0, null]);
+  assert.match(row.firstInternalError!, /forged/);
+  assert.equal(await claim(db.prisma, 'submissions'), null, 'the re-check waits for the retry delay');
+  assert.equal(await db.prisma.incident.count({ where: { submissionId: sub.id } }), 0);
+
+  await judgeSubmission(db.prisma, runner, (await claimAfterDelay(sub.id))!, silent);
+  assert.equal(seen.length, 2);
+  row = await db.prisma.submission.findUniqueOrThrow({ where: { id: sub.id }, include: { verdict: true } });
+  assert.deepEqual([row.status, row.verdict?.verdict], ['DONE', 'IE']);
+  const incidents = await db.prisma.incident.findMany({ where: { submissionId: sub.id } });
+  assert.deepEqual(incidents.map((i) => [i.kind, i.status, i.participantId]), [['JUDGE_IE', 'OPEN', sub.participantId]]);
+  assert.match((incidents[0]!.detail as { firstInternalError: string }).firstInternalError, /forged/);
+});
+
+test('an IE on the re-check that turns out fine is just the verdict, no incident', async () => {
+  await drain();
+  const { sub } = await queued('SUBMIT');
+  await judgeSubmission(db.prisma, fakeRunner('ie').runner, (await claim(db.prisma, 'submissions'))!, silent);
+  await judgeSubmission(db.prisma, fakeRunner('ok').runner, (await claimAfterDelay(sub.id))!, silent);
+  const row = await db.prisma.submission.findUniqueOrThrow({ where: { id: sub.id }, include: { verdict: true } });
+  assert.equal(row.verdict?.verdict, 'AC');
+  assert.equal(await db.prisma.incident.count({ where: { submissionId: sub.id } }), 0);
+});
+
+test('a sample run with IE is not re-checked; each docker-proxy refusal opens a PROXY_REFUSAL incident', async () => {
+  await drain();
+  const sample = await queued('SAMPLE');
+  await judgeSubmission(db.prisma, fakeRunner('refused').runner, (await claim(db.prisma, 'submissions'))!, silent);
+  const row = await db.prisma.submission.findUniqueOrThrow({ where: { id: sample.sub.id }, include: { verdict: true } });
+  assert.deepEqual([row.status, row.verdict?.verdict], ['DONE', 'IE']);
+  assert.deepEqual((await db.prisma.incident.findMany({ where: { submissionId: sample.sub.id } })).map((i) => i.kind), ['PROXY_REFUSAL']);
+
+  const submit = await queued('SUBMIT');
+  const { runner } = fakeRunner('refused');
+  await judgeSubmission(db.prisma, runner, (await claim(db.prisma, 'submissions'))!, silent);
+  await judgeSubmission(db.prisma, runner, (await claimAfterDelay(submit.sub.id))!, silent);
+  const kinds = (await db.prisma.incident.findMany({ where: { submissionId: submit.sub.id } })).map((i) => i.kind).sort();
+  assert.deepEqual(kinds, ['JUDGE_IE', 'PROXY_REFUSAL', 'PROXY_REFUSAL'], 'one per refused run: first try and re-check');
+  assert.ok(PROXY_REFUSAL_MARKER.length > 0);
 });

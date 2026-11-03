@@ -12,10 +12,12 @@ ADMIN only (policy rows in `packages/auth/src/policy.ts`, and the role list in e
 | `staff/` | list/create staff; `[id]/` activate/deactivate |
 | `roles/` | `[id]/` the one audited role change |
 | `users/` | `[id]/password/` staff password reset |
+| `ops/` | contest operations (WP-05): controls, extend, leaderboard, results + CSV, projector link, participant log/actions, overrides, incidents |
 
 ## Affects / depends on
 - Depends on: `src/lib/route.ts`, services in `src/server/` (`event-service`, `problem-admin-service`,
-  `participant-admin-service`, `checkin-service`, `staff-service`).
+  `participant-admin-service`, `checkin-service`, `staff-service`; WP-05: `contest-ops-service`, `leaderboard-service`,
+  `incident-service`, `participant-log-service`).
 - Every write is audit-logged by its service.
 
 ## Entry points & how to test

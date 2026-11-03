@@ -44,6 +44,8 @@ export async function createRun(prisma: PrismaClient, ctx: ParticipantContext, i
         codeVersionId: version.id,
         kind: input.kind,
         idempotencyKey: input.idempotencyKey,
+        // Scoring's decay reads this (ADR-028); practice runs don't score.
+        contestMs: problem.practice ? null : ctx.clock.elapsedMs,
       },
       select: { id: true },
     });

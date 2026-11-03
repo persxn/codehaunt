@@ -1,0 +1,19 @@
+# ops
+Contest operations API (WP-05, ADR-028): clock controls, leaderboard, results, projector link, participant and incident actions.
+
+## Contents
+| Path | What it does |
+|---|---|
+| `events/` | per-event operations |
+| `participants/` | per-participant log and actions |
+| `incidents/` | incident actions |
+
+## Affects / depends on
+- Depends on: `src/lib/route.ts` (session, roles, error envelope), services in `src/server/`.
+- Access: ADMIN and ORGANIZER (`/api/admin` in `packages/auth/src/policy.ts`, plus the role list passed to `route()`).
+
+## Entry points & how to test
+Service logic is tested in `apps/web/test/contest-ops.test.ts` (`npm test -w @codehaunt/web`); access per path in `packages/auth/test/policy.test.ts`.
+
+## Gotchas
+Keep handlers thin: parse with the contract schema, call one service, return its result. Every action carries a reason (audit log).

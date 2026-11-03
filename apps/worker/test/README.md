@@ -6,7 +6,7 @@ Tests for the worker: the sandbox runner (Docker) and the judge queue (PGlite).
 | Path | What it does |
 |---|---|
 | `code-runner.test.ts` | `CodeRunner` acceptance: hello world in C/C++/Java/Python, WA, CE, TLE, and no network (TCP/UDP) from inside the sandbox |
-| `queue.test.ts` | judge queue on PGlite with a fake runner: tests per kind, multiplier, verdict rows, retry then FAILED, stuck-run sweep, calibration, loop |
+| `queue.test.ts` | judge queue on PGlite with a fake runner: tests per kind, multiplier, verdict rows, retry then FAILED, stuck-run sweep, calibration, loop, IE re-check once + incidents, proxy-refusal incidents |
 
 ## Affects / depends on
 - Requires the vendored judge Docker images to be built (`make runners`).

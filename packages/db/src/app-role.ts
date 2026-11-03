@@ -38,6 +38,8 @@ export const TABLE_ACCESS: Readonly<Record<string, { web: Access; worker: Access
   verdicts: { web: 'write', worker: 'update' },
   judge_reviews: { web: 'write', worker: 'update' },
   score_overrides: { web: 'write', worker: 'read' },
+  // The worker opens judge incidents (ADR-021); staff resolve them in the web (never delete).
+  incidents: { web: 'update', worker: 'append' },
   // Ledgers: append-only for everyone; the triggers are the second wall, these grants the first.
   token_ledger: { web: 'append', worker: 'read' },
   audit_log: { web: 'append', worker: 'append' },

@@ -2,6 +2,7 @@
  * The judge queue (ADR-025): QUEUED rows of `submissions` and `calibration_runs` are the jobs. A worker claims one
  * with FOR UPDATE SKIP LOCKED, runs it through CodeRunner and writes the verdict. A row left RUNNING (worker crash)
  * is requeued after RUNNING_TIMEOUT_MS; after MAX_ATTEMPTS it is FAILED (the dead letters, shown to staff in WP-05).
+ * A submit judged IE is re-checked once; a second IE is its verdict (it counts as WA) and opens an incident (ADR-021).
  */
 import { EventConfig, type Checker, type Language, type RunResult } from '@codehaunt/contracts';
 import { fromDbLanguage } from '@codehaunt/core';
@@ -17,6 +18,10 @@ export const RETRY_DELAY_MS = 10_000;
  * the 10 s cap, audit run-9) and the docker-proxy's 40-minute sandbox reaper, so a live run is never judged twice.
  */
 export const RUNNING_TIMEOUT_MS = 45 * 60 * 1000;
+/** What docker-proxy puts in every refusal (apps/docker-proxy); seen here inside an IE's internalError. */
+export const PROXY_REFUSAL_MARKER = 'codehaunt docker-proxy';
+/** internalError can carry participant output; incidents keep this much of it. */
+const MAX_INCIDENT_TEXT = 4000;
 /** RunLimits allows at most 10 s per test, whatever the multiplier. */
 const MAX_TIME_LIMIT_MS = 10_000;
 
@@ -84,7 +89,7 @@ export async function judgeSubmission(prisma: PrismaClient, runner: CodeRunner, 
         codeVersion: { select: { language: true, source: true } },
         problem: {
           select: {
-            timeLimitMs: true, memoryLimitMb: true, checker: true, event: { select: { config: true } },
+            eventId: true, timeLimitMs: true, memoryLimitMb: true, checker: true, event: { select: { config: true } },
             testCases: {
               orderBy: [{ visibility: 'desc' }, { ord: 'asc' }],
               select: { id: true, visibility: true, input: true, expectedOutput: true },
@@ -105,9 +110,30 @@ export async function judgeSubmission(prisma: PrismaClient, runner: CodeRunner, 
       checker: sub.problem.checker as Checker,
     });
     if (result.internalError) log({ level: 'warn', msg: 'judge internal error', submissionId: id, internalError: result.internalError.slice(0, 2000) });
+    const ie = result.verdict === 'IE';
+    const ieText = (result.internalError ?? 'internal error').slice(0, MAX_INCIDENT_TEXT);
+    const incident = (kind: 'JUDGE_IE' | 'PROXY_REFUSAL') => ({
+      eventId: sub.problem.eventId, participantId: sub.participantId, submissionId: id, kind,
+      detail: { internalError: ieText, ...(sub.firstInternalError ? { firstInternalError: sub.firstInternalError } : {}) },
+    });
+    const refused = ie && ieText.includes(PROXY_REFUSAL_MARKER);
+    if (ie && sub.kind === 'SUBMIT' && sub.firstInternalError === null) {
+      // First IE: back to the queue once (after RETRY_DELAY_MS), with a fresh crash-retry count (ADR-021).
+      await prisma.$transaction([
+        prisma.submission.updateMany({
+          where: { id, status: 'RUNNING' },
+          data: { status: 'QUEUED', attempts: 0, startedAt: new Date(), firstInternalError: ieText },
+        }),
+        ...(refused ? [prisma.incident.create({ data: incident('PROXY_REFUSAL') })] : []),
+      ]);
+      return;
+    }
     await prisma.$transaction([
       prisma.verdict.create({ data: verdictRow(id, result) }),
       prisma.submission.update({ where: { id }, data: { status: 'DONE', finishedAt: new Date() } }),
+      // A submit's second IE counts as WA and goes to the incident dashboard; a refusal is flagged on any run.
+      ...(ie && sub.kind === 'SUBMIT' ? [prisma.incident.create({ data: incident('JUDGE_IE') })] : []),
+      ...(refused ? [prisma.incident.create({ data: incident('PROXY_REFUSAL') })] : []),
     ]);
   } catch (error) {
     log({ level: 'error', msg: 'submission run failed', submissionId: id, error: String(error) });

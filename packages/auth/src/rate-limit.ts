@@ -118,6 +118,21 @@ export function clearLoginRate(username: string, ip?: string | undefined): void 
   if (ip) byIp.delete(ip);
 }
 
+/**
+ * Usernames whose sign-ins are being slowed right now, with their failure count in the window (WP-05 incident
+ * dashboard, ADR-021). In memory: empty again after a restart. Usernames only, never addresses (ADR-010).
+ */
+export function slowedUsernames(): Array<{ username: string; failures: number; delayMs: number }> {
+  const now = Date.now();
+  const out: Array<{ username: string; failures: number; delayMs: number }> = [];
+  for (const [username] of byUsername) {
+    const failures = failuresIn(byUsername, username, now);
+    const steps = Math.floor(failures / MAX_USERNAME_FAILURES);
+    if (steps > 0) out.push({ username, failures, delayMs: Math.min(steps * USERNAME_SLOWDOWN_MS, MAX_USERNAME_SLOWDOWN_MS) });
+  }
+  return out;
+}
+
 /** Test-only reset. */
 export function resetLoginRateLimits(): void {
   byUsername.clear();

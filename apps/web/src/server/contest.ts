@@ -29,23 +29,44 @@ export async function participantContext(
   const participant = await prisma.participant.findFirst({
     where: { userId, status: 'CHECKED_IN', event: { status: { not: 'DRAFT' } } },
     orderBy: { createdAt: 'desc' },
-    select: { id: true, consentAt: true, event: { select: { id: true, status: true, config: true } } },
+    select: {
+      id: true, consentAt: true, extraMinutes: true,
+      event: { select: { id: true, status: true, config: true, lockedAt: true, pausedAt: true, pausedMs: true } },
+    },
   });
   if (!participant) throw forbidden('You are not checked in to an event.');
   if (!participant.consentAt && !options.allowWithoutConsent) {
     throw new AppError(403, 'consent_required', 'Please read and accept the consent text first.');
   }
   const config = EventConfig.parse(participant.event.config);
-  const clock = contestClock(
+  const clock = eventClock({ ...participant.event, config }, now, participant.extraMinutes);
+  const { id, status } = participant.event;
+  return { participantId: participant.id, userId, event: { id, status, config }, clock, consented: participant.consentAt !== null };
+}
+
+export interface ClockedEvent {
+  status: string;
+  config: EventConfig;
+  lockedAt: Date | null;
+  pausedAt: Date | null;
+  pausedMs: number;
+}
+
+/** The event's clock (ADR-028), or one participant's with their extra minutes. */
+export function eventClock(event: ClockedEvent, now: Date, extraMinutes = 0): ClockState {
+  return contestClock(
     {
-      status: participant.event.status as Parameters<typeof contestClock>[0]['status'],
-      startsAt: config.schedule.startsAt,
-      durationMinutes: config.schedule.durationMinutes,
-      freezeMinutes: config.schedule.freezeMinutes,
+      status: event.status as Parameters<typeof contestClock>[0]['status'],
+      startsAt: event.config.schedule.startsAt,
+      durationMinutes: event.config.schedule.durationMinutes,
+      freezeMinutes: event.config.schedule.freezeMinutes,
+      startedAt: event.lockedAt,
+      pausedAt: event.pausedAt,
+      pausedMs: event.pausedMs,
+      extraMinutes,
     },
     now,
   );
-  return { participantId: participant.id, userId, event: { ...participant.event, config }, clock, consented: participant.consentAt !== null };
 }
 
 /**

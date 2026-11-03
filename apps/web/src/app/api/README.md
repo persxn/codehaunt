@@ -10,10 +10,11 @@ Backend API routes for the web app.
 | `account/` | own-password change for every role |
 | `admin/` | admin console API (WP-04): event editor, problems, participants, badges, staff, roles, password resets |
 | `staff/` | desk API incl. volunteers: events, participant list, waitlist promotion, check-in |
+| `projector/` | public projector board (ADR-008, WP-05): no session, token in the path |
 
 ## Affects / depends on
 - Depends on `@codehaunt/auth` for session validation and `@codehaunt/db` for user data.
-- Changing routes may require updates to `ROUTE_POLICY`.
+- Changing routes may require updates to `ROUTE_POLICY`. `projector/` is the only public data route.
 
 ## Entry points & how to test
 - Access via HTTP requests (e.g., `POST /api/auth/login`).

@@ -1,7 +1,9 @@
 /**
- * Contest clock logic.
+ * Contest clock logic (ADR-028).
  *
- * Computes the current phase of a contest and timing information.
+ * The contest runs `durationMinutes` from its actual start (`startedAt`, set by the Start control; the scheduled
+ * `startsAt` until then). Pauses push the end back: `pausedMs` is the sum of finished pauses, `pausedAt` the start of
+ * the current one. `extraMinutes` is a participant's own extra time.
  */
 import type { EventStatus } from '@codehaunt/contracts';
 
@@ -18,6 +20,12 @@ export interface ClockInput {
   freezeMinutes: number;
   /** Additional minutes added to the contest duration (default 0). */
   extraMinutes?: number;
+  /** Actual start (events.lockedAt); overrides `startsAt` when set. */
+  startedAt?: Date | string | null;
+  /** Start of the current pause (events.pausedAt). */
+  pausedAt?: Date | string | null;
+  /** Finished pauses in milliseconds (events.pausedMs). */
+  pausedMs?: number;
 }
 
 export interface ClockState {
@@ -31,6 +39,8 @@ export interface ClockState {
   msLeft: number;
   /** Whether the contest is frozen (running or paused after freeze time). */
   frozen: boolean;
+  /** Contest time elapsed, pauses excluded; 0 before the start. */
+  elapsedMs: number;
 }
 
 /**
@@ -40,8 +50,10 @@ export interface ClockState {
  */
 export function contestClock(input: ClockInput, now: Date): ClockState {
   const extra = input.extraMinutes ?? 0;
-  const startsAt = new Date(input.startsAt);
-  const endsAt = new Date(startsAt.getTime() + (input.durationMinutes + extra) * 60_000);
+  const startsAt = new Date(input.startedAt ?? input.startsAt);
+  const pausedAt = input.pausedAt ? new Date(input.pausedAt) : null;
+  const paused = (input.pausedMs ?? 0) + (pausedAt ? Math.max(0, now.getTime() - pausedAt.getTime()) : 0);
+  const endsAt = new Date(startsAt.getTime() + (input.durationMinutes + extra) * 60_000 + paused);
   const freezesAt = new Date(endsAt.getTime() - input.freezeMinutes * 60_000);
 
   // Determine base phase based on status.
@@ -78,5 +90,7 @@ export function contestClock(input: ClockInput, now: Date): ClockState {
   const msLeft = (phase === 'running' || phase === 'paused') ? Math.max(0, endsAt.getTime() - now.getTime()) : 0;
   const frozen = ((phase === 'running' || phase === 'paused') && now >= freezesAt) || phase === 'ended';
 
-  return { phase, startsAt, endsAt, freezesAt, msLeft, frozen };
+  const elapsedMs = phase === 'not_started' ? 0 : Math.max(0, Math.min(now.getTime(), endsAt.getTime()) - startsAt.getTime() - paused);
+
+  return { phase, startsAt, endsAt, freezesAt, msLeft, frozen, elapsedMs };
 }

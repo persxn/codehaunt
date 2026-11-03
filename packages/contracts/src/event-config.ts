@@ -82,6 +82,8 @@ export const EventConfig = z.object({
   }).prefault({}),
   leaderboard: z.object({
     projectorEnabled: z.boolean().default(true),
+    /** Appeal window between provisional and final results (ADR-009, ADR-028). */
+    appealMinutes: z.number().int().min(0).max(240).default(30),
   }).prefault({}),
   access: z.object({
     sebRequired: z.boolean().default(true),

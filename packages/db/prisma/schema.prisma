@@ -74,6 +74,13 @@ enum EventStatus {
   PUBLISHED
 }
 
+/// Results after the contest (ADR-009): provisional → appeal window → final.
+enum ResultsState {
+  NONE
+  PROVISIONAL
+  FINAL
+}
+
 model Event {
   id        String      @id @default(cuid())
   slug      String      @unique
@@ -81,14 +88,24 @@ model Event {
   status    EventStatus @default(DRAFT)
   /// EventConfig (zod, @codehaunt/contracts): schedule, budgets, languages, weights, model, rubric.
   config    Json
-  /// Set when the contest starts; problems and scoring weights are frozen from then on (ADR-006).
+  /// Set when the contest starts; problems and scoring weights are frozen from then on (ADR-006). Also the actual
+  /// start of the contest clock (ADR-028).
   lockedAt  DateTime?
+  /// Set while paused; on resume the pause is added to `pausedMs` (ADR-028).
+  pausedAt  DateTime?
+  pausedMs  Int         @default(0)
+  /// SHA-256 of the projector link's token (ADR-028); the token itself is shown once.
+  projectorTokenHash String? @unique
+  resultsState  ResultsState @default(NONE)
+  /// When provisional results were published: the appeal window runs from here.
+  provisionalAt DateTime?
   createdAt DateTime    @default(now())
   updatedAt DateTime    @updatedAt
 
   problems     Problem[]
   participants Participant[]
   tokenLedger  TokenLedger[]
+  incidents    Incident[]
 
   @@map("events")
 }
@@ -228,6 +245,8 @@ model Participant {
   reuseConsent     Boolean           @default(false)
   /// Required only when the event allows minors (ADR-010).
   guardianConsent  Boolean           @default(false)
+  /// Personal extra contest time: extensions and accommodation (ADR-028).
+  extraMinutes     Int               @default(0)
   createdAt        DateTime          @default(now())
 
   chatSessions   ChatSession[]
@@ -235,6 +254,7 @@ model Participant {
   tokenLedger    TokenLedger[]
   judgeReviews   JudgeReview[]
   scoreOverrides ScoreOverride[]
+  incidents      Incident[]
 
   @@unique([eventId, userId])
   @@unique([eventId, enrolmentNo])
@@ -333,11 +353,16 @@ model Submission {
   idempotencyKey String           @unique
   /// Claims by the worker (ADR-025): a row left RUNNING is requeued; after 2 attempts it is FAILED.
   attempts       Int              @default(0)
+  /// Contest time elapsed when it was made, pauses excluded (ADR-028); scoring's decay uses it. Null for practice.
+  contestMs      Int?
+  /// The first IE's internalError: set means the run is (or was) the automatic re-check (ADR-021).
+  firstInternalError String?
   createdAt      DateTime         @default(now())
   startedAt      DateTime?
   finishedAt     DateTime?
 
-  verdict Verdict?
+  verdict   Verdict?
+  incidents Incident[]
 
   @@index([participantId, problemId, createdAt])
   @@index([status, createdAt])
@@ -394,6 +419,42 @@ model ScoreOverride {
 
   @@index([participantId])
   @@map("score_overrides")
+}
+
+enum IncidentKind {
+  /// A submit was IE twice; the second counts as WA (ADR-021).
+  JUDGE_IE
+  /// docker-proxy refused a sandbox request during a run.
+  PROXY_REFUSAL
+}
+
+enum IncidentStatus {
+  OPEN
+  RESOLVED
+}
+
+/// Staff-facing (ADR-021, ADR-028). `detail` may hold participant-controlled text: render as plain text only.
+model Incident {
+  id            String         @id @default(cuid())
+  eventId       String
+  event         Event          @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  participantId String?
+  participant   Participant?   @relation(fields: [participantId], references: [id], onDelete: Cascade)
+  submissionId  String?
+  submission    Submission?    @relation(fields: [submissionId], references: [id], onDelete: Cascade)
+  kind          IncidentKind
+  status        IncidentStatus @default(OPEN)
+  detail        Json
+  /// Set by "reverse penalty": the submission no longer counts as a wrong attempt.
+  penaltyReversed Boolean      @default(false)
+  resolution    String?
+  resolvedBy    String?
+  resolvedAt    DateTime?
+  createdAt     DateTime       @default(now())
+
+  @@index([submissionId])
+  @@index([eventId, createdAt])
+  @@map("incidents")
 }
 
 // ---------------------------------------------------------------------------

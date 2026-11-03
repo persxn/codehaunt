@@ -98,3 +98,29 @@ test('PUBLISHED status => ended, frozen true, msLeft 0', () => {
 });
 
 
+
+test('the actual start overrides the scheduled one', () => {
+  const state = contestClock({ ...base, startedAt: '2023-01-01T00:10:00Z' }, new Date('2023-01-01T01:05:00Z'));
+  assert.equal(state.phase, 'running');
+  assert.equal(state.endsAt.toISOString(), '2023-01-01T01:10:00.000Z');
+  assert.equal(state.elapsedMs, 55 * 60_000);
+});
+
+test('a running pause freezes time left and elapsed time; finished pauses push the end back', () => {
+  const input = { ...base, status: 'PAUSED' as const, pausedAt: '2023-01-01T00:20:00Z', pausedMs: 5 * 60_000 };
+  const a = contestClock(input, new Date('2023-01-01T00:30:00Z'));
+  const b = contestClock(input, new Date('2023-01-01T00:40:00Z'));
+  assert.equal(a.phase, 'paused');
+  assert.equal(a.msLeft, b.msLeft);
+  assert.equal(a.elapsedMs, 15 * 60_000);
+  assert.equal(b.elapsedMs, 15 * 60_000);
+  // After resuming (pause of 20 min folded into pausedMs), the end is 25 min later than scheduled.
+  const resumed = contestClock({ ...base, pausedMs: 25 * 60_000 }, new Date('2023-01-01T00:40:00Z'));
+  assert.equal(resumed.endsAt.toISOString(), '2023-01-01T01:25:00.000Z');
+  assert.equal(resumed.elapsedMs, 15 * 60_000);
+});
+
+test('elapsed time stops at the end and is 0 before the start', () => {
+  assert.equal(contestClock(base, new Date('2023-01-01T03:00:00Z')).elapsedMs, 60 * 60_000);
+  assert.equal(contestClock({ ...base, status: 'CHECK_IN' as const }, new Date('2023-01-01T00:30:00Z')).elapsedMs, 0);
+});

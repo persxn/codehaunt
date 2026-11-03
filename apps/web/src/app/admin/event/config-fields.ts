@@ -45,9 +45,12 @@ export const SECTIONS: Array<{ key: keyof EventConfig; title: string; fields: Fi
     { path: 'scoring.weights.resourceEfficiency', label: 'Memory + runtime weight', kind: 'number', step: 0.05 },
     { path: 'scoring.weights.processQuality', label: 'Process quality weight', kind: 'number', step: 0.05 },
     { path: 'scoring.wrongSubmissionPenalty', label: 'Wrong submission penalty', kind: 'number' },
-    { path: 'scoring.decayPerMinute', label: 'Decay per minute', kind: 'number', step: 0.1 },
+    { path: 'scoring.decayPerMinute', label: 'Decay per minute (points per 500)', kind: 'number', step: 0.1 },
   ] },
-  { key: 'leaderboard', title: 'Leaderboard', fields: [{ path: 'leaderboard.projectorEnabled', label: 'Projector view enabled', kind: 'bool' }] },
+  { key: 'leaderboard', title: 'Leaderboard', fields: [
+    { path: 'leaderboard.projectorEnabled', label: 'Projector view enabled', kind: 'bool' },
+    { path: 'leaderboard.appealMinutes', label: 'Appeal window (minutes)', kind: 'number' },
+  ] },
   { key: 'access', title: 'Access', fields: [
     { path: 'access.sebRequired', label: 'Safe Exam Browser required', kind: 'bool' },
     { path: 'access.checkInCap', label: 'Check-in cap', kind: 'number' },
@@ -104,7 +107,7 @@ export function defaultConfig(name: string): EventConfig {
     model: { baseUrl: 'http://gateway.invalid', name: 'junior', systemPromptVersion: 'v1', temperature: 0.2, hostedAllowed: false },
     judge: { rubricVersion: 'v1', model: 'gpt-oss:120b' },
     scoring: { weights: { correctness: 0.55, tokenEfficiency: 0.15, resourceEfficiency: 0.1, processQuality: 0.2 }, wrongSubmissionPenalty: 50, decayPerMinute: 2 },
-    leaderboard: { projectorEnabled: true },
+    leaderboard: { projectorEnabled: true, appealMinutes: 30 },
     access: { sebRequired: true, checkInCap: 40, allowMinors: false },
     consent: { text: 'I agree that my prompts, replies and code are logged and judged. Traffic passes through Cloudflare.', retentionDays: 30 },
   };

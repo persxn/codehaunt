@@ -10,9 +10,11 @@ import {
   ParticipantProblem,
   ParticipantVerdict,
   ProblemInput,
+  ProjectorView,
   PromptRequest,
   RunRequest,
   SubmissionRequest,
+  TopUpRequest,
 } from '../src/index.ts';
 
 const minimalConfig = {
@@ -112,4 +114,21 @@ test('GatewayChatRequest requires the codehaunt caps and rejects unknown fields'
   assert.equal(GatewayChatRequest.safeParse({ ...ok, codehaunt: undefined }).success, false);
   assert.equal(GatewayChatRequest.safeParse({ ...ok, model: 'other' }).success, false);
   assert.equal(GatewayChatRequest.safeParse({ ...ok, messages: [{ role: 'tool', content: 'x' }] }).success, false);
+});
+
+test('projector view is strict: an extra field (an enrolment number) fails', () => {
+  const view = { title: 'T', phase: 'running', msLeft: 0, frozen: false, final: false, problems: 6, rows: [{ rank: 1, name: 'A', solved: 2 }] };
+  assert.ok(ProjectorView.safeParse(view).success);
+  assert.equal(ProjectorView.safeParse({ ...view, rows: [{ rank: 1, name: 'A', solved: 2, enrolmentNo: 'E1' }] }).success, false);
+});
+
+test('top-ups need a reason and an idempotency key, and are bounded', () => {
+  assert.ok(TopUpRequest.safeParse({ tokens: 5000, reason: 'gateway glitch', idempotencyKey: randomUUID() }).success);
+  assert.equal(TopUpRequest.safeParse({ tokens: 5000, reason: ' ', idempotencyKey: randomUUID() }).success, false);
+  assert.equal(TopUpRequest.safeParse({ tokens: 0, reason: 'x', idempotencyKey: randomUUID() }).success, false);
+  assert.equal(TopUpRequest.safeParse({ tokens: 5000, reason: 'x' }).success, false);
+});
+
+test('appeal window defaults to 30 minutes', () => {
+  assert.equal(EventConfig.parse(minimalConfig).leaderboard.appealMinutes, 30);
 });

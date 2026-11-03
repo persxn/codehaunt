@@ -11,7 +11,7 @@ import { test } from 'node:test';
 import { authorize } from '@codehaunt/auth/policy';
 
 const APP = fileURLToPath(new URL('../src/app', import.meta.url));
-const PUBLIC = new Set(['/login', '/api/auth/login', '/healthz', '/readyz', '/system-check']);
+const PUBLIC = new Set(['/login', '/api/auth/login', '/healthz', '/readyz', '/system-check', '/projector/x', '/api/projector/x']);
 
 function routes(dir: string): string[] {
   const found: string[] = [];

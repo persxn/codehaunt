@@ -7,3 +7,4 @@ export * from './auth.ts';
 export * from './gateway.ts';
 export * from './contest.ts';
 export * from './admin.ts';
+export * from './ops.ts';
