@@ -7,22 +7,33 @@
 import { isDeepStrictEqual } from 'node:util';
 
 import { EventConfig, LIVE_EDITABLE_KEYS, type EventCreateRequest, type EventUpdateRequest } from '@codehaunt/contracts';
-import { adjustTokens, type PrismaClient } from '@codehaunt/db';
+import { adjustTokensIn, type PrismaClient } from '@codehaunt/db';
 
 import { conflict, notFound } from './errors.ts';
+
+/**
+ * Problems and scoring freeze once the contest starts (ADR-006). Started means any of: `lockedAt` set (WP-05's start
+ * control), the status past check-in, or the configured start time passed — so nothing depends on one flag (audit M1).
+ */
+export function isLocked(event: { lockedAt: Date | null; status: string; config: unknown }, now = new Date()): boolean {
+  if (event.lockedAt) return true;
+  if (!['DRAFT', 'CHECK_IN'].includes(event.status)) return true;
+  const parsed = EventConfig.safeParse(event.config);
+  return parsed.success && new Date(parsed.data.schedule.startsAt).getTime() <= now.getTime();
+}
 
 export async function listEvents(prisma: PrismaClient) {
   const events = await prisma.event.findMany({
     orderBy: { createdAt: 'desc' },
     select: { id: true, slug: true, name: true, status: true, lockedAt: true, _count: { select: { participants: true, problems: true } } },
   });
-  return events.map(({ _count, lockedAt, ...e }) => ({ ...e, locked: lockedAt !== null, participants: _count.participants, problems: _count.problems }));
+  return events.map(({ _count, lockedAt, ...e }) => ({ ...e, locked: lockedAt !== null || !['DRAFT', 'CHECK_IN'].includes(e.status), participants: _count.participants, problems: _count.problems }));
 }
 
 export async function getEvent(prisma: PrismaClient, id: string) {
   const event = await prisma.event.findUnique({ where: { id } });
   if (!event) throw notFound('That event');
-  return { id: event.id, slug: event.slug, name: event.name, status: event.status, locked: event.lockedAt !== null, config: EventConfig.parse(event.config) };
+  return { id: event.id, slug: event.slug, name: event.name, status: event.status, locked: isLocked(event), config: EventConfig.parse(event.config) };
 }
 
 export async function createEvent(prisma: PrismaClient, input: EventCreateRequest, actor: { id: string; requestId: string }) {
@@ -37,13 +48,13 @@ export async function createEvent(prisma: PrismaClient, input: EventCreateReques
 }
 
 export async function updateEvent(prisma: PrismaClient, id: string, input: EventUpdateRequest, actor: { id: string; requestId: string }) {
-  const result = await prisma.$transaction(async (tx) => {
+  await prisma.$transaction(async (tx) => {
     await tx.$queryRaw`SELECT id FROM events WHERE id = ${id} FOR UPDATE`;
     const event = await tx.event.findUnique({ where: { id } });
     if (!event) throw notFound('That event');
     const before = EventConfig.parse(event.config);
     const after = input.config;
-    if (event.lockedAt) {
+    if (isLocked(event)) {
       const live = new Set<string>(LIVE_EDITABLE_KEYS);
       const frozen = (Object.keys(after) as Array<keyof EventConfig>).filter((k) => !live.has(k) && !isDeepStrictEqual(before[k], after[k]));
       if (frozen.length || (input.name && input.name !== event.name)) {
@@ -63,24 +74,23 @@ export async function updateEvent(prisma: PrismaClient, id: string, input: Event
         requestId: actor.requestId,
       },
     });
-    // Snapshot under the event lock: check-ins hold the same lock, so anyone checking in after this commit is
-    // granted the new amount and is not in this list (no double adjustment).
-    const participants = await tx.participant.findMany({ where: { eventId: id, status: 'CHECKED_IN' }, select: { id: true } });
-    return { auditId: audit.id, participants, delta: after.budget.tokensPerParticipant - before.budget.tokensPerParticipant };
-  });
-  if (result.delta !== 0) {
-    // Those already checked in get the difference. Each adjustment takes that participant's lock (ledger invariant).
-    for (const p of result.participants) {
-      await adjustTokens(prisma, {
-        eventId: id,
-        participantId: p.id,
-        kind: 'ADJUSTMENT',
-        delta: result.delta,
-        actorId: actor.id,
-        reason: 'event budget changed',
-        idempotencyKey: `budget:${result.auditId}:${p.id}`,
-      });
+    // Everyone checked in gets the difference, in this same transaction (all or nothing; audit L1). Check-ins hold
+    // the event lock too, so nobody is granted the old amount and then missed, or adjusted twice.
+    const delta = after.budget.tokensPerParticipant - before.budget.tokensPerParticipant;
+    if (delta !== 0) {
+      const participants = await tx.participant.findMany({ where: { eventId: id, status: 'CHECKED_IN' }, select: { id: true } });
+      for (const p of participants) {
+        await adjustTokensIn(tx, {
+          eventId: id,
+          participantId: p.id,
+          kind: 'ADJUSTMENT',
+          delta,
+          actorId: actor.id,
+          reason: 'event budget changed',
+          idempotencyKey: `budget:${audit.id}:${p.id}`,
+        });
+      }
     }
-  }
+  }, { timeout: 30_000 });
   return getEvent(prisma, id);
 }

@@ -41,6 +41,11 @@ export async function importParticipants(prisma: PrismaClient, input: Participan
         skipped.push({ enrolmentNo: row.enrolmentNo, reason: 'email used by another account' });
         continue;
       }
+      if (existing) {
+        // Re-imported from an earlier event: inactive again until scanned at this event's desk (audit L4).
+        await tx.user.update({ where: { id: existing.id }, data: { active: false } });
+        await tx.authSession.deleteMany({ where: { userId: existing.id } });
+      }
       const user = existing ?? (await tx.user.create({
         data: { username, name: row.name, email: row.email?.toLowerCase() ?? null, role: 'PARTICIPANT', passwordHash: placeholderHash, active: false },
         select: { id: true, role: true },
@@ -54,7 +59,8 @@ export async function importParticipants(prisma: PrismaClient, input: Participan
       created.push(p.id);
     }
     await tx.auditLog.create({
-      data: { actorId: actor.id, action: 'participant.imported', targetType: 'event', targetId: event.id, after: { created: created.length, skipped }, requestId: actor.requestId },
+      // Counts and reasons only: the audit log is append-only and outlives anonymisation (ADR-010).
+      data: { actorId: actor.id, action: 'participant.imported', targetType: 'event', targetId: event.id, after: { created: created.length, skipped: skipped.map((s) => s.reason) }, requestId: actor.requestId },
     });
   });
   return { created: created.length, skipped };
@@ -92,9 +98,16 @@ export async function exportParticipant(prisma: PrismaClient, participantId: str
       submissions: { include: { verdict: true } },
       judgeReviews: true,
       scoreOverrides: true,
+      tokenLedger: { orderBy: { id: 'asc' } },
     },
   });
   if (!p) throw notFound('That participant');
+  const authSessions = await prisma.authSession.findMany({ where: { userId: p.userId }, select: { createdAt: true, expiresAt: true, ipAddress: true, userAgent: true } });
+  const audit = await prisma.auditLog.findMany({
+    where: { OR: [{ targetType: 'participant', targetId: p.id }, { targetType: 'user', targetId: p.userId }, { actorId: p.userId }] },
+    orderBy: { id: 'asc' },
+    select: { action: true, createdAt: true, after: true, reason: true },
+  });
   await prisma.auditLog.create({ data: { actorId: actor.id, action: 'participant.exported', targetType: 'participant', targetId: participantId, requestId: actor.requestId } });
   return {
     participant: {
@@ -109,6 +122,9 @@ export async function exportParticipant(prisma: PrismaClient, participantId: str
     runs: p.submissions.map((s) => ({ problemId: s.problemId, createdAt: s.createdAt, ...toParticipantVerdict({ id: s.id, kind: s.kind, status: s.status, verdict: s.verdict }, new Set()) })),
     reviews: p.judgeReviews.map((r) => ({ problemId: r.problemId, score: r.score, rationale: r.rationale, createdAt: r.createdAt })),
     overrides: p.scoreOverrides.map((o) => ({ problemId: o.problemId, component: o.component, value: o.value, reason: o.reason, createdAt: o.createdAt })),
+    tokens: p.tokenLedger.map((t) => ({ kind: t.kind, delta: t.delta, reason: t.reason, createdAt: t.createdAt })),
+    signIns: authSessions,
+    auditTrail: audit,
   };
 }
 
@@ -124,11 +140,16 @@ export async function anonymiseParticipant(prisma: PrismaClient, participantId: 
     const tag = `deleted-${p.id}`;
     await tx.promptTurn.updateMany({ where: { chatSession: { participantId: p.id } }, data: { prompt: '', reply: '' } });
     await tx.codeVersion.updateMany({ where: { chatSession: { participantId: p.id } }, data: { source: '' } });
+    // Compiler logs and output excerpts come from their code; judge text and override reasons describe them.
+    await tx.verdict.updateMany({ where: { submission: { participantId: p.id } }, data: { compileLog: '', results: [] } });
+    await tx.judgeReview.updateMany({ where: { participantId: p.id }, data: { rationale: '', raw: {} } });
+    await tx.scoreOverride.updateMany({ where: { participantId: p.id }, data: { reason: '' } });
     await tx.participant.update({ where: { id: p.id }, data: { enrolmentNo: tag, phone: null, seatLabel: null, checkInTokenHash: null } });
+    // Signed out (and their sign-in records with IPs gone) in every case.
+    await tx.authSession.deleteMany({ where: { userId: p.userId } });
     // A user may belong to several events; only a user with no other participation is erased.
     if ((await tx.participant.count({ where: { userId: p.userId } })) === 1) {
       await tx.user.update({ where: { id: p.userId }, data: { username: tag, name: 'Deleted participant', email: null, active: false } });
-      await tx.authSession.deleteMany({ where: { userId: p.userId } });
     }
     await tx.auditLog.create({
       data: { actorId: actor.id, action: 'participant.anonymised', targetType: 'participant', targetId: p.id, reason: actor.reason, requestId: actor.requestId },

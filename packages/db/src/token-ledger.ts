@@ -23,7 +23,7 @@ export class BudgetExhausted extends Error {
 const reserveKey = (turnId: string) => `turn:${turnId}:reserve`;
 const settleKey = (turnId: string) => `turn:${turnId}:settle`;
 
-type Tx = Parameters<Parameters<PrismaClient['$transaction']>[0]>[0];
+export type Tx = Parameters<Parameters<PrismaClient['$transaction']>[0]>[0];
 
 async function sum(tx: Tx, participantId: string): Promise<number> {
   const r = await tx.tokenLedger.aggregate({ where: { participantId }, _sum: { delta: true } });
@@ -137,26 +137,31 @@ async function releaseStale(tx: Tx, participantId: string, now: Date): Promise<v
   }
 }
 
+export interface AdjustInput {
+  eventId: string;
+  participantId: string;
+  kind: 'TOP_UP' | 'ADJUSTMENT' | 'GRANT';
+  delta: number;
+  actorId: string | null;
+  reason: string;
+  idempotencyKey: string;
+}
+
 /**
  * Staff change a participant's budget (top-up, or a live change of the event's budget; ADR-006). Positive deltas
  * are added as is; a negative delta takes the participant lock and is clamped so the balance never goes below 0.
- * Idempotent per key. Returns the delta actually written (0 if the key was used before).
+ * The balance includes open reservations, so a decrease during a reply is clamped conservatively; the reservation's
+ * unused part returns at settle. Idempotent per key. Returns the delta written (0 if the key was used before).
  */
-export async function adjustTokens(
-  prisma: PrismaClient,
-  input: {
-    eventId: string;
-    participantId: string;
-    kind: 'TOP_UP' | 'ADJUSTMENT' | 'GRANT';
-    delta: number;
-    actorId: string | null;
-    reason: string;
-    idempotencyKey: string;
-  },
-): Promise<number> {
+export async function adjustTokens(prisma: PrismaClient, input: AdjustInput): Promise<number> {
+  return prisma.$transaction((tx) => adjustTokensIn(tx, input));
+}
+
+/** The same inside a caller's transaction (e.g. the event budget change, so all adjustments commit with it). */
+export async function adjustTokensIn(tx: Tx, input: AdjustInput): Promise<number> {
   if (!Number.isInteger(input.delta)) throw new RangeError('delta must be an integer');
   if (input.kind !== 'ADJUSTMENT' && input.delta < 0) throw new RangeError(`${input.kind} must not be negative`);
-  return prisma.$transaction(async (tx) => {
+  {
     await tx.$queryRaw`SELECT id FROM participants WHERE id = ${input.participantId} FOR UPDATE`;
     if (await tx.tokenLedger.findUnique({ where: { idempotencyKey: input.idempotencyKey } })) return 0;
     const delta = input.delta < 0 ? -Math.min(-input.delta, Math.max(0, await sum(tx, input.participantId))) : input.delta;
@@ -173,5 +178,5 @@ export async function adjustTokens(
       },
     });
     return delta;
-  });
+  }
 }

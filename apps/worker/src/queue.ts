@@ -10,6 +10,8 @@ import type { PrismaClient } from '@codehaunt/db';
 import type { CodeRunner } from './sandbox/code-runner.ts';
 
 export const MAX_ATTEMPTS = 2;
+/** A run given back after a failure waits this long before it can be claimed again (audit run-10 L2). */
+export const RETRY_DELAY_MS = 10_000;
 /**
  * A row RUNNING longer than this belongs to a dead worker. Above the judge's own worst case (~38 min with 200 tests at
  * the 10 s cap, audit run-9) and the docker-proxy's 40-minute sandbox reaper, so a live run is never judged twice.
@@ -29,8 +31,11 @@ export async function claim(prisma: PrismaClient, table: Table): Promise<string 
   // Table names come from the closed `Table` union, never from input.
   const rows = await prisma.$queryRawUnsafe<Array<{ id: string }>>(
     `UPDATE ${table} SET status = 'RUNNING', attempts = attempts + 1, "startedAt" = now()
-     WHERE id = (SELECT id FROM ${table} WHERE status = 'QUEUED' ORDER BY "createdAt" FOR UPDATE SKIP LOCKED LIMIT 1)
+     WHERE id = (SELECT id FROM ${table} WHERE status = 'QUEUED'
+                   AND ("startedAt" IS NULL OR "startedAt" < now() - make_interval(secs => $1))
+                 ORDER BY "createdAt" FOR UPDATE SKIP LOCKED LIMIT 1)
      RETURNING id`,
+    RETRY_DELAY_MS / 1000,
   );
   return rows[0]?.id ?? null;
 }
@@ -59,11 +64,11 @@ function limitsFor(problem: { timeLimitMs: number; memoryLimitMb: number; event:
   };
 }
 
-/** A failed attempt: back to QUEUED, or FAILED once out of attempts. */
+/** A failed attempt: back to QUEUED (claimable after RETRY_DELAY_MS, `startedAt` = now), or FAILED once out of attempts. */
 async function giveBack(prisma: PrismaClient, table: Table, id: string): Promise<void> {
   await prisma.$executeRawUnsafe(
     `UPDATE ${table} SET status = CASE WHEN attempts >= $1 THEN 'FAILED'::"SubmissionStatus" ELSE 'QUEUED'::"SubmissionStatus" END,
-       "finishedAt" = CASE WHEN attempts >= $1 THEN now() ELSE NULL END
+       "finishedAt" = CASE WHEN attempts >= $1 THEN now() ELSE NULL END, "startedAt" = now()
      WHERE id = $2 AND status = 'RUNNING'`,
     MAX_ATTEMPTS,
     id,

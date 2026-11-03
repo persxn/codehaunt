@@ -47,36 +47,37 @@ export async function issueBadges(
     orderBy: { enrolmentNo: 'asc' },
     select: { id: true, enrolmentNo: true, user: { select: { id: true, name: true, username: true } } },
   });
-  const badges: Badge[] = [];
-  for (const p of participants) {
+  // argon2 first (slow), then every write and the audit row in one transaction: all badges or none (audit L2).
+  const prepared = await Promise.all(participants.map(async (p) => {
     const token = randomBytes(32).toString('base64url');
     const password = generatePassword();
-    const passwordHash = await hashPassword(password);
-    await prisma.$transaction([
-      prisma.participant.update({ where: { id: p.id }, data: { checkInTokenHash: hash(token) } }),
-      prisma.user.update({ where: { id: p.user.id }, data: { passwordHash } }),
-      prisma.authSession.deleteMany({ where: { userId: p.user.id } }),
-    ]);
-    badges.push({
-      participantId: p.id,
-      name: p.user.name,
-      enrolmentNo: p.enrolmentNo,
-      username: p.user.username,
-      password,
-      checkInCode: `${PREFIX}${token}`,
+    return { p, token, password, passwordHash: await hashPassword(password) };
+  }));
+  await prisma.$transaction(async (tx) => {
+    for (const { p, token, passwordHash } of prepared) {
+      await tx.participant.update({ where: { id: p.id }, data: { checkInTokenHash: hash(token) } });
+      await tx.user.update({ where: { id: p.user.id }, data: { passwordHash } });
+      await tx.authSession.deleteMany({ where: { userId: p.user.id } });
+    }
+    await tx.auditLog.create({
+      data: {
+        actorId: input.actorId,
+        action: 'checkin.badges_issued',
+        targetType: 'event',
+        targetId: input.eventId,
+        after: { participantIds: prepared.map(({ p }) => p.id) },
+        requestId: input.requestId,
+      },
     });
-  }
-  await prisma.auditLog.create({
-    data: {
-      actorId: input.actorId,
-      action: 'checkin.badges_issued',
-      targetType: 'event',
-      targetId: input.eventId,
-      after: { participantIds: badges.map((b) => b.participantId) },
-      requestId: input.requestId,
-    },
   });
-  return badges;
+  return prepared.map(({ p, token, password }) => ({
+    participantId: p.id,
+    name: p.user.name,
+    enrolmentNo: p.enrolmentNo,
+    username: p.user.username,
+    password,
+    checkInCode: `${PREFIX}${token}`,
+  }));
 }
 
 export interface CheckInResult {
@@ -103,6 +104,9 @@ export async function checkIn(
       include: { user: { select: { id: true, name: true } }, event: { select: { config: true, status: true } } },
     });
     if (p.checkInTokenHash !== tokenHash) throw usedCode();
+    if (!['CHECK_IN', 'RUNNING', 'PAUSED'].includes(p.event.status)) {
+      throw conflict('event_not_checking_in', `Check-in is not open for this event (status: ${p.event.status.toLowerCase()}).`);
+    }
     if (p.status === 'WAITLISTED') throw conflict('waitlisted', 'This person is on the waitlist. Promote them at the desk first.');
     if (p.status !== 'REGISTERED') throw conflict('not_registered', 'This person cannot be checked in (status: ' + p.status.toLowerCase() + ').');
     const config = EventConfig.parse(p.event.config);
@@ -115,6 +119,9 @@ export async function checkIn(
       data: { status: 'CHECKED_IN', checkedInAt: now, seatLabel: input.seatLabel, checkInTokenHash: null },
     });
     await tx.user.update({ where: { id: p.user.id }, data: { active: true } });
+    await tx.auditLog.create({
+      data: { actorId: input.actorId, action: 'user.activated', targetType: 'user', targetId: p.user.id, after: { active: true, via: 'check-in' }, requestId: input.requestId },
+    });
     await tx.tokenLedger.upsert({
       where: { idempotencyKey: `grant:${p.id}` },
       create: {

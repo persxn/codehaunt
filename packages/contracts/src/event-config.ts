@@ -49,8 +49,8 @@ export const EventConfig = z.object({
     python: z.number().min(0.5).max(20),
   }).default({ c: 1, cpp: 1, java: 2, python: 3 }),
   budget: z.object({
-    tokensPerParticipant: z.number().int().min(1000).default(60000),
-    contextTokens: z.number().int().min(512).default(8192),
+    tokensPerParticipant: z.number().int().min(1000).max(10_000_000).default(60000),
+    contextTokens: z.number().int().min(512).max(131_072).default(8192),
     contextWarnPercent: z.number().int().min(50).max(99).default(80),
     /** Reply cap per prompt (the gateway also caps it to what is left of the context). */
     replyTokens: z.number().int().min(64).max(4096).default(1024),
@@ -85,7 +85,7 @@ export const EventConfig = z.object({
   }).prefault({}),
   access: z.object({
     sebRequired: z.boolean().default(true),
-    checkInCap: z.number().int().min(1).default(40),
+    checkInCap: z.number().int().min(1).max(10_000).default(40),
     allowMinors: z.boolean().default(false),
   }).prefault({}),
   consent: z.object({

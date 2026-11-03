@@ -12,10 +12,10 @@ authorise and call one function here; nothing here imports Next.
 | `prompt-service.ts` | `[claude]` `startPrompt`: reserve → stream → settle (0 without usage) → store reply + extracted code; one prompt in flight per participant; `currentCode` |
 | `participant-service.ts` | contest state (tokens, phase, consent), problem list/statement (visible tests only), workspace, new session, revert, `recordConsent`, `visibleTestIds` |
 | `submission-service.ts` | `createRun` (idempotent, ≤ 2 active per participant) and `runView` (verdict projection only) |
-| `checkin-service.ts` | `[claude]` badges (password + single-use `CH1:` code, only its SHA-256 stored), `checkIn` (cap, activation, token grant, audit), `promoteFromWaitlist` |
-| `event-service.ts` | Event editor: list/get/create/update; after the start only budget and schedule change; a budget change adjusts every checked-in balance |
-| `problem-admin-service.ts` | problems with visible/hidden tests and reference/naive solutions; frozen at the start; calibration runs |
-| `participant-admin-service.ts` | CSV/form import (waitlist beyond the cap), desk list, export, anonymise (ADR-010) |
+| `checkin-service.ts` | `[claude]` badges (password + single-use `CH1:` code, only its SHA-256 stored; all-or-nothing with the audit row), `checkIn` (open events only, cap, activation, token grant, audit), `promoteFromWaitlist` |
+| `event-service.ts` | Event editor: list/get/create/update; `isLocked` (lockedAt, status past check-in, or start time passed); then only budget and schedule change; a budget change adjusts every checked-in balance in the same transaction |
+| `problem-admin-service.ts` | problems with visible/hidden tests and reference/naive solutions; frozen once locked; calibration runs (audit-logged, refused once locked) |
+| `participant-admin-service.ts` | CSV/form import (waitlist beyond the cap; re-imported people inactive again), desk list, export (incl. ledger, sign-ins, audit trail), anonymise every derived text (ADR-010) |
 | `staff-service.ts` | staff create/remove (organizers: volunteers only), the one `changeRole`, password resets; `AccessGroupSync` (no-op until WP-06) |
 
 ## Affects / depends on
@@ -33,4 +33,5 @@ authorise and call one function here; nothing here imports Next.
 - Imports between these files are relative with `.ts` so the tests can load them with plain Node.
 - Token ledger invariant: negative deltas only via `reserveTokens`/`adjustTokens` (participant row lock).
 - Check-in, budget changes and problem edits lock the event row; that is what keeps the cap and the budget snapshot right.
+- The audit log is append-only and outlives anonymisation: write counts, ids and reasons there, never names, enrolment numbers or IPs.
 - `inFlight` in `prompt-service.ts` is per process: the web runs as one process (ADR-003).

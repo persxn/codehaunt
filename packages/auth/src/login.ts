@@ -72,6 +72,9 @@ export async function login(
     // First statement on purpose: the row lock serialises concurrent logins of one user, so
     // the second waits, then its deleteMany sees (and ends) the first's session.
     await tx.user.update({ where: { id: user.id }, data: { lastLoginAt: new Date() } });
+    const previousIps = user.role === 'PARTICIPANT'
+      ? (await tx.authSession.findMany({ where: { userId: user.id }, select: { ipAddress: true } })).map((s) => s.ipAddress)
+      : [];
     const replaced =
       user.role === 'PARTICIPANT'
         ? (await tx.authSession.deleteMany({ where: { userId: user.id } })).count
@@ -88,7 +91,8 @@ export async function login(
           action: 'auth.session_replaced',
           targetType: 'user',
           targetId: user.id,
-          after: { replacedSessions: replaced, ipAddress: context.ipAddress ?? null },
+          // No IP in the append-only log (ADR-010); whether it changed is what organizers need (ADR-013).
+          after: { replacedSessions: replaced, ipChanged: previousIps.some((ip) => ip !== (context.ipAddress ?? null)) },
           requestId: context.requestId ?? null,
         },
       });

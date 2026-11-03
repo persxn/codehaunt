@@ -42,6 +42,9 @@ export async function createStaff(prisma: PrismaClient, input: StaffCreateReques
   }
   const passwordHash = await hashPassword(input.password);
   const user = await prisma.$transaction(async (tx) => {
+    if (await tx.user.findFirst({ where: { OR: [{ username: input.username }, { email: input.email.toLowerCase() }] } })) {
+      throw conflict('user_exists', 'That username or email is already used.');
+    }
     const u = await tx.user.create({
       data: { username: input.username, name: input.name, email: input.email.toLowerCase(), role: input.role, passwordHash, active: true },
       select: { id: true, email: true },
@@ -50,6 +53,10 @@ export async function createStaff(prisma: PrismaClient, input: StaffCreateReques
       data: { actorId: actor.id, action: 'staff.created', targetType: 'user', targetId: u.id, after: { username: input.username, role: input.role }, requestId: actor.requestId },
     });
     return u;
+  }).catch((error: unknown) => {
+    // The unique index decides a race between two simultaneous creations.
+    if ((error as { code?: string }).code === 'P2002') throw conflict('user_exists', 'That username or email is already used.');
+    throw error;
   });
   await sync.add(user.email!);
   return { id: user.id };
@@ -66,7 +73,11 @@ export async function setStaffActive(prisma: PrismaClient, userId: string, activ
   return { ok: true };
 }
 
-/** The only route that changes `users.role` (admin only; audited with a reason). Participants never become staff here. */
+/**
+ * The only route that changes `users.role` (admin only; audited with a reason). Participants never become staff here.
+ * The Cloudflare Access group holds every active staff member whatever their role (ADR-013), so a role change needs
+ * no Access sync; the app's own policy decides what each role reaches.
+ */
 export async function changeRole(prisma: PrismaClient, userId: string, input: RoleChangeRequest, actor: Actor) {
   if (actor.role !== 'ADMIN') throw forbidden();
   if (userId === actor.id) throw badRequest('You cannot change your own role.');

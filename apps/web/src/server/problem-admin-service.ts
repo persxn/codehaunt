@@ -8,13 +8,14 @@ import { ProblemInput, type ProblemInput as ProblemInputT } from '@codehaunt/con
 import type { PrismaClient } from '@codehaunt/db';
 
 import { conflict, notFound } from './errors.ts';
+import { isLocked } from './event-service.ts';
 
 type Actor = { id: string; requestId: string };
 
 async function assertEditable(prisma: Pick<PrismaClient, 'event'>, eventId: string) {
-  const event = await prisma.event.findUnique({ where: { id: eventId }, select: { lockedAt: true } });
+  const event = await prisma.event.findUnique({ where: { id: eventId }, select: { lockedAt: true, status: true, config: true } });
   if (!event) throw notFound('That event');
-  if (event.lockedAt) throw conflict('event_locked', 'The contest has started: problems can no longer change.');
+  if (isLocked(event)) throw conflict('event_locked', 'The contest has started: problems can no longer change.');
 }
 
 export async function listProblems(prisma: PrismaClient, eventId: string) {
@@ -125,12 +126,23 @@ export async function deleteProblem(prisma: PrismaClient, id: string, actor: Act
   return { ok: true };
 }
 
-/** Queues one calibration run per stored solution. */
+/**
+ * Queues one calibration run per stored solution, audit-logged. Refused once the contest has started: calibration
+ * shares the judge (≤ 16 sandboxes) with participants (audit M3).
+ */
 export async function calibrate(prisma: PrismaClient, problemId: string, actor: Actor) {
-  const solutions = await prisma.referenceSolution.findMany({ where: { problemId } });
-  if (!solutions.length) throw conflict('no_solutions', 'Add a reference solution first.');
-  await prisma.calibrationRun.createMany({
-    data: solutions.map((s) => ({ problemId, language: s.language, kind: s.kind, source: s.source, requestedBy: actor.id })),
+  await prisma.$transaction(async (tx) => {
+    const problem = await tx.problem.findUnique({ where: { id: problemId }, select: { eventId: true } });
+    if (!problem) throw notFound('That problem');
+    await assertEditable(tx, problem.eventId);
+    const solutions = await tx.referenceSolution.findMany({ where: { problemId } });
+    if (!solutions.length) throw conflict('no_solutions', 'Add a reference solution first.');
+    await tx.calibrationRun.createMany({
+      data: solutions.map((s) => ({ problemId, language: s.language, kind: s.kind, source: s.source, requestedBy: actor.id })),
+    });
+    await tx.auditLog.create({
+      data: { actorId: actor.id, action: 'problem.calibration_requested', targetType: 'problem', targetId: problemId, after: { runs: solutions.map((s) => `${s.language}:${s.kind}`) }, requestId: actor.requestId },
+    });
   });
   return calibrationRuns(prisma, problemId);
 }

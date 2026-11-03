@@ -8,7 +8,7 @@ import { after, before, test } from 'node:test';
 import type { RunRequest, RunResult } from '@codehaunt/contracts';
 import { createTestDatabase, type TestDatabase } from '@codehaunt/db/testing';
 
-import { claim, judgeLoop, judgeSubmission, MAX_ATTEMPTS, requeueStuck, RUNNING_TIMEOUT_MS, runCalibration } from '../src/queue.ts';
+import { claim, judgeLoop, judgeSubmission, MAX_ATTEMPTS, requeueStuck, RETRY_DELAY_MS, RUNNING_TIMEOUT_MS, runCalibration } from '../src/queue.ts';
 import type { CodeRunner } from '../src/sandbox/code-runner.ts';
 
 let db: TestDatabase;
@@ -90,7 +90,7 @@ test('a sample runs the visible tests only; a submission runs all, with the lang
   assert.deepEqual([row.verdict?.verdict, row.verdict?.maxTimeMs, row.verdict?.maxMemoryKb], ['AC', 13, 2048]);
 });
 
-test('a failing run is retried once, then becomes FAILED', async () => {
+test('a failing run is retried once after a delay, then becomes FAILED', async () => {
   await drain();
   const { runner } = fakeRunner('throw');
   const { sub } = await queued('SUBMIT');
@@ -98,6 +98,10 @@ test('a failing run is retried once, then becomes FAILED', async () => {
     const id = await claim(db.prisma, 'submissions');
     assert.equal(id, sub.id);
     await judgeSubmission(db.prisma, runner, id!, silent);
+    if (attempt < MAX_ATTEMPTS) {
+      assert.equal(await claim(db.prisma, 'submissions'), null, 'not claimable during the retry delay');
+      await db.prisma.submission.update({ where: { id: sub.id }, data: { startedAt: new Date(Date.now() - RETRY_DELAY_MS - 1000) } });
+    }
   }
   const row = await db.prisma.submission.findUniqueOrThrow({ where: { id: sub.id } });
   assert.deepEqual([row.status, row.attempts], ['FAILED', 2]);
