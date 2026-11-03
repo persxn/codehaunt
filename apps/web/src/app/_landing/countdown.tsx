@@ -2,32 +2,50 @@
 
 import { useEffect, useState } from 'react';
 
-/** 7 Nov 2026, 10:00 IST (UTC+5:30). */
-const START = Date.UTC(2026, 10, 7, 4, 30);
-const DAY_END = Date.UTC(2026, 10, 7, 13, 30);
+import { EVENT } from '../_public/event';
+import styles from './hero.module.css';
 
-function parts(ms: number) {
-  const s = Math.floor(ms / 1000);
-  return { d: Math.floor(s / 86400), h: Math.floor((s % 86400) / 3600), m: Math.floor((s % 3600) / 60), s: s % 60 };
-}
+const UNITS = [
+  ['days', 86400],
+  ['hours', 3600],
+  ['minutes', 60],
+  ['seconds', 1],
+] as const;
 
-/** Server renders the date; the client swaps in a live countdown (no hydration mismatch: first paint is the same). */
-export function Countdown({ className }: { className?: string }) {
+/**
+ * Four outlined tiles counting down to doors opening. The server renders dashes (no hydration mismatch); the exact
+ * date is always given as text next to it. Under reduced motion the seconds tile is dropped and it updates per minute.
+ */
+export function Countdown() {
   const [now, setNow] = useState<number | null>(null);
+  const [calm, setCalm] = useState(false);
   useEffect(() => {
+    const reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    setCalm(reduce);
     setNow(Date.now());
-    const id = setInterval(() => setNow(Date.now()), 1000);
+    const id = setInterval(() => setNow(Date.now()), reduce ? 30_000 : 1000);
     return () => clearInterval(id);
   }, []);
 
-  if (now === null) return <p className={className}>Doors at 10 AM</p>;
-  if (now >= DAY_END) return <p className={className}>That&rsquo;s a wrap. Thanks for haunting.</p>;
-  if (now >= START) return <p className={className}>Happening now at IEM Newtown</p>;
-  const { d, h, m, s } = parts(START - now);
+  if (now !== null && now >= EVENT.endsAt) return <p className={styles.countNote}>That&rsquo;s a wrap. Thanks for haunting.</p>;
+  if (now !== null && now >= EVENT.startsAt) return <p className={styles.countNote}>Happening now at {EVENT.venue}.</p>;
+
+  let left = now === null ? null : Math.floor((EVENT.startsAt - now) / 1000);
+  const units = calm ? UNITS.slice(0, 3) : UNITS;
   return (
-    <p className={className} aria-live="off">
-      <span>Starts in </span>
-      <strong>{d}</strong>d <strong>{h}</strong>h <strong>{m}</strong>m <strong>{s}</strong>s
-    </p>
+    <div className={styles.count} role="timer" aria-label="Time until doors open">
+      {units.map(([label, size]) => {
+        const value = left === null ? null : Math.floor(left / size);
+        if (left !== null && value !== null) left -= value * size;
+        return (
+          <div key={label} className={styles.tile}>
+            <span className={styles.tileValue} key={value ?? '-'}>
+              {value === null ? '–' : value}
+            </span>
+            <span className={styles.tileLabel}>{label}</span>
+          </div>
+        );
+      })}
+    </div>
   );
 }

@@ -15,6 +15,8 @@
   border: 1px solid var(--border-strong);
   border-radius: var(--radius-sm);
   padding: var(--space-2) var(--space-3);
+  /* Padding inside the 100%: without this every input overflowed its container by its padding (audit C5). */
+  box-sizing: border-box;
   width: 100%;
   font-family: var(--font-sans);
   font-size: var(--text-base);

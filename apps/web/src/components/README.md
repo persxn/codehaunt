@@ -10,7 +10,7 @@
 | `button.tsx` | Button component (primary, secondary, danger) |
 | `button.module.css` | Button styles |
 | `field.tsx` | Form field wrapper with label, hint, error |
-| `field.module.css` | Input styles |
+| `field.module.css` | Input styles; inputs are `box-sizing: border-box` so they never overflow their container |
 | `verdict-badge.tsx` | Verdict badge component |
 | `verdict-badge.module.css` | Badge styles |
 | `meter.tsx` | Token usage meter |

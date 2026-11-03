@@ -17,9 +17,9 @@ Next.js route folder – each sub‑folder corresponds to a URL path.
 | `tokens.css` | design tokens (colours, type, spacing, radius, motion) as CSS custom properties; dark default, `[data-theme="light"]` |
 | `globals.css` | base element styles on the design tokens |
 | `layout.tsx` | root layout: fonts, tokens, startup config check, `metadataBase` (`PUBLIC_ORIGIN` or the tunnel hostname) |
-| `page.tsx` | public event page (ADR-029/030): hero with countdown, verb panels, "say what you mean" demo, the day, FAQ cards, Enter band, footer; signed-in users are redirected to their area |
-| `landing.module.css` | the event page's styles: poster palette tokens, Creepster display type, motion (reduced-motion safe) |
-| `_landing/` | event page pieces: countdown, demo, reveal, artwork (`_landing/README.md`) |
+| `page.tsx` | public event page (ADR-029/031): composes the `_landing/` sections in the public theme; signed-in users are redirected to their area |
+| `_public/` | the public theme shared by `/` and `/login`: tokens, icons, event facts (`_public/README.md`) |
+| `_landing/` | event page sections, demo, countdown, artwork (`_landing/README.md`) |
 | `icon.png` | app icon (hooded skull), served at `/icon.png` (public) |
 | `opengraph-image.jpg` | link-preview image, served at `/opengraph-image.jpg` (public); absolute via `metadataBase` in `layout.tsx` |
 

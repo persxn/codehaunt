@@ -1,0 +1,126 @@
+.head {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: var(--s6);
+  align-items: end;
+}
+.head :global(p) { margin: 0; }
+.center { text-align: center; }
+
+/* ---------- How it works: three arches ---------- */
+.steps {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: clamp(20px, 3vw, 40px);
+  margin: var(--s8) 0 0;
+  padding: 0;
+  list-style: none;
+}
+.step { display: grid; align-content: start; }
+.stepArch { width: 100%; }
+.stepArch img { animation: breathe 7s ease-in-out infinite; }
+.step:nth-child(2) .stepArch img { animation-delay: -2.3s; }
+.step:nth-child(3) .stepArch img { animation-delay: -4.6s; }
+.step:hover .stepArch { border-color: var(--bone); box-shadow: var(--lift); transform: translateY(-4px); }
+.stepTitle {
+  margin: var(--s5) 0 0;
+  font-family: var(--display);
+  font-weight: 400;
+  font-size: 40px;
+  line-height: 1;
+  color: var(--pumpkin);
+}
+.stepText { margin: var(--s3) 0 0; max-width: 34ch; color: var(--muted); }
+
+/* ---------- Two halves: the poster's own arch panels ---------- */
+.halvesBand { background: var(--surface); }
+.halves {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: clamp(24px, 4vw, 64px);
+  margin-top: var(--s8);
+}
+.half {
+  display: grid;
+  grid-template-columns: minmax(150px, 210px) minmax(0, 1fr);
+  gap: var(--s6);
+  align-items: center;
+}
+.posterArch {
+  width: 100%;
+  height: auto;
+  transition: transform var(--t-slow) var(--ease);
+}
+.half:hover .posterArch { transform: translateY(-6px) rotate(-1deg); }
+/* Clip to the poster's own frame shapes so no black corners show: the competition panel is round at the bottom,
+   the talk panel is an arch. */
+.half:nth-child(1) .posterArch { border-radius: 8px 8px 999px 999px; }
+.half:nth-child(2) .posterArch { border-radius: 999px 999px 8px 8px; }
+.halfTitle {
+  margin: 0;
+  font-family: var(--display);
+  font-weight: 400;
+  font-size: clamp(32px, 3vw, 44px);
+  line-height: 1.02;
+  color: var(--bone);
+}
+.halfText { margin: var(--s3) 0 0; color: var(--muted); max-width: 38ch; }
+
+/* ---------- The day: a five-stop track ---------- */
+.track {
+  position: relative;
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: var(--s5);
+  margin: var(--s8) 0 0;
+  padding: 0;
+  list-style: none;
+}
+/* The line the stops sit on. */
+.track::before {
+  content: '';
+  position: absolute;
+  top: 27px;
+  left: 28px;
+  right: 28px;
+  height: 2px;
+  background: repeating-linear-gradient(90deg, var(--pumpkin) 0 10px, transparent 10px 18px);
+}
+.stop { position: relative; }
+.stopIcon {
+  display: grid;
+  place-items: center;
+  width: 56px;
+  height: 56px;
+  border: 2px solid var(--line);
+  border-radius: 50%;
+  background: var(--ink);
+  color: var(--pumpkin);
+  transition: background-color var(--t-base) var(--ease), color var(--t-base) var(--ease), transform var(--t-base) var(--ease);
+}
+.stop:hover .stopIcon { background: var(--pumpkin); color: var(--ink); transform: scale(1.06); }
+.stopTitle { margin: var(--s4) 0 0; font-size: 19px; font-weight: 700; line-height: 1.3; }
+.stopText { margin: var(--s2) 0 0; font-size: 15px; color: var(--muted); }
+
+@keyframes breathe { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-8px); } }
+
+@media (max-width: 899px) {
+  .head { grid-template-columns: 1fr; gap: var(--s3); align-items: start; }
+  .stepTitle { font-size: 32px; }
+  .halves { grid-template-columns: 1fr; gap: var(--s7); }
+  .half { grid-template-columns: 140px minmax(0, 1fr); }
+  .center { text-align: left; }
+  .track { grid-template-columns: 1fr; gap: var(--s5); }
+  .track::before { top: 28px; bottom: 28px; left: 27px; right: auto; width: 2px; height: auto;
+    background: repeating-linear-gradient(180deg, var(--pumpkin) 0 10px, transparent 10px 18px); }
+  .stop { display: grid; grid-template-columns: 56px 1fr; column-gap: var(--s4); }
+  .stopIcon { grid-row: span 2; }
+  .stopTitle { margin-top: var(--s2); }
+}
+@media (max-width: 599px) {
+  .steps { grid-template-columns: 1fr; gap: var(--s7); }
+  .step { grid-template-columns: 130px 1fr; column-gap: var(--s5); align-items: center; }
+  .stepArch { grid-row: span 2; }
+  .stepTitle { margin-top: 0; align-self: end; }
+  .half { grid-template-columns: 110px minmax(0, 1fr); gap: var(--s4); }
+}

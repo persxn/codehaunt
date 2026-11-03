@@ -1,0 +1,156 @@
+/* Framed like the poster's panels: corner brackets top-left and bottom-right. */
+.frame { position: relative; padding: var(--s5); }
+.frame::before,
+.frame::after {
+  content: '';
+  position: absolute;
+  width: 40px;
+  height: 40px;
+  border: 2px solid var(--muted);
+  opacity: 0.7;
+}
+.frame::before { top: 0; left: 0; border-right: 0; border-bottom: 0; }
+.frame::after { bottom: 0; right: 0; border-left: 0; border-top: 0; }
+
+.panel {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1.1fr);
+  gap: clamp(24px, 4vw, 64px);
+  align-items: stretch;
+}
+
+.copy { display: flex; flex-direction: column; }
+.copy code {
+  font-family: var(--font-code);
+  font-size: 0.92em;
+  white-space: nowrap;
+  padding: 1px 6px;
+  border-radius: 4px;
+  background: var(--surface-2);
+  color: var(--pumpkin);
+}
+
+/* Segmented control: real radios; the chosen one fills. */
+.toggle {
+  position: relative;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  margin-top: var(--s6);
+  padding: 4px;
+  max-width: 360px;
+  border: 2px solid var(--line-soft);
+  border-radius: var(--r-sm);
+}
+.option {
+  position: relative;
+  z-index: 1;
+  display: grid;
+  place-items: center;
+  min-height: 44px;
+  font-weight: 700;
+  color: var(--muted);
+  cursor: pointer;
+  transition: color var(--t-base) var(--ease), background-color var(--t-base) var(--ease);
+}
+.option[data-active] { color: var(--ink); background: var(--pumpkin); border-radius: 4px; }
+.option input { position: absolute; inset: 0; opacity: 0; cursor: pointer; margin: 0; }
+.option:has(input:focus-visible) { outline: 2px solid var(--pumpkin); outline-offset: 2px; border-radius: 4px; }
+
+.bubble {
+  margin: var(--s5) 0 0;
+  padding: var(--s4) var(--s5);
+  border-radius: var(--r-sm) var(--r-sm) var(--r-sm) 2px;
+  background: var(--violet);
+  animation: swap var(--t-slow) var(--ease);
+}
+.bubble figcaption { font-size: var(--fs-small); color: var(--violet-hi); font-weight: 600; filter: brightness(1.25); }
+.bubble blockquote { margin: var(--s1) 0 0; font-size: 19px; line-height: 1.45; color: var(--bone); }
+
+/* The editor: the right half, as tall as the left. */
+.editor {
+  display: flex;
+  flex-direction: column;
+  border: 2px solid var(--line-soft);
+  border-radius: var(--r-sm);
+  background: var(--surface);
+  overflow: hidden;
+}
+.tabs {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--s3);
+  padding: 0 var(--s4);
+  min-height: 44px;
+  background: var(--surface-2);
+  font-size: var(--fs-small);
+}
+.tab { font-family: var(--font-code); color: var(--bone); border-bottom: 2px solid var(--pumpkin); padding: 11px 0 9px; }
+.by { color: var(--muted); }
+
+.code {
+  margin: 0;
+  padding: var(--s5) var(--s5) var(--s4);
+  font: 15px/1.7 var(--font-code);
+  color: var(--bone);
+  counter-reset: line;
+  overflow-x: auto;
+  animation: swap var(--t-slow) var(--ease);
+}
+.line { display: block; white-space: pre; }
+.line::before {
+  counter-increment: line;
+  content: counter(line);
+  display: inline-block;
+  width: 2ch;
+  margin-right: var(--s4);
+  text-align: right;
+  color: rgb(196 180 192 / 0.45);
+}
+.type {
+  background: rgb(236 91 28 / 0.18);
+  color: var(--pumpkin-hi);
+  border-radius: 3px;
+  padding: 0 2px;
+}
+
+.result {
+  margin-top: auto;
+  padding: var(--s4) var(--s5) var(--s5);
+  background: var(--surface-2);
+  display: grid;
+  gap: var(--s3);
+}
+.verdict {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--s2);
+  margin: 0;
+  font-weight: 700;
+  font-size: 19px;
+  color: var(--bad);
+  animation: swap var(--t-base) var(--ease);
+}
+.verdict svg { flex: none; margin-top: 2px; }
+.verdict[data-ok] { color: var(--ok); }
+.note { margin: 0; color: var(--muted); font-size: 16px; }
+.meterHead { display: flex; justify-content: space-between; gap: var(--s3); font-size: var(--fs-small); color: var(--muted); }
+.meterHead strong { color: var(--bone); }
+.bar { margin-top: var(--s2); height: 10px; border-radius: 999px; background: var(--surface-2); overflow: hidden; }
+.bar span {
+  display: block;
+  height: 100%;
+  background: var(--bad);
+  transform-origin: left;
+  transition: transform 700ms var(--ease), background-color var(--t-base) var(--ease);
+}
+.bar span[data-ok] { background: var(--ok); }
+
+@keyframes swap { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
+
+@media (max-width: 899px) {
+  .panel { grid-template-columns: 1fr; }
+  .frame { padding: var(--s4) 0; }
+  .frame::before, .frame::after { display: none; }
+  .code { font-size: 14px; }
+}

@@ -1,0 +1,203 @@
+/*
+ * Public theme (ADR-031): the poster's design system for `/` and `/login`. Tokens live on `.theme`; every public
+ * component reads them. Plan and rationale: control repo docs/UI_UX_REDESIGN_PLAN.md §3.
+ */
+.theme {
+  /* Ground and surfaces */
+  --ink: #0a0809;
+  --surface: #140e17;
+  --surface-2: #1e1523;
+  /* Text */
+  --bone: #f0e2cc;
+  --muted: #c4b4c0;
+  /* Accents */
+  --pumpkin: #ec5b1c;
+  --pumpkin-hi: #ff7a3d;
+  --violet: #4e1e61;
+  --violet-hi: #b98be0;
+  --ok: #7be29a;
+  --bad: #ff8a7a;
+  /* Lines */
+  --line: var(--pumpkin);
+  --line-soft: rgb(240 226 204 / 0.16);
+  /* Type */
+  --display: 'Creepster', 'IBM Plex Sans', system-ui, sans-serif;
+  --font-text: 'IBM Plex Sans', system-ui, sans-serif;
+  --font-code: 'JetBrains Mono', ui-monospace, monospace;
+  --fs-hero: clamp(84px, 11vw, 184px);
+  --fs-title: clamp(40px, 5vw, 72px);
+  --fs-h3: 24px;
+  --fs-lead: clamp(18px, 1.6vw, 21px);
+  --fs-body: 17px;
+  --fs-small: 14px;
+  /* Space */
+  --s1: 4px;
+  --s2: 8px;
+  --s3: 12px;
+  --s4: 16px;
+  --s5: 24px;
+  --s6: 32px;
+  --s7: 48px;
+  --s8: 64px;
+  --s9: 96px;
+  --gutter: clamp(20px, 4vw, 56px);
+  --section: clamp(80px, 11vw, 144px);
+  /* Shape */
+  --r-sm: 6px;
+  --r-arch: 999px 999px 10px 10px;
+  --lift: 0 18px 40px -20px rgb(0 0 0 / 0.8);
+  /* Motion */
+  --t-fast: 150ms;
+  --t-base: 240ms;
+  --t-slow: 600ms;
+  --ease: cubic-bezier(0.2, 0.7, 0.2, 1);
+
+  min-height: 100vh;
+  background: var(--ink);
+  color: var(--bone);
+  font-family: var(--font-text);
+  font-size: var(--fs-body);
+  line-height: 1.6;
+  overflow-x: clip;
+}
+
+.theme *,
+.theme *::before,
+.theme *::after {
+  box-sizing: border-box;
+}
+
+.theme :focus-visible {
+  outline: 2px solid var(--pumpkin);
+  outline-offset: 3px;
+}
+
+.theme ::selection {
+  background: var(--pumpkin);
+  color: var(--ink);
+}
+
+/* The poster's grunge ground, behind everything (desktop only: fixed backgrounds stutter on phones). */
+/* A fixed layer at low opacity keeps the ground warm black (the raw texture reads navy at full strength). */
+@media (min-width: 900px) {
+  .textured { position: relative; isolation: isolate; }
+  .textured::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    z-index: -1;
+    background: url('./texture.webp') center / cover;
+    opacity: 0.4;
+    pointer-events: none;
+  }
+}
+
+.container {
+  width: min(1200px, 100% - 2 * var(--gutter));
+  margin-inline: auto;
+}
+
+.section {
+  padding-block: var(--section);
+  scroll-margin-top: 72px;
+}
+
+.title {
+  margin: 0;
+  font-family: var(--display);
+  font-weight: 400;
+  font-size: var(--fs-title);
+  line-height: 1;
+  letter-spacing: 0.01em;
+  color: var(--bone);
+  text-wrap: balance;
+}
+
+.lead {
+  margin: var(--s4) 0 0;
+  max-width: 52ch;
+  font-size: var(--fs-lead);
+  line-height: 1.5;
+  color: var(--muted);
+}
+
+/* ---------- Buttons: one shape, two weights ---------- */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--s2);
+  min-height: 48px;
+  padding: 0 var(--s5);
+  border-radius: var(--r-sm);
+  border: 2px solid transparent;
+  font: 600 16px/1 var(--font-text);
+  text-decoration: none;
+  cursor: pointer;
+  white-space: nowrap;
+  transition:
+    background-color var(--t-base) var(--ease),
+    color var(--t-base) var(--ease),
+    border-color var(--t-base) var(--ease),
+    transform var(--t-fast) var(--ease);
+}
+.btn svg { width: 20px; height: 20px; flex: none; }
+.btn:active { transform: translateY(1px) scale(0.98); }
+.btn[aria-disabled='true'], .btn:disabled { opacity: 0.55; cursor: not-allowed; transform: none; }
+
+.primary { background: var(--pumpkin); color: var(--ink); }
+.primary:hover { background: var(--pumpkin-hi); }
+
+.secondary { background: transparent; color: var(--bone); border-color: var(--line-soft); }
+.secondary:hover { border-color: var(--bone); }
+
+/* ---------- Arch: the poster's frame ---------- */
+.arch {
+  position: relative;
+  aspect-ratio: 3 / 4;
+  border: 2px solid var(--line);
+  border-radius: var(--r-arch);
+  background: var(--violet);
+  overflow: hidden;
+  isolation: isolate;
+  transition: border-color var(--t-base) var(--ease), box-shadow var(--t-base) var(--ease), transform var(--t-base) var(--ease);
+}
+.arch img {
+  position: absolute;
+  inset: auto 0 6% 0;
+  margin-inline: auto;
+  width: 78%;
+  height: auto;
+  transition: transform var(--t-slow) var(--ease);
+}
+
+.skip {
+  position: absolute;
+  left: var(--s4);
+  top: -100px;
+  z-index: 100;
+  padding: var(--s3) var(--s4);
+  background: var(--pumpkin);
+  color: var(--ink);
+  font-weight: 700;
+  border-radius: var(--r-sm);
+}
+.skip:focus { top: var(--s4); }
+
+@media (prefers-reduced-motion: reduce) {
+  .theme *, .theme *::before, .theme *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* Anchor links glide; reduced motion jumps (rule above). */
+:global(html):has(.theme) { scroll-behavior: smooth; }
+
+/* Entrances: hidden only after `_landing/reveal.tsx` has run, so no-script and reduced motion show everything. */
+:global(html[data-reveal-ready]) .theme [data-reveal]:not([data-shown]) { opacity: 0; transform: translateY(16px); }
+:global(html[data-reveal-ready]) .theme [data-reveal] {
+  transition: opacity var(--t-slow) var(--ease), transform var(--t-slow) var(--ease);
+}

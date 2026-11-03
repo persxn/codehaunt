@@ -1,0 +1,76 @@
+.bar {
+  position: sticky;
+  top: 0;
+  z-index: 50;
+  background: rgb(10 8 9 / 0.94);
+  border-bottom: 1px solid transparent;
+  transition: border-color var(--t-base) var(--ease);
+}
+.bar[data-scrolled] { border-bottom-color: rgb(236 91 28 / 0.5); }
+
+.inner {
+  display: flex;
+  align-items: center;
+  gap: var(--s6);
+  min-height: 72px;
+}
+
+.mark {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--s2);
+  min-height: 44px;
+  color: var(--bone);
+  text-decoration: none;
+  font-family: var(--display);
+  font-size: 26px;
+  letter-spacing: 0.02em;
+}
+.mark img { transition: transform var(--t-base) var(--ease); }
+.mark:hover img { transform: rotate(-8deg) scale(1.06); }
+
+.links {
+  display: flex;
+  gap: var(--s5);
+  margin: 0 0 0 auto;
+  padding: 0;
+  list-style: none;
+}
+.links a {
+  position: relative;
+  display: inline-block;
+  padding: var(--s2) 0;
+  color: var(--muted);
+  text-decoration: none;
+  font-weight: 600;
+  font-size: 15px;
+  transition: color var(--t-base) var(--ease);
+}
+.links a::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 2px;
+  height: 2px;
+  background: var(--pumpkin);
+  transform: scaleX(0);
+  transform-origin: left;
+  transition: transform var(--t-base) var(--ease);
+}
+.links a:hover { color: var(--bone); }
+.links a:hover::after { transform: scaleX(1); }
+
+.actions { display: flex; gap: var(--s3); }
+.compact { min-height: 44px; padding: 0 var(--s4); font-size: 15px; }
+.shortLabel { display: none; }
+
+@media (max-width: 899px) {
+  .links { display: none; }
+  .actions { margin-left: auto; }
+}
+@media (max-width: 420px) {
+  .mark span { font-size: 22px; }
+  .longLabel { display: none; }
+  .shortLabel { display: inline; }
+}
