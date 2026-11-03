@@ -36,14 +36,15 @@
 .halvesBand { background: var(--surface); }
 .halves {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-template-columns: repeat(2, minmax(0, 440px));
+  justify-content: center;
   gap: clamp(24px, 4vw, 64px);
   margin-top: var(--s8);
 }
 .half { display: grid; gap: var(--s5); align-content: start; }
 /* Equal arches, the picture filling each one; the hover lifts the frame like the step cards. */
-.halfArch { aspect-ratio: 4 / 5; max-height: 560px; background: var(--ink); }
-.halfArch img.halfImg { inset: 0; width: 100%; height: 100%; object-fit: cover; object-position: 50% 62%; }
+.halfArch { aspect-ratio: 4 / 5; background: var(--ink); }
+.halfArch img.halfImg { inset: 0; width: 100%; height: 100%; object-fit: cover; object-position: 50% 52%; }
 .half:hover .halfArch { border-color: var(--bone); box-shadow: var(--lift); transform: translateY(-4px); }
 .halfTitle {
   margin: 0;
@@ -96,8 +97,7 @@
 @media (max-width: 899px) {
   .head { grid-template-columns: 1fr; gap: var(--s3); align-items: start; }
   .stepTitle { font-size: 32px; }
-  .halves { grid-template-columns: 1fr; gap: var(--s7); }
-  .half { grid-template-columns: 180px minmax(0, 1fr); align-items: center; }
+  .halves { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--s5); }
   .center { text-align: left; }
   .track { grid-template-columns: 1fr; gap: var(--s5); }
   .track::before { top: 28px; bottom: 28px; left: 27px; right: auto; width: 2px; height: auto;
@@ -111,5 +111,6 @@
   .step { grid-template-columns: 130px 1fr; column-gap: var(--s5); align-items: center; }
   .stepArch { grid-row: span 2; }
   .stepTitle { margin-top: 0; align-self: end; }
-  .half { grid-template-columns: 120px minmax(0, 1fr); gap: var(--s4); }
+  .halves { grid-template-columns: 1fr; gap: var(--s6); }
+  .half { grid-template-columns: 130px minmax(0, 1fr); gap: var(--s4); align-items: center; }
 }

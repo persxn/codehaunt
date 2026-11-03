@@ -13,9 +13,9 @@ module, all on the tokens in `../_public/`.
 | `closing.tsx` / `closing.module.css` | FAQ accordion (`details name`, one open), ghosts' banner call to action, footer |
 | `content.ts` | copy for steps, the day and FAQ |
 | `reveal.tsx` | client: entrances for `[data-reveal]`; anything at or above the fold line shows, so fast scrolls never hide content |
-| `hero-lab.webp`, `hero-lab-phone.webp` | hero art (generated asset 1) and its portrait crop |
+| `hero-arch.webp`, `hero-arch-phone.webp` | hero art drawn for the arch (generated asset 15) and its landscape phone crop |
 | `coder-wave.webp`, `coder-debug.webp`, `winner.webp` | the three steps (assets 2, 7, 8) |
-| `arch-competition.webp`, `arch-talk.webp` | the poster's two arch panels, cut from the client's poster |
+| `arch-competition.webp`, `arch-talk.webp` | the two halves, drawn for the arch (generated assets 16, 17) |
 | `coder-asleep.webp` | beside the FAQ (asset 6) |
 | `ghosts-banner.webp` | the call-to-action banner (asset 4) |
 | `divider.webp` | footer ornament (asset 11) |

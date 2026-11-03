@@ -2,8 +2,8 @@ import { EVENT } from '../_public/event';
 import { ArrowDownIcon, CalendarIcon, ClockIcon, PinIcon } from '../_public/icons';
 import ui from '../_public/public.module.css';
 import { Countdown } from './countdown';
-import heroPhone from './hero-lab-phone.webp';
-import heroLab from './hero-lab.webp';
+import heroPhone from './hero-arch-phone.webp';
+import heroLab from './hero-arch.webp';
 import bat from './icon-bat.webp';
 import styles from './hero.module.css';
 
@@ -64,7 +64,7 @@ export function Hero({ calendar }: { calendar: string }) {
           src={heroLab.src}
           width={heroLab.width}
           height={heroLab.height}
-          alt="The hooded skeleton coder at his laptop in a candlelit gothic computer lab under an orange moon"
+          alt="The hooded skeleton coder at his glowing laptop under a gothic window and a full moon, ghosts coding around him"
           fetchPriority="high"
         />
       </picture>

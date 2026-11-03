@@ -38,13 +38,13 @@ export function Halves() {
       title: 'AI Coding Competition',
       text: 'Data-structure problems in Python, C, C++ or Java, solved only by instructing the junior. Correct answers, lean prompts and sound reasoning all score.',
       art: archCompetition,
-      alt: 'Poster art: a hooded skeleton typing on a laptop under an orange moon',
+      alt: 'A candlelit contest hall: rows of hooded coders and ghosts at laptops facing a glowing leaderboard',
     },
     {
       title: 'Tech Talk',
       text: 'The other half of the day: a talk from the stage. Follow csi.uemkolkata for the speaker and the topic.',
       art: archTalk,
-      alt: 'Poster art: a skeleton speaker at a lectern in a candlelit gothic hall',
+      alt: 'The Reaper at a lectern presenting a glowing network diagram to an audience of ghosts',
     },
   ];
   return (
