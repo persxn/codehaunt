@@ -1,0 +1,62 @@
+/* apps/web/src/app/admin/checkin/checkin.module.css */
+
+/* Container – single column, centered, with spacing */
+.container {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  max-width: 28rem;
+  margin: 0 auto;
+  gap: var(--space-2);
+  padding: var(--space-2);
+}
+
+/* Button – enforce minimum touch target */
+.button {
+  min-height: 44px;
+}
+
+/* Video – full width, with border and rounded corners */
+.video {
+  width: 100%;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+}
+
+/* Hidden – used to hide elements (video, canvas) */
+.hidden {
+  display: none;
+}
+
+/* Fallback – manual entry area */
+.fallback {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+/* Result panel – after check-in attempt */
+.result {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+/* Large text for successful check-in */
+.big {
+  font-size: var(--text-xl);
+}
+
+/* Icons */
+.successIcon {
+  color: var(--success);
+}
+.errorIcon {
+  color: var(--danger);
+}
+
+/* Error text */
+.error {
+  color: var(--danger);
+}

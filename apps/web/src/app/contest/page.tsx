@@ -1,12 +1,6 @@
-import { currentUser } from '@/lib/session';
+import { ContestApp } from './contest-app';
 
-/** Placeholder: the participant flow arrives in WP-03. */
-export default async function ContestHome() {
-  const user = await currentUser();
-  return (
-    <main>
-      <h1>Contest</h1>
-      <p>Welcome, {user?.name}. The contest has not started.</p>
-    </main>
-  );
+/** Participant contest screen; everything interactive lives in the client component. */
+export default function ContestPage() {
+  return <ContestApp />;
 }

@@ -4,7 +4,7 @@ SHELL := bash
 export CJUDGE_RUNNER_IMAGE := codehaunt-runner:1
 
 .DEFAULT_GOAL := help
-.PHONY: help install check-env install-if-needed db migrate seed dev runners typecheck lint test check-readmes build loadtest ci down
+.PHONY: help install check-env install-if-needed db migrate seed dev runners typecheck lint test check-readmes build e2e loadtest ci down
 
 help: ## list targets
 	@grep -E '^[a-z-]+:.*## ' $(MAKEFILE_LIST) | sed -E 's/^([a-z-]+):.*## (.*)/  \1\t\2/'
@@ -51,6 +51,10 @@ check-readmes: ## check every folder README
 
 build: ## build the web app
 	npm run build -w @codehaunt/web
+
+e2e: check-env ## end-to-end tests against the live gateway and the practice DB (never during the event)
+	NEXT_DIST_DIR=.next-e2e npm run build -w @codehaunt/web
+	set -a && . ./.env && set +a && cd e2e && NEXT_DIST_DIR=.next-e2e npx playwright test
 
 loadtest: ## load test (WP-08)
 	echo "load test: WP-08" && exit 1

@@ -26,6 +26,7 @@ AI‑assisted coding‑contest harness: participants solve problems by prompting
 | `tsconfig.base.json` | shared compiler options every workspace extends |
 | `tsconfig.json` | typechecks `scripts/` (part of `npm run typecheck`) |
 | `apps/` | web, worker, docker-proxy (DGX) and gateway (GPU cluster) services |
+| `e2e/` | end-to-end tests (Playwright) of the participant flow against the live stack (`e2e/README.md`) |
 | `deploy/` | deployment manifests outside Docker Compose: the GPU cluster (`deploy/README.md`) |
 | `packages/` | shared libraries (auth, db, judge, …) |
 | `scripts/` | tooling scripts (README checks, CI, seeding) |
@@ -37,6 +38,7 @@ AI‑assisted coding‑contest harness: participants solve problems by prompting
 ## Entry points & how to test
 - `make test` – run all unit/integration tests (requires Docker runner images).
 - `make check-readmes` – verify all folder READMEs are up‑to‑date.
+- `make e2e` – end-to-end tests against the live gateway (practice DB only; never during the event).
 - `make ci` – full CI pipeline (lint, typecheck, tests).
 
 ## Gotchas

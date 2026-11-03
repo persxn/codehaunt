@@ -5,8 +5,10 @@ Next.js route folder – each sub‑folder corresponds to a URL path.
 ## Contents
 | Path | What it does |
 |---|---|
-| `admin/` | admin console page |
-| `contest/` | contest landing page |
+| `admin/` | admin console and desk (WP-04; details in `admin/README.md`) |
+| `contest/` | participant contest screen (WP-03; details in `contest/README.md`) |
+| `system-check/` | public pre-event system check (SEB, latency, screen) |
+| `account/` | change your own password (every role) |
 | `login/` | login UI |
 | `healthz/` | liveness probe (`/healthz`) |
 | `readyz/` | readiness probe (`/readyz`) |

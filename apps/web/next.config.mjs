@@ -4,6 +4,8 @@
  */
 export default {
   output: 'standalone',
+  // E2E builds into its own folder so it never clobbers a dev build (make e2e sets NEXT_DIST_DIR).
+  distDir: process.env.NEXT_DIST_DIR || '.next',
   poweredByHeader: false,
   transpilePackages: ['@codehaunt/auth', '@codehaunt/contracts', '@codehaunt/core', '@codehaunt/db'],
   serverExternalPackages: ['@prisma/client', 'pg', '@node-rs/argon2'],
