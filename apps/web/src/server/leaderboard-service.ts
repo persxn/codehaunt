@@ -9,10 +9,13 @@ import type { PrismaClient } from '@codehaunt/db';
 
 import { eventClock } from './contest.ts';
 import { conflict, notFound } from './errors.ts';
-import { contestStatus, hashProjectorToken, type Actor } from './contest-ops-service.ts';
+import { contestStatus, freezeCut, hashProjectorToken, type Actor } from './contest-ops-service.ts';
 
 interface LoadOptions {
-  /** Count only verdicts and prompts recorded before this instant (the projector's freeze). */
+  /**
+   * The projector's freeze: count only what was recorded before this instant — verdicts, prompts, overrides, penalty
+   * reversals, judge reviews (R13-2). Disqualification is the exception: it takes someone off the board at once.
+   */
   cutoff?: Date | null;
 }
 
@@ -43,7 +46,7 @@ export async function standingsFor(prisma: PrismaClient, event: LoadedEvent, opt
       participantId: true, problemId: true, contestMs: true, createdAt: true, status: true,
       codeVersion: { select: { language: true } },
       verdict: { select: { verdict: true, maxTimeMs: true, maxMemoryKb: true, createdAt: true } },
-      incidents: { where: { penaltyReversed: true }, select: { id: true } },
+      incidents: { where: { penaltyReversed: true, ...(cutoff ? { resolvedAt: { lt: cutoff } } : {}) }, select: { id: true } },
     },
   });
   const tokenRows = await prisma.$queryRaw<Array<{ participantId: string; tokens: bigint | number | null }>>`
@@ -59,10 +62,10 @@ export async function standingsFor(prisma: PrismaClient, event: LoadedEvent, opt
     select: { problemId: true, language: true, result: true },
   });
   const reviews = await prisma.judgeReview.groupBy({
-    by: ['participantId'], where: { participant: { eventId: event.id } }, _avg: { score: true },
+    by: ['participantId'], where: { participant: { eventId: event.id }, ...(cutoff ? { createdAt: { lt: cutoff } } : {}) }, _avg: { score: true },
   });
   const overrides = await prisma.scoreOverride.findMany({
-    where: { participant: { eventId: event.id }, problemId: null },
+    where: { participant: { eventId: event.id }, problemId: null, ...(cutoff ? { createdAt: { lt: cutoff } } : {}) },
     orderBy: { createdAt: 'asc' },
     select: { participantId: true, component: true, value: true },
   });
@@ -139,8 +142,11 @@ export async function projectorView(prisma: PrismaClient, token: string, now = n
   const loaded = { ...event, config };
   const clock = eventClock(loaded, now);
   const final = event.resultsState === 'FINAL';
-  const frozen = !final && clock.frozen;
-  const { problems, standings } = await standingsFor(prisma, loaded, { cutoff: frozen ? clock.freezesAt : null });
+  const cut = final ? null : freezeCut(event, clock);
+  // Store the cut the first time it is seen, so a later pause or extend can't move it (R13-1).
+  if (cut && !event.frozenAt) await prisma.event.updateMany({ where: { id: event.id, frozenAt: null }, data: { frozenAt: cut } });
+  const frozen = cut !== null;
+  const { problems, standings } = await standingsFor(prisma, loaded, { cutoff: cut });
   return ProjectorView.parse({
     title: config.branding.title,
     phase: clock.phase,

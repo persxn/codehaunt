@@ -92,7 +92,7 @@ test('pause blocks prompts and submits at once and freezes the clock; resume and
   const resumed = await controlContest(db.prisma, f.event.id, { action: 'resume', reason: 'power back' }, f.actor, new Date(t0.getTime() + 5 * MIN));
   assert.equal(new Date(resumed.endsAt).getTime(), t0.getTime() - 10 * MIN + 180 * MIN + 5 * MIN);
 
-  const extended = await extendContest(db.prisma, f.event.id, { minutes: 15, reason: 'lost time' }, f.actor, new Date(t0.getTime() + 5 * MIN));
+  const extended = await extendContest(db.prisma, f.event.id, { minutes: 15, reason: 'lost time', idempotencyKey: randomUUID() }, f.actor, new Date(t0.getTime() + 5 * MIN));
   assert.equal(new Date(extended.endsAt).getTime() - new Date(resumed.endsAt).getTime(), 15 * MIN);
   assert.equal(extended.durationMinutes, 195);
   const actions = (await db.prisma.auditLog.findMany({ where: { targetId: f.event.id }, orderBy: { id: 'asc' } })).map((a) => [a.action, a.reason]);
@@ -155,8 +155,10 @@ test('leaderboard scores a counted IE as WA; reversing the incident restores the
   let board = await adminLeaderboard(db.prisma, f.event.id);
   const row = () => board.standings.find((s) => s.participantId === f.participant.id)!;
   assert.equal(row().problems[0]!.points, 500 - 20 - 50);
-  const list = await listIncidents(db.prisma, f.event.id);
+  const list = await listIncidents(db.prisma, f.event.id, { role: 'ADMIN' });
   assert.equal(list.incidents[0]!.internalError, '<b>forged</b>', 'plain string; the UI renders it as text');
+  const forOrganizer = await listIncidents(db.prisma, f.event.id, { role: 'ORGANIZER' });
+  assert.deepEqual([forOrganizer.incidents[0]!.internalError, forOrganizer.incidents[0]!.textHidden], [null, true], 'it can echo hidden input: admins only');
 
   await actOnIncident(db.prisma, incident.id, { action: 'reverse_penalty', reason: 'our fault' }, f.actor);
   board = await adminLeaderboard(db.prisma, f.event.id);
@@ -179,7 +181,7 @@ test('the projector shows rank, name, solved only, and nothing that happened aft
   const f = await world();
   const start = new Date(Date.now() - 170 * MIN); // 180 min contest, 30 min freeze: frozen since 20 min ago
   await db.prisma.event.update({ where: { id: f.event.id }, data: { lockedAt: start } });
-  const { path } = await newProjectorLink(db.prisma, f.event.id, f.actor);
+  const { path } = await newProjectorLink(db.prisma, f.event.id, { reason: 'projector' }, f.actor);
   const token = path.split('/').pop()!;
   await judged(f, 'AC', 165, new Date(Date.now() - 5 * MIN));
 
@@ -191,7 +193,7 @@ test('the projector shows rank, name, solved only, and nothing that happened aft
   assert.equal((await adminLeaderboard(db.prisma, f.event.id)).standings[0]!.solved, 1, 'the admin board keeps updating');
 
   await assert.rejects(projectorView(db.prisma, 'wrong-token'), code('not_found'));
-  const { path: second } = await newProjectorLink(db.prisma, f.event.id, f.actor);
+  const { path: second } = await newProjectorLink(db.prisma, f.event.id, { reason: 'projector' }, f.actor);
   await assert.rejects(projectorView(db.prisma, token), code('not_found'), 'a new link replaces the old one');
   await projectorView(db.prisma, second.split('/').pop()!);
 });
@@ -207,7 +209,7 @@ test('results: provisional after the end, final only after the appeal window; pr
   await assert.rejects(publishResults(db.prisma, f.event.id, { action: 'final', reason: 'x' }, f.actor, new Date(t.getTime() + 29 * MIN)), code('appeal_window'));
   const fin = await publishResults(db.prisma, f.event.id, { action: 'final', reason: 'no appeals' }, f.actor, new Date(t.getTime() + 31 * MIN));
   assert.deepEqual([fin.status, fin.resultsState], ['PUBLISHED', 'FINAL']);
-  const { path } = await newProjectorLink(db.prisma, f.event.id, f.actor);
+  const { path } = await newProjectorLink(db.prisma, f.event.id, { reason: 'projector' }, f.actor);
   const view = await projectorView(db.prisma, path.split('/').pop()!);
   assert.equal(view.final, true);
   assert.equal(typeof view.rows[0]!.total, 'number');
@@ -238,4 +240,91 @@ test('the participant log never carries hidden-test output', async () => {
   const log = await participantLog(db.prisma, f.participant.id);
   assert.equal(JSON.stringify(log).includes(HIDDEN_OUTPUT), false);
   assert.deepEqual(log.submissions[0]!.verdict!.tests.map((t) => [t.hidden, t.outputExcerpt]), [[false, '3'], [true, undefined]]);
+});
+
+/** A running event whose 180-min contest started `minutes` ago (30-min freeze), with a projector link. */
+async function frozenWorld(minutes: number) {
+  const f = await world();
+  await db.prisma.event.update({ where: { id: f.event.id }, data: { lockedAt: new Date(Date.now() - minutes * MIN) } });
+  const { path } = await newProjectorLink(db.prisma, f.event.id, { reason: 'projector' }, f.actor);
+  return { ...f, token: path.split('/').pop()! };
+}
+
+test('R13-1: pausing or extending during the freeze never moves the projector cut', async () => {
+  const f = await frozenWorld(170); // frozen since 20 min ago
+  await judged(f, 'AC', 165, new Date(Date.now() - 5 * MIN));
+  await controlContest(db.prisma, f.event.id, { action: 'pause', reason: 'p' }, f.actor);
+  // An hour of pause later the live freeze time would be after that AC; the stored cut is not.
+  const later = new Date(Date.now() + 60 * MIN);
+  assert.equal((await projectorView(db.prisma, f.token, later)).rows[0]!.solved, 0);
+  await controlContest(db.prisma, f.event.id, { action: 'resume', reason: 'r' }, f.actor, later);
+  await extendContest(db.prisma, f.event.id, { minutes: 60, reason: 'e', idempotencyKey: randomUUID() }, f.actor, later);
+  const view = await projectorView(db.prisma, f.token, later);
+  assert.deepEqual([view.frozen, view.rows[0]!.solved], [true, 0], 'an extend during the freeze does not reopen the board');
+});
+
+test('R13-1: the projector stores the cut the first time it sees the freeze', async () => {
+  const f = await frozenWorld(170);
+  await projectorView(db.prisma, f.token);
+  const stored = (await db.prisma.event.findUniqueOrThrow({ where: { id: f.event.id } })).frozenAt;
+  assert.ok(stored);
+  // Moving the end afterwards (a raw extend) leaves the cut alone.
+  await db.prisma.event.update({ where: { id: f.event.id }, data: { pausedMs: 90 * MIN } });
+  await projectorView(db.prisma, f.token);
+  assert.equal((await db.prisma.event.findUniqueOrThrow({ where: { id: f.event.id } })).frozenAt?.getTime(), stored.getTime());
+});
+
+test('R13-2: overrides and penalty reversals made during the freeze do not move the projector', async () => {
+  const f = await frozenWorld(170);
+  // A second participant in the same event, solved before the freeze.
+  const user = await db.prisma.user.create({ data: { username: `q${randomUUID().slice(0, 8)}`, name: 'Q', role: 'PARTICIPANT', passwordHash: 'x', active: true } });
+  const q = await db.prisma.participant.create({ data: { eventId: f.event.id, userId: user.id, enrolmentNo: `Q${randomUUID().slice(0, 6)}`, status: 'CHECKED_IN' } });
+  const before = new Date(Date.now() - 30 * MIN);
+  const ie = await judged(f, 'IE', 100, before);
+  await judged(f, 'AC', 101, before);
+  const qs = await db.prisma.chatSession.create({ data: { participantId: q.id, problemId: f.problem.id, language: 'PYTHON' } });
+  const qv = await db.prisma.codeVersion.create({ data: { chatSessionId: qs.id, language: 'PYTHON', source: 'x' } });
+  await db.prisma.submission.create({
+    data: {
+      participantId: q.id, problemId: f.problem.id, codeVersionId: qv.id, kind: 'SUBMIT', status: 'DONE', idempotencyKey: randomUUID(), contestMs: 101 * MIN, createdAt: before,
+      verdict: { create: { verdict: 'AC', testsPassed: 2, testsTotal: 2, maxTimeMs: 20, maxMemoryKb: 9000, compileLog: '', results: [], createdAt: before } },
+    },
+  });
+  const ranks = async () => (await projectorView(db.prisma, f.token)).rows.map((r) => [r.name, r.rank]);
+  const start = await ranks();
+  const incident = await db.prisma.incident.create({ data: { eventId: f.event.id, participantId: f.participant.id, submissionId: ie.id, kind: 'JUDGE_IE', detail: {} } });
+  await actOnIncident(db.prisma, incident.id, { action: 'reverse_penalty', reason: 'ours' }, f.actor);
+  await db.prisma.scoreOverride.create({ data: { participantId: f.participant.id, component: 'correctness', value: 100, reason: 'x', actorId: f.admin.id } });
+  assert.deepEqual(await ranks(), start);
+  const live = (await adminLeaderboard(db.prisma, f.event.id)).standings.find((s) => s.participantId === f.participant.id)!;
+  assert.equal(live.correctness, 100, 'the admin board applies them at once');
+});
+
+test('R13-3: a re-judge clears an earlier penalty reversal', async () => {
+  const f = await world();
+  const ie = await judged(f, 'IE', 1);
+  const incident = await db.prisma.incident.create({ data: { eventId: f.event.id, participantId: f.participant.id, submissionId: ie.id, kind: 'JUDGE_IE', detail: {} } });
+  await actOnIncident(db.prisma, incident.id, { action: 'reverse_penalty', reason: 'ours' }, f.actor);
+  await actOnIncident(db.prisma, incident.id, { action: 'rejudge', reason: 'fixed' }, f.actor);
+  assert.equal((await db.prisma.incident.findUniqueOrThrow({ where: { id: incident.id } })).penaltyReversed, false);
+});
+
+test('R13-4: concurrent staff actions on one participant serialise', async () => {
+  const f = await world();
+  const results = await Promise.allSettled([
+    participantAction(db.prisma, f.participant.id, { action: 'disqualify', reason: 'a' }, f.actor),
+    participantAction(db.prisma, f.participant.id, { action: 'disqualify', reason: 'b' }, f.actor),
+  ]);
+  assert.deepEqual(results.map((r) => r.status).sort(), ['fulfilled', 'rejected']);
+  assert.equal(await db.prisma.auditLog.count({ where: { action: 'participant.disqualify', targetId: f.participant.id } }), 1);
+});
+
+test('R13-5: a retried extend adds nothing; the projector link records its reason', async () => {
+  const f = await world();
+  const req = { minutes: 10, reason: 'retry', idempotencyKey: randomUUID() };
+  await extendContest(db.prisma, f.event.id, req, f.actor);
+  const again = await extendContest(db.prisma, f.event.id, req, f.actor);
+  assert.equal(again.durationMinutes, 190);
+  await newProjectorLink(db.prisma, f.event.id, { reason: 'room 2' }, f.actor);
+  assert.ok(await db.prisma.auditLog.findFirst({ where: { action: 'projector.link_created', targetId: f.event.id, reason: 'room 2' } }));
 });

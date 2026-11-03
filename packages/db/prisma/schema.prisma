@@ -94,6 +94,8 @@ model Event {
   /// Set while paused; on resume the pause is added to `pausedMs` (ADR-028).
   pausedAt  DateTime?
   pausedMs  Int         @default(0)
+  /// The projector's freeze cut, stored once when first seen frozen; pauses and extends never move it (audit R13-1).
+  frozenAt  DateTime?
   /// SHA-256 of the projector link's token (ADR-028); the token itself is shown once.
   projectorTokenHash String? @unique
   resultsState  ResultsState @default(NONE)

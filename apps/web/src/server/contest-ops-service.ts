@@ -11,6 +11,7 @@ import {
   type ExtendRequest,
   type ExtraTimeRequest,
   type ParticipantActionRequest,
+  type ProjectorLinkRequest,
   type ResultsRequest,
   type TopUpRequest,
 } from '@codehaunt/contracts';
@@ -32,6 +33,15 @@ async function lockEvent(tx: Tx, eventId: string) {
   return { ...event, config: EventConfig.parse(event.config) };
 }
 
+/**
+ * The projector's freeze cut (audit R13-1): once stored it never moves. Before it is stored, the live freeze time if
+ * the board is frozen now. Controls that move the end (pause, extend, end) store it first, so they can't shift it.
+ */
+export function freezeCut(event: { frozenAt: Date | null }, clock: { frozen: boolean; freezesAt: Date; phase: string }): Date | null {
+  if (event.frozenAt) return event.frozenAt;
+  return clock.frozen && clock.phase !== 'not_started' ? clock.freezesAt : null;
+}
+
 const clockFields = (e: { status: string; lockedAt: Date | null; pausedAt: Date | null; pausedMs: number }) =>
   ({ status: e.status, lockedAt: e.lockedAt?.toISOString() ?? null, pausedAt: e.pausedAt?.toISOString() ?? null, pausedMs: e.pausedMs });
 
@@ -40,7 +50,7 @@ export async function controlContest(prisma: PrismaClient, eventId: string, inpu
   return prisma.$transaction(async (tx) => {
     const event = await lockEvent(tx, eventId);
     const clock = eventClock(event, now);
-    let data: { status: 'CHECK_IN' | 'RUNNING' | 'PAUSED' | 'ENDED'; lockedAt?: Date; pausedAt?: null | Date; pausedMs?: number };
+    let data: { status: 'CHECK_IN' | 'RUNNING' | 'PAUSED' | 'ENDED'; lockedAt?: Date; pausedAt?: null | Date; pausedMs?: number; frozenAt?: Date | null };
     switch (input.action) {
       case 'open_checkin':
         if (event.status !== 'DRAFT') throw conflict('wrong_state', 'Check-in is already open.');
@@ -48,7 +58,7 @@ export async function controlContest(prisma: PrismaClient, eventId: string, inpu
         break;
       case 'start':
         if (!['DRAFT', 'CHECK_IN'].includes(event.status)) throw conflict('wrong_state', 'The contest has already started.');
-        data = { status: 'RUNNING', lockedAt: now, pausedAt: null, pausedMs: 0 };
+        data = { status: 'RUNNING', lockedAt: now, pausedAt: null, pausedMs: 0, frozenAt: null };
         break;
       case 'pause':
         if (event.status !== 'RUNNING' || clock.phase !== 'running') throw conflict('wrong_state', 'Only a running contest can be paused.');
@@ -65,6 +75,8 @@ export async function controlContest(prisma: PrismaClient, eventId: string, inpu
           : { status: 'ENDED' };
         break;
     }
+    const cut = freezeCut(event, clock);
+    if (cut && !event.frozenAt && input.action !== 'start') data.frozenAt = cut;
     const updated = await tx.event.update({ where: { id: eventId }, data });
     await tx.auditLog.create({
       data: {
@@ -76,20 +88,26 @@ export async function controlContest(prisma: PrismaClient, eventId: string, inpu
   });
 }
 
-/** Adds minutes for everyone: `schedule.durationMinutes` grows (one source of truth for the length). */
+/**
+ * Adds minutes for everyone: `schedule.durationMinutes` grows (one source of truth for the length). Idempotent per
+ * key (the key is kept in the audit row). An extend during the freeze does not reopen the projector (R13-1).
+ */
 export async function extendContest(prisma: PrismaClient, eventId: string, input: ExtendRequest, actor: Actor, now = new Date()) {
   return prisma.$transaction(async (tx) => {
     const event = await lockEvent(tx, eventId);
+    const done = await tx.auditLog.findFirst({ where: { action: 'contest.extended', targetId: eventId, after: { path: ['idempotencyKey'], equals: input.idempotencyKey } } });
+    if (done) return contestStatus(event, now);
     if (!['RUNNING', 'PAUSED'].includes(event.status)) throw conflict('wrong_state', 'Only a running or paused contest can be extended.');
     const before = event.config.schedule.durationMinutes;
     const after = before + input.minutes;
     if (after > 1440) throw conflict('too_long', 'A contest can last at most 24 hours.');
     const config = EventConfig.parse({ ...event.config, schedule: { ...event.config.schedule, durationMinutes: after } });
-    const updated = await tx.event.update({ where: { id: eventId }, data: { config } });
+    const cut = freezeCut(event, eventClock(event, now));
+    const updated = await tx.event.update({ where: { id: eventId }, data: { config, ...(cut && !event.frozenAt ? { frozenAt: cut } : {}) } });
     await tx.auditLog.create({
       data: {
         actorId: actor.id, action: 'contest.extended', targetType: 'event', targetId: eventId,
-        before: { durationMinutes: before }, after: { durationMinutes: after }, reason: input.reason, requestId: actor.requestId,
+        before: { durationMinutes: before }, after: { durationMinutes: after, idempotencyKey: input.idempotencyKey }, reason: input.reason, requestId: actor.requestId,
       },
     });
     return contestStatus({ ...updated, config }, now);
@@ -126,8 +144,12 @@ export async function getContestStatus(prisma: PrismaClient, eventId: string, no
   return contestStatus({ ...event, config: EventConfig.parse(event.config) }, now);
 }
 
-/** A participant of this event, or 404 (ids from the URL are never trusted to belong to the event). */
-async function participantIn(tx: Tx | PrismaClient, participantId: string) {
+/**
+ * The participant, or 404. Inside a transaction it takes the participant row lock first (the same lock the ledger
+ * uses), so concurrent staff actions serialise and record the right "before" (audit R13-4).
+ */
+async function participantIn(tx: Tx | PrismaClient, participantId: string, lock = false) {
+  if (lock) await tx.$queryRaw`SELECT id FROM participants WHERE id = ${participantId} FOR UPDATE`;
   const p = await tx.participant.findUnique({ where: { id: participantId }, select: { id: true, eventId: true, userId: true, status: true, extraMinutes: true, checkedInAt: true } });
   if (!p) throw notFound('That participant');
   return p;
@@ -154,7 +176,7 @@ export async function topUp(prisma: PrismaClient, participantId: string, input: 
 /** Sets the participant's extra minutes (time extension or accommodation); applies from now on. */
 export async function setExtraTime(prisma: PrismaClient, participantId: string, input: ExtraTimeRequest, actor: Actor) {
   return prisma.$transaction(async (tx) => {
-    const p = await participantIn(tx, participantId);
+    const p = await participantIn(tx, participantId, true);
     await tx.participant.update({ where: { id: participantId }, data: { extraMinutes: input.minutes } });
     await tx.auditLog.create({
       data: {
@@ -171,7 +193,7 @@ export async function setExtraTime(prisma: PrismaClient, participantId: string, 
  * end_session only signs them out; reinstate undoes disqualify and deactivate. Exported for the incident actions.
  */
 export async function participantActionIn(tx: Tx, participantId: string, input: ParticipantActionRequest, actor: Actor) {
-  const p = await participantIn(tx, participantId);
+  const p = await participantIn(tx, participantId, true);
   const user = await tx.user.findUniqueOrThrow({ where: { id: p.userId }, select: { active: true } });
   const before = { status: p.status, active: user.active };
   const after = { ...before };
@@ -238,7 +260,7 @@ export async function publishResults(prisma: PrismaClient, eventId: string, inpu
 export const hashProjectorToken = (token: string) => createHash('sha256').update(token).digest('hex');
 
 /** A new projector link; the old one stops working. The token is returned once and only its hash is stored. */
-export async function newProjectorLink(prisma: PrismaClient, eventId: string, actor: Actor) {
+export async function newProjectorLink(prisma: PrismaClient, eventId: string, input: ProjectorLinkRequest, actor: Actor) {
   const token = randomBytes(32).toString('base64url');
   await prisma.$transaction(async (tx) => {
     const event = await lockEvent(tx, eventId);
@@ -246,7 +268,7 @@ export async function newProjectorLink(prisma: PrismaClient, eventId: string, ac
     await tx.auditLog.create({
       data: {
         actorId: actor.id, action: 'projector.link_created', targetType: 'event', targetId: eventId,
-        after: { replaced: event.projectorTokenHash !== null }, requestId: actor.requestId,
+        after: { replaced: event.projectorTokenHash !== null }, reason: input.reason, requestId: actor.requestId,
       },
     });
   });

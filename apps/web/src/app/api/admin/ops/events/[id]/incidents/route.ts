@@ -5,4 +5,4 @@ import { listIncidents } from '@/server/incident-service';
 
 type P = { id: string };
 
-export const GET = route<P>(['ADMIN', 'ORGANIZER'], async ({ params }) => listIncidents(getPrismaClient(), params.id));
+export const GET = route<P>(['ADMIN', 'ORGANIZER'], async ({ user, params }) => listIncidents(getPrismaClient(), params.id, user));

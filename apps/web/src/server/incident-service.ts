@@ -14,7 +14,12 @@ import { participantActionIn, type Actor } from './contest-ops-service.ts';
 const MAX_TEXT = 4000;
 const text = (v: unknown) => (typeof v === 'string' ? v.slice(0, MAX_TEXT) : null);
 
-export async function listIncidents(prisma: PrismaClient, eventId: string) {
+/**
+ * `internalError` can echo program output, and through it a hidden-test input: only admins (who may see hidden tests)
+ * get the text; organizers see that an incident happened (audit run-13 needs-validation item).
+ */
+export async function listIncidents(prisma: PrismaClient, eventId: string, viewer: { role: string }) {
+  const showText = viewer.role === 'ADMIN';
   const event = await prisma.event.findUnique({ where: { id: eventId }, select: { id: true, createdAt: true } });
   if (!event) throw notFound('That event');
   const participantSelect = { id: true, enrolmentNo: true, user: { select: { name: true, username: true } } } as const;
@@ -59,8 +64,9 @@ export async function listIncidents(prisma: PrismaClient, eventId: string) {
         submission: i.submission
           ? { id: i.submission.id, kind: i.submission.kind, status: i.submission.status, problem: i.submission.problem.title, verdict: i.submission.verdict?.verdict ?? null }
           : null,
-        internalError: text(detail.internalError),
-        firstInternalError: text(detail.firstInternalError),
+        internalError: showText ? text(detail.internalError) : null,
+        firstInternalError: showText ? text(detail.firstInternalError) : null,
+        textHidden: !showText && (detail.internalError !== undefined || detail.firstInternalError !== undefined),
         penaltyReversed: i.penaltyReversed,
         resolution: i.resolution,
         resolvedAt: i.resolvedAt?.toISOString() ?? null,
@@ -95,8 +101,11 @@ export async function actOnIncident(prisma: PrismaClient, incidentId: string, in
         if (!incident.submissionId) throw conflict('wrong_kind', 'This incident has no submission.');
         const sub = await tx.submission.findUniqueOrThrow({ where: { id: incident.submissionId }, select: { status: true } });
         if (sub.status === 'QUEUED' || sub.status === 'RUNNING') throw conflict('wrong_state', 'It is being judged already.');
-        // A fresh judgement: the old verdict goes, the re-check-once rule applies again.
+        // A fresh judgement: the old verdict goes, the re-check-once rule applies again, and an earlier penalty
+        // reversal no longer holds: a genuine wrong answer from the new run must count (R13-3).
         await tx.verdict.deleteMany({ where: { submissionId: incident.submissionId } });
+        await tx.incident.updateMany({ where: { submissionId: incident.submissionId }, data: { penaltyReversed: false } });
+        penaltyReversed = false;
         await tx.submission.update({
           where: { id: incident.submissionId },
           data: { status: 'QUEUED', attempts: 0, startedAt: null, finishedAt: null, firstInternalError: null },

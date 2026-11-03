@@ -6,7 +6,6 @@
 import Link from 'next/link';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 
-import { Button } from '@/components/button';
 import { Field, inputClass } from '@/components/field';
 
 import styles from '../admin.module.css';
@@ -64,15 +63,15 @@ export function ContestOps({ admin }: { admin: boolean }) {
     await status.refresh();
   }, [base, status]);
 
-  const newLink = async () => {
-    const { path } = await postJSON<{ path: string }>(`${base}/projector`, {});
+  const newLink = async (reason: string) => {
+    const { path } = await postJSON<{ path: string }>(`${base}/projector`, { reason });
     setProjector(`${window.location.origin}${path}`);
     await status.refresh();
   };
 
-  const act = async (p: OpsParticipant, action: string, reason: string, value: number | undefined) => {
+  const act = async (p: OpsParticipant, action: string, reason: string, value: number | undefined, idempotencyKey: string) => {
     const url = `/api/admin/ops/participants/${encodeURIComponent(p.id)}`;
-    if (action === 'topup') await postJSON(`${url}/topup`, { tokens: value, reason, idempotencyKey: crypto.randomUUID() });
+    if (action === 'topup') await postJSON(`${url}/topup`, { tokens: value, reason, idempotencyKey });
     else if (action === 'extra') await postJSON(`${url}/extra-time`, { minutes: value, reason });
     else await postJSON(`${url}/action`, { action, reason });
     await people.refresh();
@@ -102,7 +101,7 @@ export function ContestOps({ admin }: { admin: boolean }) {
               <ActionForm key={s.status} id="control" choices={CONTROLS[s.status]!} run={(a, r) => control(a, r)} />
               {(s.status === 'RUNNING' || s.status === 'PAUSED') && (
                 <ActionForm id="extend" choices={[{ value: 'extend', label: 'Extend for everyone', number: { label: 'Minutes', min: 1, max: 240, initial: 10 } }]}
-                  run={async (_a, reason, minutes) => { await postJSON(`${base}/extend`, { minutes, reason }); await status.refresh(); }} />
+                  run={async (_a, reason, minutes, idempotencyKey) => { await postJSON(`${base}/extend`, { minutes, reason, idempotencyKey }); await status.refresh(); }} />
               )}
               <p className={styles.muted}>Pause stops prompts and submits for everyone at once and stops the clock. End stops everyone, including people on extra time.</p>
             </section>
@@ -111,11 +110,9 @@ export function ContestOps({ admin }: { admin: boolean }) {
           <section className={`${styles.card} ${styles.stack}`} aria-labelledby="projector">
             <h2 id="projector">Projector</h2>
             {!s.projectorEnabled && <p className={styles.muted}>The projector is switched off in the event settings.</p>}
-            <div className={styles.row}>
-              <Button variant="secondary" onClick={() => void newLink().catch((e: Error) => setProjector(`Error: ${e.message}`))}>
-                {s.projectorLink ? 'Make a new link (the old one stops working)' : 'Make projector link'}
-              </Button>
-            </div>
+            <ActionForm id="projector" key={String(s.projectorLink)}
+              choices={[{ value: 'link', label: s.projectorLink ? 'Make a new link (the old one stops working)' : 'Make projector link' }]}
+              run={(_a, reason) => newLink(reason)} />
             {projector && (
               <div className={styles.stack}>
                 <p className={styles.muted}>Shown once. Open it on the projector computer now; anyone with the link sees rank, name and solved.</p>
@@ -163,7 +160,7 @@ export function ContestOps({ admin }: { admin: boolean }) {
                     <td>
                       <details>
                         <summary>Act</summary>
-                        <ActionForm id={`p-${p.id}`} compact choices={PARTICIPANT_ACTIONS} run={(a, r, v) => act(p, a, r, v)} />
+                        <ActionForm id={`p-${p.id}`} compact choices={PARTICIPANT_ACTIONS} run={(a, r, v, k) => act(p, a, r, v, k)} />
                       </details>
                     </td>
                   </tr>

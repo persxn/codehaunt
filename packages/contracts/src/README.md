@@ -13,7 +13,7 @@ Schema modules of `@codehaunt/contracts`, re-exported from `index.ts`.
 | `gateway.ts` | `GatewayChatRequest` (OpenAI chat + `codehaunt` caps: budgetTokens, contextLimit, sessionId), `GatewayError`, `GatewayUsage` (ADR-022) |
 | `submission.ts` | `SubmissionRequest`, `ParticipantVerdict` (strict), `SubmissionKind`, `SubmissionStatus` |
 | `contest.ts` | participant screen shapes: `ContestState`, `ProblemSummary`, `Workspace`, `RunView`, `NewSessionRequest`, `RevertRequest`, `ChangePasswordRequest` |
-| `ops.ts` | contest operations (WP-05): `ContestControlRequest`, `ExtendRequest`, `TopUpRequest` (idempotent), `ExtraTimeRequest`, `ParticipantActionRequest`, `IncidentActionRequest`, `ScoreOverrideRequest`, `ResultsRequest`, `ProjectorView` (public, strict) |
+| `ops.ts` | contest operations (WP-05): `ContestControlRequest`, `ExtendRequest` (idempotent), `ProjectorLinkRequest`, `TopUpRequest` (idempotent), `ExtraTimeRequest`, `ParticipantActionRequest`, `IncidentActionRequest`, `ScoreOverrideRequest`, `ResultsRequest`, `ProjectorView` (public, strict) |
 | `admin.ts` | admin/desk shapes: `EventCreate/UpdateRequest`, `ParticipantRow`/`ImportRequest`, `BadgeRequest`, `CheckInRequest`, `StaffCreateRequest`, `RoleChangeRequest`, `PasswordResetRequest`, `ConsentRequest` |
 
 ## Affects / depends on

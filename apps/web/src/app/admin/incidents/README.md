@@ -15,4 +15,5 @@ Incident dashboard (ADR-021, ADR-028): judge errors after the re-check, sandbox 
 
 ## Gotchas
 - `internalError` can hold participant output: it is rendered in `<pre>` as text, never as HTML.
+- Organizers see that a judge incident exists but not its text (it can echo hidden input); admins see the text.
 - Slowed logins live in the web process memory: a restart clears them.

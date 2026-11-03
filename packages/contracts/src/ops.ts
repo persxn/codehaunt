@@ -11,7 +11,12 @@ export const ContestControlRequest = z.object({
 export type ContestControlRequest = z.infer<typeof ContestControlRequest>;
 
 /** Adds minutes to `schedule.durationMinutes` for everyone. */
-export const ExtendRequest = z.object({ minutes: z.number().int().min(1).max(240), reason: Reason }).strict();
+/** Idempotent per key (standards §2): a retried extend adds nothing. */
+export const ExtendRequest = z.object({
+  minutes: z.number().int().min(1).max(240),
+  reason: Reason,
+  idempotencyKey: z.string().min(8).max(100),
+}).strict();
 export type ExtendRequest = z.infer<typeof ExtendRequest>;
 
 /** Idempotent per key (standards §2): a retried top-up adds nothing. */
@@ -21,6 +26,10 @@ export const TopUpRequest = z.object({
   idempotencyKey: z.string().min(8).max(100),
 }).strict();
 export type TopUpRequest = z.infer<typeof TopUpRequest>;
+
+/** A new projector link (the old one stops working). */
+export const ProjectorLinkRequest = z.object({ reason: Reason }).strict();
+export type ProjectorLinkRequest = z.infer<typeof ProjectorLinkRequest>;
 
 /** Sets (not adds) a participant's extra minutes: extensions and accommodation. */
 export const ExtraTimeRequest = z.object({ minutes: z.number().int().min(0).max(600), reason: Reason }).strict();

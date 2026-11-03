@@ -16,5 +16,5 @@ Contest operations page (WP-05, ADR-028): the clock and its controls, extend, pr
 
 ## Gotchas
 - Every action needs a reason: it goes to audit_log.
-- Top-ups send a fresh `idempotencyKey` per submit; the busy button stops double clicks.
+- Top-ups and extend carry an `idempotencyKey` that stays the same until a submit succeeds (`ActionForm`), so a retry after an error applies once.
 - The projector link is shown once (only its hash is stored); making a new one breaks the old.

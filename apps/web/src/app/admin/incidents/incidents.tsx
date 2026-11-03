@@ -15,7 +15,7 @@ type Who = { participantId: string; name: string; enrolmentNo: string } | null;
 interface Incident {
   id: string; kind: 'JUDGE_IE' | 'PROXY_REFUSAL'; status: 'OPEN' | 'RESOLVED'; createdAt: string; participant: Who;
   submission: { id: string; kind: string; status: string; problem: string; verdict: string | null } | null;
-  internalError: string | null; firstInternalError: string | null; penaltyReversed: boolean; resolution: string | null; resolvedAt: string | null;
+  internalError: string | null; firstInternalError: string | null; textHidden: boolean; penaltyReversed: boolean; resolution: string | null; resolvedAt: string | null;
 }
 interface Dashboard {
   incidents: Incident[];
@@ -69,6 +69,7 @@ export function Incidents({ admin }: { admin: boolean }) {
                 </div>
                 {i.firstInternalError && <><div className={styles.muted}>First try</div><pre className={styles.pre}>{i.firstInternalError}</pre></>}
                 {i.internalError && <><div className={styles.muted}>{i.firstInternalError ? 'Re-check' : 'Detail'}</div><pre className={styles.pre}>{i.internalError}</pre></>}
+                {i.textHidden && <p className={styles.muted}>The judge's error text can contain test data: only admins see it.</p>}
                 <ActionForm id={`i-${i.id}`} choices={choices(i)} run={async (action, reason) => {
                   await postJSON(`/api/admin/ops/incidents/${encodeURIComponent(i.id)}`, { action, reason });
                   await refresh();

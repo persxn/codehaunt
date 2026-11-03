@@ -11,7 +11,7 @@ Who may open what is decided per path in `packages/auth/src/policy.ts` (voluntee
 | `page.tsx` | overview route (ADMIN, ORGANIZER) |
 | `overview.tsx` | counts by participant status for the selected event, links to the pages |
 | `event-picker.tsx` | `useEventId()` (from `?event=`) and `EventPicker` |
-| `ops.tsx` | WP-05 shared: `usePoll` (5 s boards), `clock`, `time`, `ActionForm` (action + optional number + required reason) |
+| `ops.tsx` | WP-05 shared: `usePoll` (5 s boards), `clock`, `time`, `ActionForm` (action + optional number + required reason; idempotency key kept until success) |
 | `api.ts` | typed fetch helpers (`getJSON`, `postJSON`, `putJSON`, `patchJSON`, `deleteJSON`) and `eventOptions()` |
 | `admin.module.css` | shared classes: shell, table, stack, row, card, fieldset, cards, muted, error, success, pre |
 | `event/` | Event editor (ADMIN) |

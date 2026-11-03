@@ -53,12 +53,13 @@ export interface ActionChoice {
 
 /**
  * One form for every audited action: pick the action, give a number if it needs one, write the reason (required:
- * it goes to audit_log). `run` throws with the server's message on failure.
+ * it goes to audit_log). `run` throws with the server's message on failure. `idempotencyKey` stays the same until a
+ * submit succeeds, so retrying after an error (e.g. a lost response) can't apply a top-up or extend twice (R13-5).
  */
 export function ActionForm({ id, choices, run, compact = false }: {
   id: string;
   choices: ActionChoice[];
-  run: (action: string, reason: string, value: number | undefined) => Promise<unknown>;
+  run: (action: string, reason: string, value: number | undefined, idempotencyKey: string) => Promise<unknown>;
   compact?: boolean;
 }) {
   const [action, setAction] = useState(choices[0]?.value ?? '');
@@ -67,6 +68,7 @@ export function ActionForm({ id, choices, run, compact = false }: {
   const [reason, setReason] = useState('');
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState<{ ok: boolean; text: string } | null>(null);
+  const [key, setKey] = useState(() => crypto.randomUUID());
 
   const initial = choice?.number?.initial;
   useEffect(() => {
@@ -79,9 +81,10 @@ export function ActionForm({ id, choices, run, compact = false }: {
     setBusy(true);
     setMessage(null);
     try {
-      await run(choice.value, reason.trim(), choice.number ? value : undefined);
+      await run(choice.value, reason.trim(), choice.number ? value : undefined, key);
       setMessage({ ok: true, text: `${choice.label}: done.` });
       setReason('');
+      setKey(crypto.randomUUID());
     } catch (err) {
       setMessage({ ok: false, text: err instanceof Error ? err.message : 'Request failed.' });
     } finally {

@@ -14,6 +14,7 @@ CREATE TYPE "IncidentStatus" AS ENUM ('OPEN', 'RESOLVED');
 -- AlterTable
 ALTER TABLE "events" ADD COLUMN     "pausedAt" TIMESTAMP(3),
 ADD COLUMN     "pausedMs" INTEGER NOT NULL DEFAULT 0,
+ADD COLUMN     "frozenAt" TIMESTAMP(3),
 ADD COLUMN     "projectorTokenHash" TEXT,
 ADD COLUMN     "provisionalAt" TIMESTAMP(3),
 ADD COLUMN     "resultsState" "ResultsState" NOT NULL DEFAULT 'NONE';
