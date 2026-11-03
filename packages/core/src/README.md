@@ -10,9 +10,11 @@ Framework-free business logic of `@codehaunt/core`: pure functions, no I/O, no c
 | `extract-code.ts` | `extractCode(reply, language)`: last fenced block tagged with the language, else the last untagged one; size-capped |
 | `contest-clock.ts` | `contestClock(input, now)`: phase, start/end/freeze times, time left, frozen, elapsed; actual start, pauses and extra minutes (ADR-028) |
 | `scoring.ts` | `[claude]` `computeStandings`: ADR-009 components (constants ADR-028: problem values, decay, token median, resource vs reference), overrides, ranking with tie-breaks; `decayedPoints` ported from JojoCode |
+| `process-metrics.ts` | `computeProcessMetrics`: deterministic per-problem metrics for the batch judge (WP-07): prompts, tokens, attempts, rejections before AC, time to AC, tokens after AC, time/memory ratio vs reference |
+| `similarity.ts` | `similarityFlags`: pairs of participants with near-identical prompts or code on one problem (5-token shingle Jaccard ≥ 0.85, texts under 10 tokens skipped); integrity flag only, never a score change |
 
 ## Affects / depends on
-- Used by: `apps/web/src/server/*` (prompt, participant, submission, leaderboard services), `apps/worker/src/queue.ts` (languages).
+- Used by: `apps/web/src/server/*` (prompt, participant, submission, leaderboard services), `apps/worker/src/queue.ts` (languages). `process-metrics.ts` and `similarity.ts` feed the WP-07 batch judge (not wired yet).
 - Depends on: `@codehaunt/contracts` types and `MAX_SOURCE_BYTES`.
 - Changing `verdict-projection.ts` changes what every participant sees of every run.
 - Changing a constant in `scoring.ts` changes every score and rank (live board, projector, export).
