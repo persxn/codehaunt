@@ -66,6 +66,10 @@ services:
     environment:
       DATABASE_URL: postgresql://codehaunt_web:${WEB_DB_PASSWORD}@postgres:5432/${POSTGRES_DB:-codehaunt}
       COOKIE_SECURE: ${COOKIE_SECURE:-}
+      # Inference gateway (ADR-022): the web API is its only client. Reached over the host's tailnet via the edge network.
+      GATEWAY_URL: ${GATEWAY_URL:-}
+      GATEWAY_FALLBACK_URL: ${GATEWAY_FALLBACK_URL:-}
+      GATEWAY_TOKEN: ${GATEWAY_TOKEN:-}
     tmpfs: [/tmp, /app/apps/web/.next/cache]
     mem_limit: 2g
     ports:
@@ -87,6 +91,8 @@ services:
       DATABASE_URL: postgresql://codehaunt_worker:${WORKER_DB_PASSWORD}@postgres:5432/${POSTGRES_DB:-codehaunt}
       RUNNER_IMAGE: ${RUNNER_IMAGE:-codehaunt-runner:1}
       DOCKER_HOST: tcp://docker-proxy:2375
+      # ≤ 16: the docker-proxy refuses more concurrent sandboxes (ADR-019).
+      JUDGE_CONCURRENCY: ${JUDGE_CONCURRENCY:-8}
     tmpfs: [/tmp, /home/node]
     mem_limit: 1g
     networks: [db, sandbox]
