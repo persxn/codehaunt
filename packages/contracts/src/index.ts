@@ -1,4 +1,5 @@
 export * from './judge.ts';
+export * from './judge-review.ts';
 export * from './event-config.ts';
 export * from './problem.ts';
 export * from './prompt.ts';
