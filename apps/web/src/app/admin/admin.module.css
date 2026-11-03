@@ -27,3 +27,9 @@
 .success { color: var(--success); }
 .card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-md); padding: var(--space-4); }
 .pre { font-family: var(--font-mono); font-size: var(--text-sm); white-space: pre-wrap; background: var(--bg); border: 1px solid var(--border); border-radius: var(--radius-sm); padding: var(--space-2); max-height: 12rem; overflow: auto; }
+.cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(10rem, 1fr)); gap: var(--space-3); }
+.big { font-family: var(--font-mono); font-size: var(--text-xl); }
+.fieldset { border: 1px solid var(--border); border-radius: var(--radius-md); padding: var(--space-4); display: grid; gap: var(--space-3); grid-template-columns: repeat(auto-fill, minmax(14rem, 1fr)); }
+.fieldset legend { padding: 0 var(--space-2); font-weight: 600; }
+.wide { grid-column: 1 / -1; }
+.check { display: flex; gap: var(--space-2); align-items: center; }

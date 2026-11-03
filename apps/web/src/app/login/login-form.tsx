@@ -7,7 +7,8 @@ import styles from './page.module.css';
 
 /** Staff land on /admin, participants on /contest. */
 function homeFor(user: Me): string {
-  return user.role === 'PARTICIPANT' ? '/contest' : '/admin';
+  // Volunteers may open only check-in and the desk (ADR-013).
+  return user.role === 'PARTICIPANT' ? '/contest' : user.role === 'VOLUNTEER' ? '/admin/checkin' : '/admin';
 }
 
 export function LoginForm() {

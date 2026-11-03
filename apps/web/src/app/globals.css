@@ -33,3 +33,11 @@ code {
   white-space: nowrap;
   border: 0;
 }
+
+/* Printing (badge sheet): only the sheet, black on white, no app chrome. */
+@media print {
+  @page { size: A4; margin: 10mm; }
+  html, body { background: white; color: black; }
+  nav, header, .no-print { display: none !important; }
+  main { padding: 0 !important; max-width: none !important; }
+}
