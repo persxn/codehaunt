@@ -30,6 +30,15 @@ export function Hero({ calendar }: { calendar: string }) {
           time.
         </p>
 
+        <p className={styles.powered}>
+          <span className={styles.poweredLabel}>Powered by</span>
+          <span className={styles.poweredNames}>
+            <strong>{EVENT.poweredBy[0]}</strong>
+            <span aria-hidden> · </span>
+            <strong>{EVENT.poweredBy[1]}</strong>
+          </span>
+        </p>
+
         <ul className={styles.facts}>
           <li>
             <CalendarIcon />
@@ -58,12 +67,6 @@ export function Hero({ calendar }: { calendar: string }) {
           </a>
         </div>
 
-        <p className={styles.powered}>
-          <span>Powered by</span>
-          {EVENT.poweredBy.map((name) => (
-            <strong key={name}>{name}</strong>
-          ))}
-        </p>
       </div>
       <picture className={styles.art}>
         <source media="(max-width: 899px)" srcSet={heroPhone.src} width={heroPhone.width} height={heroPhone.height} />

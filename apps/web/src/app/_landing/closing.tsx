@@ -76,6 +76,9 @@ export function Footer() {
           <div>
             <p className={styles.footName}>CodeHaunt</p>
             <p className={styles.footMeta}>Presented by the {EVENT.organiser}</p>
+            <p className={styles.footMeta}>
+              Powered by {EVENT.poweredBy[0]}, {EVENT.poweredBy[1]}
+            </p>
           </div>
         </div>
         <div className={styles.footCol}>

@@ -6,7 +6,7 @@ export const EVENT = {
   name: 'CodeHaunt',
   organiser: 'CSI Student Chapter, UEM Kolkata',
   /** As given by the client, 2026-11-04. */
-  poweredBy: ['SATYAMEBA', 'IEDC', 'Dept. of CSE (IoT, CS, BT)'],
+  poweredBy: ['SATYAMEBA', 'IEDC Laboratory of Dept. of CSE (IoT, CS, BT)'],
   venue: 'IEM Newtown Campus',
   dateLabel: 'Saturday, 7 November 2026',
   timeLabel: '10 AM onwards',

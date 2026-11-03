@@ -197,24 +197,23 @@
   animation: rise 700ms 460ms var(--ease) both;
 }
 
+/* "Powered by" credit, emphasised (client, 2026-11-04): a framed plate right under the description. */
 .powered {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: var(--s2) var(--s3);
-  margin: var(--s6) 0 0;
-  font-size: var(--fs-small);
-  color: var(--muted);
-  animation: rise 700ms 540ms var(--ease) both;
+  display: grid;
+  gap: var(--s1);
+  max-width: 420px;
+  margin: var(--s5) 0 0;
+  padding: var(--s3) var(--s4);
+  border: 2px solid var(--line);
+  border-left-width: 6px;
+  border-radius: var(--r-sm);
+  background: rgb(236 91 28 / 0.08);
+  animation: rise 700ms 260ms var(--ease) both;
 }
-.powered strong {
-  padding: var(--s1) var(--s3);
-  border: 1px solid var(--line-soft);
-  border-radius: 999px;
-  font-weight: 600;
-  color: var(--bone);
-  letter-spacing: 0.02em;
-}
+.poweredLabel { font-size: var(--fs-small); font-weight: 700; color: var(--pumpkin); }
+.poweredNames { font-size: 18px; line-height: 1.4; color: var(--bone); }
+.poweredNames strong { font-weight: 700; }
+.poweredNames strong:first-child { font-family: var(--display); font-weight: 400; font-size: 24px; letter-spacing: 0.04em; color: var(--pumpkin); }
 
 @keyframes rise { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: none; } }
 @keyframes tick { from { opacity: 0.2; transform: translateY(-6px); } to { opacity: 1; transform: none; } }
