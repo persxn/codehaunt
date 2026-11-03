@@ -31,8 +31,12 @@ export const ROUTE_POLICY: ReadonlyArray<readonly [prefix: string, access: Acces
   ['/projector', 'public'],
   ['/api/projector', 'public'],
   ['/favicon.ico', 'public'],
+  // Public event page (ADR-029); signed-in visitors are redirected to their own area by the page itself.
+  ['/', 'public'],
+  // App icon and link-preview image (Next file conventions in src/app).
+  ['/icon.png', 'public'],
+  ['/opengraph-image.jpg', 'public'],
 
-  ['/', ROLES],
   ['/api/auth/logout', ROLES],
   ['/api/auth/me', ROLES],
   ['/api/account', ROLES],

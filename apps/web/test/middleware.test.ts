@@ -20,7 +20,7 @@ function request(path: string, init: { method?: string; headers?: Record<string,
   });
 }
 
-for (const path of ['/', '/contest', '/admin', '/api/auth/me', '/api/contest/x', '/api/admin/x', '/nope']) {
+for (const path of ['/contest', '/admin', '/api/auth/me', '/api/contest/x', '/api/admin/x', '/nope']) {
   test(`${path} without a session is 401`, async () => {
     const response = await middleware(request(path));
     assert.equal(response.status, 401);
@@ -29,7 +29,7 @@ for (const path of ['/', '/contest', '/admin', '/api/auth/me', '/api/contest/x',
 }
 
 test('public routes pass through', async () => {
-  for (const path of ['/login', '/healthz', '/_next/static/chunk.js']) {
+  for (const path of ['/', '/login', '/healthz', '/_next/static/chunk.js', '/icon.png']) {
     assert.equal((await middleware(request(path))).headers.get('x-middleware-next'), '1', path);
   }
 });

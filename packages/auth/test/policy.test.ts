@@ -9,8 +9,13 @@ test('public routes need no session', () => {
   }
 });
 
+test('/ is public (ADR-029) but only itself, not everything under it', () => {
+  assert.deepEqual(authorize('/', null), { allow: true });
+  assert.deepEqual(authorize('/nope', null), { allow: false, status: 401 });
+});
+
 test('every other route is 401 without a session, including unknown ones', () => {
-  for (const path of ['/', '/contest', '/admin', '/api/admin/events', '/api/contest/prompt', '/nope', '/loginx', '/healthzz']) {
+  for (const path of ['/contest', '/admin', '/api/admin/events', '/api/contest/prompt', '/nope', '/loginx', '/healthzz']) {
     assert.deepEqual(authorize(path, null), { allow: false, status: 401 }, path);
   }
 });

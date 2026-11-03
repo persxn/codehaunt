@@ -12,3 +12,4 @@ e2e/.state.json
 test-results/
 playwright-report/
 apps/web/.next-e2e/
+.taste-skill/
