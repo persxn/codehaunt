@@ -1,0 +1,9 @@
+# Landing-page-only preview (ADR-029, client 2026-11-04): only / and its assets reach the preview server.
+# Full launch config: config.full.yml (everything → 127.0.0.1:3100), after WP-06 gating.
+tunnel: 2f3d5e18-83a2-47c6-8e27-12b11f04fa7b
+credentials-file: ~/.cloudflared-codehaunt/2f3d5e18-83a2-47c6-8e27-12b11f04fa7b.json
+ingress:
+  - hostname: codehaunt.jojocode.in
+    path: ^/(_next/static/([A-Za-z0-9_-]+(\.[A-Za-z0-9_-]+)*/)*[A-Za-z0-9_-]+(\.[A-Za-z0-9_-]+)*|icon\.png|opengraph-image\.jpg)?$
+    service: http://127.0.0.1:3200
+  - service: http_status:404
