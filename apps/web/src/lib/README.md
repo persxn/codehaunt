@@ -5,8 +5,8 @@ Server-side helpers for the web app.
 ## Contents
 | Path | What it does |
 |---|---|
-| `config.ts` | validates `DATABASE_URL`, `NODE_ENV`, `COOKIE_SECURE`, `GATEWAY_URL`, `GATEWAY_FALLBACK_URL`, `GATEWAY_TOKEN` (empty = unset) at startup; exits naming the bad key; `parseConfig` for tests |
-| `http.ts` | request IDs (`cf-ray` or UUID), `apiError` (the one `ApiError` envelope), `clientIp` (`cf-connecting-ip` only) |
+| `config.ts` | validates `DATABASE_URL`, `NODE_ENV`, `COOKIE_SECURE`, `GATEWAY_URL`, `GATEWAY_FALLBACK_URL`, `GATEWAY_TOKEN`, `SEB_CONFIG_KEY` + `PUBLIC_ORIGIN` (both or neither) (empty = unset) at startup; exits naming the bad key; `parseConfig` for tests |
+| `http.ts` | request IDs (`cf-ray` or UUID), `apiError` (the one `ApiError` envelope), `clientIp` (`cf-connecting-ip` only), `sebVerified(request)` (undefined when SEB is not enforced) |
 | `session.ts` | `currentUser()`: resolves the session cookie to a user on the server (route handlers, pages) |
 | `csp.ts` | `contentSecurityPolicy(nonce, dev)` and `newNonce()`: per-request nonce CSP, no `'unsafe-inline'` scripts (set by `middleware.ts`) |
 | `route.ts` | `route(roles, handler)`: the one route-handler wrapper (session, roles, JSON, `AppError` → `ApiError`, 500 envelope); `body(request, schema)` |

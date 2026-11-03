@@ -4,7 +4,7 @@ import { login, sessionCookieOptions, SESSION_COOKIE } from '@codehaunt/auth';
 import { LoginRequest, type Me } from '@codehaunt/contracts';
 import { getPrismaClient } from '@codehaunt/db';
 
-import { apiError, clientIp, requestIdOf } from '@/lib/http';
+import { apiError, clientIp, requestIdOf, sebVerified } from '@/lib/http';
 
 export async function POST(request: NextRequest) {
   const requestId = requestIdOf(request.headers);
@@ -15,11 +15,15 @@ export async function POST(request: NextRequest) {
     ipAddress: clientIp(request.headers),
     userAgent: request.headers.get('user-agent') ?? undefined,
     requestId,
+    sebVerified: sebVerified(request),
   });
 
   if (!result.ok) {
     if (result.reason === 'account_inactive') {
       return apiError(403, 'account_inactive', 'Your account is not active yet. Check in at the desk first.', requestId);
+    }
+    if (result.reason === 'seb_required') {
+      return apiError(403, 'seb_required', 'Open CodeHaunt in Safe Exam Browser with the event config file.', requestId);
     }
     return apiError(401, 'invalid_credentials', 'Wrong username or password.', requestId);
   }

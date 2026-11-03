@@ -15,6 +15,11 @@ export interface LoginContext {
   userAgent?: string | undefined;
   ipAddress?: string | undefined;
   requestId?: string | undefined;
+  /**
+   * Whether the request carried a valid SEB Config Key hash; `undefined` when SEB is not enforced.
+   * `false` refuses participants after the password check, before their current session is touched (ADR-013).
+   */
+  sebVerified?: boolean | undefined;
 }
 
 export type LoginResult =
@@ -25,7 +30,7 @@ export type LoginResult =
       /** Sessions this login ended (participants only). Non-zero is flagged to organizers. */
       replacedSessions: number;
     }
-  | { ok: false; reason: 'invalid_credentials' | 'account_inactive' };
+  | { ok: false; reason: 'invalid_credentials' | 'account_inactive' | 'seb_required' };
 
 /**
  * Verifies credentials and opens a session.
@@ -63,6 +68,8 @@ export async function login(
   }
 
   if (!user.active) return { ok: false, reason: 'account_inactive' };
+  // Outside SEB a participant's login would end their SEB session (one session each), so it is refused here.
+  if (user.role === 'PARTICIPANT' && context.sebVerified === false) return { ok: false, reason: 'seb_required' };
 
   clearLoginRate(username, context.ipAddress);
 

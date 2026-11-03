@@ -6,8 +6,8 @@ Tests for the web app: access control (policy, middleware, CSP) without a server
 | Path | What it does |
 |---|---|
 | `routes.test.ts` | walks every page/route under `src/app` and asserts the policy gives 401 without a session unless public |
-| `middleware.test.ts` | the real `middleware()` on real `NextRequest`s: 401s, public pass-through, path tricks, cross-site POST 403, nonce CSP per request |
-| `config.test.ts` | startup config: an empty `COOKIE_SECURE` is accepted and cookies stay Secure in production |
+| `middleware.test.ts` | the real `middleware()` on real `NextRequest`s: 401s, public pass-through, path tricks, cross-site POST 403, nonce CSP per request, SEB gate (exact URL, staff/public exempt, half config fails closed) |
+| `config.test.ts` | startup config: an empty `COOKIE_SECURE` is accepted and cookies stay Secure in production; SEB settings both or neither |
 | `support/` | Node resolve hook for `next/server`, and test fixtures (`support/README.md`) |
 | `participant-flow.test.ts` | prompt → code with exact settlement; failures uncharged and discarded; budget exhausted; practice; consent; sessions/revert; runs; hidden-test payload scan and SQL-level check |
 | `admin-flow.test.ts` | import + waitlist, badges, single-use check-in, cap, live budget change, event lock, problems, staff rules, role change, anonymise |

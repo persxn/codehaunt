@@ -70,6 +70,9 @@ services:
       GATEWAY_URL: ${GATEWAY_URL:-}
       GATEWAY_FALLBACK_URL: ${GATEWAY_FALLBACK_URL:-}
       GATEWAY_TOKEN: ${GATEWAY_TOKEN:-}
+      # SEB check for participants (ADR-013): both or neither; neither = localhost, not enforced.
+      SEB_CONFIG_KEY: ${SEB_CONFIG_KEY:-}
+      PUBLIC_ORIGIN: ${PUBLIC_ORIGIN:-}
     tmpfs: [/tmp, /app/apps/web/.next/cache]
     mem_limit: 2g
     ports:

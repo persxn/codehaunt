@@ -30,3 +30,11 @@ test('only true/false are allowed otherwise', () => {
   assert.equal(parseConfig({ ...base, COOKIE_SECURE: 'yes' }).success, false);
   assert.ok(parseConfig({ ...base, COOKIE_SECURE: 'false' }).success);
 });
+
+test('SEB settings: both or neither (ADR-013)', () => {
+  const key = 'ab'.repeat(32);
+  assert.ok(parseConfig({ ...base, SEB_CONFIG_KEY: '', PUBLIC_ORIGIN: '' }).success);
+  assert.ok(parseConfig({ ...base, SEB_CONFIG_KEY: key, PUBLIC_ORIGIN: 'https://codehaunt.jojocode.in' }).success);
+  assert.equal(parseConfig({ ...base, SEB_CONFIG_KEY: key }).success, false);
+  assert.equal(parseConfig({ ...base, PUBLIC_ORIGIN: 'https://codehaunt.jojocode.in' }).success, false);
+});

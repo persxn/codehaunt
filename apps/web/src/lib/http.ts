@@ -3,6 +3,7 @@ import { randomUUID } from 'node:crypto';
 
 import { NextResponse } from 'next/server';
 
+import { sebConfig, sebHeaderValid, SEB_HEADER } from '@codehaunt/auth';
 import type { ApiError } from '@codehaunt/contracts';
 
 /** Cloudflare's cf-ray when present (traced end to end), else a fresh UUID. */
@@ -22,4 +23,15 @@ export function apiError(status: number, code: string, message: string, requestI
  */
 export function clientIp(headers: Headers): string | undefined {
   return headers.get('cf-connecting-ip') ?? undefined;
+}
+
+/**
+ * SEB Config Key check for this request (ADR-013 §3): `undefined` when SEB is not enforced (no
+ * `SEB_CONFIG_KEY`/`PUBLIC_ORIGIN`). The hashed URL is the public origin plus the path and query as received.
+ */
+export function sebVerified(request: Request): boolean | undefined {
+  const config = sebConfig();
+  if (!config) return undefined;
+  const url = new URL(request.url);
+  return sebHeaderValid(config, url.pathname + url.search, request.headers.get(SEB_HEADER));
 }

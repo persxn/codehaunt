@@ -1,0 +1,11 @@
+[Unit]
+Description=CodeHaunt — Cloudflare tunnel (codehaunt.jojocode.in)
+After=network-online.target
+
+[Service]
+ExecStart=%h/.local/bin/cloudflared --no-autoupdate --config %h/.cloudflared-codehaunt/config.yml tunnel run
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=default.target

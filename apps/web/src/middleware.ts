@@ -7,18 +7,23 @@
  */
 import { NextResponse, type NextRequest } from 'next/server';
 
-import { authorize, resolveSession, SESSION_COOKIE } from '@codehaunt/auth';
+import { accessFor, authorize, resolveSession, SESSION_COOKIE, type Role } from '@codehaunt/auth';
 import { getPrismaClient } from '@codehaunt/db';
 
 // Relative, not `@/`: the HTTP-level test loads this file with plain Node.
 import { contentSecurityPolicy, newNonce } from './lib/csp.ts';
-import { apiError, requestIdOf } from './lib/http.ts';
+import { apiError, requestIdOf, sebVerified } from './lib/http.ts';
 
 const SAFE_METHODS = new Set(['GET', 'HEAD', 'OPTIONS']);
 
 const SIGN_IN_PAGE =
   '<!doctype html><meta charset="utf-8"><meta http-equiv="refresh" content="0;url=/login">' +
   '<title>Sign in</title><p><a href="/login">Sign in</a> to continue.</p>';
+
+const SEB_PAGE =
+  '<!doctype html><meta charset="utf-8"><title>Safe Exam Browser required</title>' +
+  '<p>Open CodeHaunt in Safe Exam Browser with the event config file. Ask a volunteer if you need it.</p>';
+const SEB_MESSAGE = 'Open CodeHaunt in Safe Exam Browser with the event config file.';
 
 /** `null` for an unparsable Origin (including the literal "null"), which then never matches. */
 function hostOf(origin: string): string | null {
@@ -27,6 +32,29 @@ function hostOf(origin: string): string | null {
   } catch {
     return null;
   }
+}
+
+/**
+ * Participants: every non-public request must come from SEB with the event's config (ADR-013 §3).
+ * A half-set SEB config throws in sebVerified: participants are then refused, never let through unchecked.
+ * Exported for the tests (they have no database to resolve a participant session).
+ */
+export function sebGate(request: NextRequest, role: Role | null, requestId: string): NextResponse | null {
+  const { pathname } = request.nextUrl;
+  if (role !== 'PARTICIPANT' || accessFor(pathname) === 'public') return null;
+  let verified: boolean | undefined;
+  try {
+    verified = sebVerified(request);
+  } catch (error) {
+    console.error(`seb: ${(error as Error).message}`);
+    verified = false;
+  }
+  if (verified !== false) return null;
+  if (pathname.startsWith('/api/')) return apiError(403, 'seb_required', SEB_MESSAGE, requestId);
+  return new NextResponse(SEB_PAGE, {
+    status: 403,
+    headers: { 'content-type': 'text/html; charset=utf-8', 'x-request-id': requestId },
+  });
 }
 
 export async function middleware(request: NextRequest) {
@@ -58,6 +86,9 @@ export async function middleware(request: NextRequest) {
       headers: { 'content-type': 'text/html; charset=utf-8', 'x-request-id': requestId },
     });
   }
+
+  const sebRefused = sebGate(request, session?.user.role ?? null, requestId);
+  if (sebRefused) return sebRefused;
 
   const csp = contentSecurityPolicy(newNonce(), process.env.NODE_ENV !== 'production');
   const headers = new Headers(request.headers);
