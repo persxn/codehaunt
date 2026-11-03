@@ -29,6 +29,25 @@
 .mark img { transition: transform var(--t-base) var(--ease); }
 .mark:hover img { transform: rotate(-8deg) scale(1.06); }
 
+.partners {
+  display: flex;
+  align-items: center;
+  gap: var(--s2);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.partners img {
+  display: block;
+  width: 44px;
+  height: 44px;
+  background: #fff;
+  transition: transform var(--t-base) var(--ease);
+}
+.partners img:hover { transform: translateY(-2px); }
+.square { border-radius: 10px; }
+.round { border-radius: 50%; }
+
 .links {
   display: flex;
   gap: var(--s5);
@@ -65,12 +84,23 @@
 .compact { min-height: 44px; padding: 0 var(--s4); font-size: 15px; }
 .shortLabel { display: none; }
 
-@media (max-width: 899px) {
+/* The links give way first, so wordmark, logos and the action always fit on one row. */
+@media (max-width: 1099px) {
   .links { display: none; }
   .actions { margin-left: auto; }
 }
+@media (max-width: 599px) {
+  .inner { gap: var(--s3); }
+  .mark span { display: none; }
+  .partners { gap: 6px; }
+  .partners img { width: 36px; height: 36px; }
+  .square { border-radius: 8px; }
+}
 @media (max-width: 420px) {
-  .mark span { font-size: 22px; }
   .longLabel { display: none; }
   .shortLabel { display: inline; }
+}
+@media (max-width: 359px) {
+  .mark { display: none; }
+  .compact { padding: 0 var(--s3); }
 }

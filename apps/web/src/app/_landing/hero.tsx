@@ -22,8 +22,8 @@ export function Hero({ calendar }: { calendar: string }) {
       <div className={`${ui.container} ${styles.layout}`}>
       <div className={styles.content}>
         <h1 id="hero-title" className={styles.wordmark}>
-          <span className={styles.line1}>Code</span>
-          <span className={styles.line2}>Haunt</span>
+          <span className={styles.line1} data-text="Code">Code</span>
+          <span className={styles.line2} data-text="Haunt">Haunt</span>
         </h1>
         <p className={styles.lede}>
           An AI coding competition and a tech talk. Solve problems by directing an AI junior developer, one prompt at a
@@ -57,6 +57,13 @@ export function Hero({ calendar }: { calendar: string }) {
             <ArrowDownIcon />
           </a>
         </div>
+
+        <p className={styles.powered}>
+          <span>Powered by</span>
+          {EVENT.poweredBy.map((name) => (
+            <strong key={name}>{name}</strong>
+          ))}
+        </p>
       </div>
       <picture className={styles.art}>
         <source media="(max-width: 899px)" srcSet={heroPhone.src} width={heroPhone.width} height={heroPhone.height} />

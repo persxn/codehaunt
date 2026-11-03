@@ -11,6 +11,8 @@ The public theme (ADR-031): the poster's design system shared by the event page 
 | `event.ts` | event facts from the poster (date, time, venue, socials) and `calendarHref()` (.ics data URL for "Add to calendar") |
 | `texture.webp` | the client's grunge texture (generated asset 12), the page ground at 40% |
 | `desk-scene.webp` | sign-in page art (generated asset 13) |
+| `logo-iem.webp`, `logo-uem.webp`, `logo-csi.webp` | organiser logos for the navbar (client-supplied, cropped on white; CSI shown round). Sources: control repo `docs/assets/logos/` |
+| `logo-iem.webp`, `logo-uem.webp`, `logo-csi.webp` | organiser logos for the navbar (client-supplied, cropped on white; CSI shown round). Sources: control repo `docs/assets/logos/` |
 | `hood.webp` | the hooded-skull mark (generated asset 10) next to the wordmark |
 
 ## Affects / depends on

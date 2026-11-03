@@ -3,9 +3,19 @@
 import { useEffect, useState } from 'react';
 
 import hood from '../_public/hood.webp';
+import logoCsi from '../_public/logo-csi.webp';
+import logoIem from '../_public/logo-iem.webp';
+import logoUem from '../_public/logo-uem.webp';
 import { CalendarIcon } from '../_public/icons';
 import ui from '../_public/public.module.css';
 import styles from './nav.module.css';
+
+/** Organisers, in the poster's order. IEM and UEM in soft squares, CSI in a circle (client, 2026-11-04). */
+const PARTNERS = [
+  { src: logoIem.src, alt: 'Institute of Engineering & Management', round: false },
+  { src: logoCsi.src, alt: 'Computer Society of India', round: true },
+  { src: logoUem.src, alt: 'University of Engineering & Management', round: false },
+];
 
 const LINKS = [
   { href: '#how', label: 'How it works' },
@@ -30,6 +40,13 @@ export function Nav({ calendar, signIn }: { calendar: string; signIn: boolean })
           <img src={hood.src} width={36} height={36} alt="" />
           <span>CodeHaunt</span>
         </a>
+        <ul className={styles.partners} aria-label="Organised by">
+          {PARTNERS.map((p) => (
+            <li key={p.alt}>
+              <img className={p.round ? styles.round : styles.square} src={p.src} width={44} height={44} alt={p.alt} title={p.alt} />
+            </li>
+          ))}
+        </ul>
         <ul className={styles.links}>
           {LINKS.map((l) => (
             <li key={l.href}>
