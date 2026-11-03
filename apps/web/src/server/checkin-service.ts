@@ -89,6 +89,13 @@ export function checkInOpen(status: string, config: EventConfig, now: Date): boo
   return status === 'DRAFT' && new Date(config.schedule.checkInAt).getTime() <= now.getTime();
 }
 
+/** Events the desk works on (all staff): any event past draft, or a draft whose check-in has opened (run-12 R12-1). */
+export function deskVisible(event: { status: string; config: unknown }, now = new Date()): boolean {
+  if (event.status !== 'DRAFT') return true;
+  const parsed = EventConfig.safeParse(event.config);
+  return parsed.success && checkInOpen(event.status, parsed.data, now);
+}
+
 export interface CheckInResult {
   participantId: string;
   name: string;
@@ -115,7 +122,12 @@ export async function checkIn(
     if (p.checkInTokenHash !== tokenHash) throw usedCode();
     const config = EventConfig.parse(p.event.config);
     if (!checkInOpen(p.event.status, config, new Date())) {
-      throw conflict('event_not_checking_in', `Check-in is not open for this event yet (it opens ${new Date(config.schedule.checkInAt).toLocaleString('en-IN')}).`);
+      throw conflict(
+        'event_not_checking_in',
+        p.event.status === 'DRAFT'
+          ? `Check-in is not open for this event yet (it opens at ${config.schedule.checkInAt}).`
+          : `Check-in has closed for this event (status: ${p.event.status.toLowerCase()}).`,
+      );
     }
     if (p.status === 'WAITLISTED') throw conflict('waitlisted', 'This person is on the waitlist. Promote them at the desk first.');
     if (p.status !== 'REGISTERED') throw conflict('not_registered', 'This person cannot be checked in (status: ' + p.status.toLowerCase() + ').');

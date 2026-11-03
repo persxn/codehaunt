@@ -43,7 +43,8 @@ export async function importParticipants(prisma: PrismaClient, input: Participan
       }
       if (existing) {
         const live = await tx.participant.findFirst({
-          where: { userId: existing.id, status: 'CHECKED_IN', event: { status: { in: ['CHECK_IN', 'RUNNING', 'PAUSED'] } } },
+          // Any event that hasn't ended counts, including a draft already checking in (run-12 R12-2).
+          where: { userId: existing.id, status: 'CHECKED_IN', event: { status: { notIn: ['ENDED', 'JUDGING', 'PUBLISHED'] } } },
           select: { id: true },
         });
         if (live) {

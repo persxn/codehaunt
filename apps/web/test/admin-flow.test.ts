@@ -245,3 +245,20 @@ test('audit run-10: a re-imported participant is inactive again; anonymise clear
   ]);
   assert.doesNotMatch(left, /SECRET/);
 });
+
+test('run-12: the desk sees a draft event once its check-in opens; import never signs out someone checked in elsewhere', async () => {
+  const { deskVisible } = await import('../src/server/checkin-service.ts');
+  const draft = { status: 'DRAFT', config: eventConfig({ schedule: { checkInAt: new Date(Date.now() - 1000).toISOString(), startsAt: new Date(Date.now() + 3_600_000).toISOString() } }) };
+  assert.equal(deskVisible(draft), true);
+  assert.equal(deskVisible({ ...draft, config: eventConfig({ schedule: { checkInAt: new Date(Date.now() + 1000).toISOString(), startsAt: new Date(Date.now() + 3_600_000).toISOString() } }) }), false);
+
+  const first = await eventWith(5, 1);
+  const p = await db.prisma.participant.findFirstOrThrow({ where: { eventId: first.id }, include: { user: true } });
+  await db.prisma.participant.update({ where: { id: p.id }, data: { status: 'CHECKED_IN' } });
+  await db.prisma.user.update({ where: { id: p.userId }, data: { active: true } });
+  await db.prisma.event.update({ where: { id: first.id }, data: { status: 'DRAFT' } });
+  const second = await eventWith(5, 1);
+  const result = await importParticipants(db.prisma, { eventId: second.id, rows: [{ name: p.user.name, enrolmentNo: p.enrolmentNo }] }, second.a);
+  assert.equal(result.skipped[0]?.reason, 'checked in at another live event');
+  assert.equal((await db.prisma.user.findUniqueOrThrow({ where: { id: p.userId } })).active, true);
+});

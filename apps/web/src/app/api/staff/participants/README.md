@@ -1,5 +1,5 @@
 # participants
-GET `?eventId=`: status, seat, badge and check-in state per participant.
+GET `?eventId=`: status, seat, badge and check-in state per participant; volunteers only for events `deskVisible` allows.
 
 ## Contents
 | Path | What it does |

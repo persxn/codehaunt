@@ -1,5 +1,5 @@
 # events
-GET non-draft events (id, name, status) for the desk pickers.
+GET events the desk works on (past draft, or a draft whose check-in time has passed: `deskVisible`): id, name, status.
 
 ## Contents
 | Path | What it does |
