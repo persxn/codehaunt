@@ -8,6 +8,7 @@ Repository tooling: README enforcement, test wrappers, dev seed and CI entry poi
 | `check-readmes.test.mjs` | tests for the checker (temp trees, no git needed) |
 | `test-judge.mjs` | runs the vendored judge suite on `codehaunt-runner*` images; skips 2 arch-specific tests on arm64 |
 | `seed.ts` | seeds a demo event, admin and participants for dev; idempotent; random password unless `SEED_PASSWORD` is set |
+| `judge-golden.ts` | WP-07 task 7: 10 golden tutor-mode transcripts (3 honest, 3 integrity cases, 4 injection attempts) through the real judge (GPT-OSS in Ollama); checks schema, injection flags and score order; prints time per transcript. Never during the event |
 | `ci.sh` | CI entry point: `npm ci`, README check, typecheck, all tests; starts Postgres for the concurrency tests |
 
 ## Affects / depends on

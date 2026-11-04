@@ -47,7 +47,17 @@ function flagNotes(r: Row, titles: Map<string, string>): string[] {
     if (f.aiCopiedLines) notes.push(`${t(f.problemId)}: ${f.aiCopiedLines} final-code line${f.aiCopiedLines > 1 ? 's' : ''} match the tutor's examples`);
     if (f.codeHeavyQuestions) notes.push(`${t(f.problemId)}: ${f.codeHeavyQuestions} question${f.codeHeavyQuestions > 1 ? 's' : ''} mostly code`);
   }
-  for (const s of r.similarity) notes.push(`${t(s.problemId)}: ${s.kind === 'code' ? 'final code' : 'questions'} ${Math.round(s.score * 100)}% like ${s.other}'s`);
+  // One line per problem and kind, however many look-alikes (a short problem can have many honest twins).
+  const groups = new Map<string, Row['similarity']>();
+  for (const s of r.similarity) groups.set(`${s.problemId}\u0000${s.kind}`, [...(groups.get(`${s.problemId}\u0000${s.kind}`) ?? []), s]);
+  for (const list of groups.values()) {
+    const first = list[0]!;
+    const sorted = [...list].sort((a, b) => b.score - a.score);
+    const names = sorted.slice(0, 3).map((s) => s.other).join(', ');
+    const more = sorted.length > 3 ? ` +${sorted.length - 3}` : '';
+    const what = first.kind === 'code' ? 'final code' : 'questions';
+    notes.push(`${t(first.problemId)}: ${what} like ${sorted.length} other${sorted.length > 1 ? 's' : ''} (best ${Math.round(sorted[0]!.score * 100)}%: ${names}${more})`);
+  }
   return notes;
 }
 
@@ -87,7 +97,7 @@ export function Review({ admin }: { admin: boolean }) {
             )}
           </div>
           <div className={styles.scroll}>
-            <table className={styles.table}>
+            <table className={`${styles.table} ${styles.topAligned}`}>
               <thead>
                 <tr><th>Name</th><th>Status</th><th>Process score</th><th>Flags</th><th></th></tr>
               </thead>

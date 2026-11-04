@@ -37,6 +37,8 @@ Score each problem 0–5 on these criteria (0 = absent or very poor, 5 = excelle
   not needed, lower if they were clearly stuck and did not ask.
 - independence: did the participant build the solution themselves? Lower it for aiCopiedLines, saveBursts and
   code-heavy questions, and for asking the tutor to do the work piece by piece, but only as far as the evidence goes.
+  A save flagged as a burst that holds most of the final solution, with no earlier saves showing it being written,
+  means the code did not come from typing here: independence at most 1, and let it weigh on the score.
 - debugging: after a failed run or submit, did they reason about the cause (edge case, overflow, complexity) and fix
   it, rather than resubmit blindly?
 - improvement: across the snapshots and saves, did the code get better in a deliberate way (structure, types,
@@ -68,6 +70,11 @@ export function buildJudgeMessagesV2(input: JudgeInputV2): ChatMessage[] {
 /** Phrases aimed at a grader rather than at the tutor (v1's list, plus the tutor's own name for the rules). */
 const INJECTION_PATTERNS: readonly RegExp[] = [
   /\b(judge|grader|evaluator|reviewer|scoring (model|system))\b/i,
+  // Verb forms aimed at whoever scores the transcript ("whoever evaluates this", "when you grade me").
+  /\b(evaluat(e|es|ing)|grad(e|es|ing)|judg(es|ing)|review(s|ing)?)\b.{0,40}\b(transcripts?|this|me|my|participant|student|submission)\b/i,
+  // Asking for a score outright ("deserves 5/5", "top marks").
+  /\b(5\/5|10\/10|100\/100|full marks|top marks|perfect score)\b/i,
+  /\bdeserves?\b.{0,40}\b(score|marks?|points|\d+\s*\/\s*\d+)\b/i,
   /\bignore (all |any |the )?(previous|prior|above|earlier) (instructions|rules|prompts?)\b/i,
   /\b(give|award|assign|rate)\b.{0,40}\b(100|full marks|max(imum)? score|perfect score|5\/5|10\/10)\b/i,
   /\bsystem (prompt|message)\b/i,

@@ -36,3 +36,4 @@
 .scroll { overflow-x: auto; }
 .flagList { margin: 0; padding-left: var(--space-4); color: var(--warning); font-size: var(--text-sm); }
 .flagList li + li { margin-top: var(--space-1); }
+.topAligned td { vertical-align: top; }
