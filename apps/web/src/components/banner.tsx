@@ -15,7 +15,7 @@ export function Banner({
 }) {
   return (
     <div role="status" className={`${styles.banner} ${styles[tone]}`} data-art={art ? '' : undefined}>
-      {art && <StateArt kind={art} size={96} />}
+      {art && <span className={styles.art}><StateArt kind={art} size={52} /></span>}
       <div>{children}</div>
     </div>
   );

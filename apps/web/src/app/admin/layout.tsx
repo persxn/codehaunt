@@ -16,6 +16,7 @@ export default async function AdminLayout({ children }: { children: ReactNode })
     <div className={styles.shell}>
       <header className={styles.header}>
         <Wordmark />
+        <span className={styles.consoleLabel}>Admin console</span>
         <span className={styles.who}>{user.name} · {user.role.toLowerCase()}</span>
         <SignOut />
       </header>

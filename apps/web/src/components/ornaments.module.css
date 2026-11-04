@@ -1,0 +1,37 @@
+/* Ornaments (ornaments.tsx, ADR-037). Transform/opacity only; reduced motion removes the flight. */
+
+/* The poster's bracket corners: four L-shaped ticks drawn as backgrounds, no extra DOM. Add to any bordered box. */
+.cornered {
+  --tick: 14px;
+  --tw: 2px;
+  background-image:
+    linear-gradient(var(--corner), var(--corner)), linear-gradient(var(--corner), var(--corner)),
+    linear-gradient(var(--corner), var(--corner)), linear-gradient(var(--corner), var(--corner)),
+    linear-gradient(var(--corner), var(--corner)), linear-gradient(var(--corner), var(--corner)),
+    linear-gradient(var(--corner), var(--corner)), linear-gradient(var(--corner), var(--corner));
+  background-size:
+    var(--tick) var(--tw), var(--tw) var(--tick), var(--tick) var(--tw), var(--tw) var(--tick),
+    var(--tick) var(--tw), var(--tw) var(--tick), var(--tick) var(--tw), var(--tw) var(--tick);
+  background-position:
+    top left, top left, top right, top right,
+    bottom left, bottom left, bottom right, bottom right;
+  background-repeat: no-repeat;
+}
+
+.burst { position: absolute; inset: 0; pointer-events: none; color: var(--text); z-index: 1; }
+.burst svg { position: absolute; left: 50%; top: 50%; opacity: 0; }
+.bat1 { animation: fly1 calc(var(--duration-moment) * 1.3) var(--ease-out) 1 both; }
+.bat2 { animation: fly2 calc(var(--duration-moment) * 1.3) var(--ease-out) 60ms 1 both; }
+.bat3 { animation: fly3 calc(var(--duration-moment) * 1.3) var(--ease-out) 120ms 1 both; }
+/* Travel in px so small bats still fly clear of the arch (about 60 px). */
+@keyframes fly1 { 0% { opacity: 0; transform: translate(-50%, -50%) scale(0.4); } 20% { opacity: 1; } 75% { opacity: 1; } 100% { opacity: 0; transform: translate(-70px, -64px) scale(1.1) rotate(-14deg); } }
+@keyframes fly2 { 0% { opacity: 0; transform: translate(-50%, -50%) scale(0.4); } 20% { opacity: 1; } 75% { opacity: 1; } 100% { opacity: 0; transform: translate(52px, -58px) scale(1) rotate(12deg); } }
+@keyframes fly3 { 0% { opacity: 0; transform: translate(-50%, -50%) scale(0.4); } 20% { opacity: 1; } 75% { opacity: 1; } 100% { opacity: 0; transform: translate(-6px, -84px) scale(1) rotate(4deg); } }
+
+.avatar { flex: none; }
+.avatarBody { fill: var(--text); stroke: var(--accent); stroke-width: 1.6; stroke-linejoin: round; }
+.avatarEye { fill: var(--bg); }
+
+@media (prefers-reduced-motion: reduce) {
+  .burst { display: none; }
+}

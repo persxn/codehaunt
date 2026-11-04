@@ -11,6 +11,8 @@ import type { ContestState, Workspace } from '@codehaunt/contracts';
 import { Button } from '@/components/button';
 import { Send } from '@/components/icons';
 import { Meter } from '@/components/meter';
+import { GhostAvatar } from '@/components/ornaments';
+import ornaments from '@/components/ornaments.module.css';
 
 import { postJSON, streamPrompt } from './api';
 import { noClipboard } from './code-editor';
@@ -74,55 +76,70 @@ export function ChatPanel({ problemId, state, workspace, canWork, reload }: {
   };
 
   return (
-    <section className={styles.pane} aria-label="Ask the tutor">
-      <div className={styles.sessionBar}>
-        <p className={styles.muted}>Ask about concepts and how to improve. The tutor never sees your code and won&apos;t write your solution.</p>
+    <section className={`${styles.pane} ${styles.chatPane} ${ornaments.cornered}`} aria-label="Ask the tutor">
+      <div className={styles.paneHead}>
+        <h2 className={styles.paneTitle}><GhostAvatar size={18} /> Tutor</h2>
+        {session && (
+          <div className={styles.headMeter}>
+            <Meter
+              compact
+              label="Context"
+              used={session.contextTokensUsed}
+              total={session.contextTokensLimit}
+              warnAtPercent={state.contextWarnPercent}
+              warning="Context almost full: start a new chat (your code is not affected)."
+            />
+          </div>
+        )}
         {session && workspace.turns.length > 0 && (
-          <Button variant="secondary" onClick={newChat} disabled={!canWork || busy}>New chat</Button>
+          <Button variant="secondary" className={styles.small} onClick={newChat} disabled={!canWork || busy}>New chat</Button>
         )}
       </div>
-      {session && (
-        <Meter
-          label="Context"
-          used={session.contextTokensUsed}
-          total={session.contextTokensLimit}
-          warnAtPercent={state.contextWarnPercent}
-          warning="Context almost full: start a new chat (your code is not affected)."
-        />
-      )}
-      <ol className={`${styles.turns} ${styles.noCopy}`} {...noClipboard}>
-        {workspace.turns.map((t) => (
-          <li key={t.id}>
-            <div className={styles.mine}>{t.prompt}</div>
-            <div className={styles.theirs}>
-              {t.reply === null ? <em>No reply (not charged).</em> : <ModelText text={t.reply} />}
-            </div>
-          </li>
-        ))}
-        {live !== null && (
-          <li>
-            <div className={styles.mine}>{sent}</div>
-            <div className={styles.theirs} aria-live="polite">{live ? <ModelText text={live} /> : <TutorThinking />}</div>
-          </li>
-        )}
-      </ol>
+      <div className={styles.turnsScroll}>
+        <p className={styles.tutorNote}>Ask about concepts and how to improve. The tutor never sees your code and won&apos;t write your solution.</p>
+        <ol className={`${styles.turns} ${styles.noCopy}`} {...noClipboard}>
+          {workspace.turns.map((t) => (
+            <li key={t.id}>
+              <div className={styles.mine}>{t.prompt}</div>
+              <div className={styles.theirsRow}>
+                <GhostAvatar />
+                <div className={styles.theirs}>
+                  {t.reply === null ? <em>No reply (not charged).</em> : <ModelText text={t.reply} />}
+                </div>
+              </div>
+            </li>
+          ))}
+          {live !== null && (
+            <li>
+              <div className={styles.mine}>{sent}</div>
+              <div className={styles.theirsRow}>
+                <GhostAvatar />
+                <div className={styles.theirs} aria-live="polite">{live ? <ModelText text={live} /> : <TutorThinking />}</div>
+              </div>
+            </li>
+          )}
+        </ol>
+      </div>
       {error && <p role="alert" className={styles.error}>{error}</p>}
       <form className={styles.promptBox} onSubmit={(e) => { e.preventDefault(); void sendPrompt(); }}>
-        <label htmlFor="prompt">Question for the tutor</label>
+        <label htmlFor="prompt" className="visually-hidden">Question for the tutor</label>
         <textarea
           id="prompt"
           value={prompt}
           maxLength={state.maxPromptChars}
-          rows={4}
+          rows={3}
+          placeholder="Ask the tutor a question… (Ctrl+Enter sends)"
           disabled={!canWork}
           onChange={(e) => setPrompt(e.target.value)}
           onKeyDown={(e) => { if (e.key === 'Enter' && e.ctrlKey) { e.preventDefault(); void sendPrompt(); } }}
           {...noClipboard}
         />
-        <p className={styles.muted}>{prompt.length} / {state.maxPromptChars} characters · typing only, paste is off</p>
-        <Button type="submit" busy={busy} disabled={!canWork || !prompt.trim()}>
-          <Send aria-hidden="true" /> Send
-        </Button>
+        <div className={styles.promptFoot}>
+          <p className={styles.muted}>{prompt.length} / {state.maxPromptChars} · typing only, paste is off</p>
+          <Button type="submit" busy={busy} disabled={!canWork || !prompt.trim()}>
+            <Send aria-hidden="true" /> Send
+          </Button>
+        </div>
       </form>
     </section>
   );

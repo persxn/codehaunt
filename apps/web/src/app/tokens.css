@@ -49,20 +49,33 @@
   /* Radius */
   --radius-sm: 4px;
   --radius-md: 6px;     /* the public --r-sm */
+  --radius-lg: 10px;    /* panes, cards */
+  --radius-arch: 999px 999px 10px 10px; /* the poster's arch (ADR-031) */
 
-  /* Shadow */
+  /* Elevation: borders first; one lift for menus and dialogs; panes get a faint violet top light. */
   --shadow-menu: 0 18px 40px -20px rgb(0 0 0 / 0.8);
+  --pane-light: linear-gradient(180deg, rgb(78 30 97 / 0.22), transparent 140px);
+  --corner: rgb(236 91 28 / 0.55); /* the poster's bracket corners */
 
-  /* Motion */
-  --duration-fast: 120ms;
-  --duration-base: 200ms;
+  /* Motion (ADR-037): enter decelerates, exit accelerates, moments may overshoot (never on dense tables). */
+  --duration-fast: 120ms;   /* hover, press */
+  --duration-base: 200ms;   /* toggles, toasts, status changes */
+  --duration-slow: 320ms;   /* entrances of panes, cards, chat turns */
+  --duration-moment: 900ms; /* one verdict moment */
   --ease: cubic-bezier(0.2, 0.7, 0.2, 1);
+  --ease-out: cubic-bezier(0.2, 0.7, 0.2, 1);
+  --ease-in: cubic-bezier(0.4, 0, 1, 1);
+  --ease-spring: cubic-bezier(0.34, 1.4, 0.64, 1);
+  --rise: 8px;              /* entrance travel */
 }
 
-/* Reduced motion */
+/* Reduced motion (ADR-037): no travel, scale or loops; short fades only. */
 @media (prefers-reduced-motion: reduce) {
   :root {
     --duration-fast: 0ms;
     --duration-base: 0ms;
+    --duration-slow: 120ms;
+    --duration-moment: 0ms;
+    --rise: 0px;
   }
 }

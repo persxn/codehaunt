@@ -5,7 +5,7 @@ Contest operations page (WP-05, ADR-028): the clock and its controls, extend, pr
 | Path | What it does |
 |---|---|
 | `page.tsx` | route (ADMIN, ORGANIZER); passes the role to the event picker |
-| `contest-ops.tsx` | status cards (polled every 2 s, local tick), control/extend/results forms, projector link (shown once), participant table with top-up, extra time, sign-out, disqualify, deactivate, reinstate |
+| `contest-ops.tsx` | status hero (big clock, live status pill, start/end/freeze/length; polled every 2 s, local tick), control/extend/results forms, projector link (shown once), participant table with top-up, extra time, sign-out, disqualify, deactivate, reinstate |
 
 ## Affects / depends on
 - Calls `/api/admin/ops/events/[id]` (+ `extend`, `projector`, `results`, `participants`) and `/api/admin/ops/participants/[id]/*`.

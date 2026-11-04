@@ -1,16 +1,17 @@
-import { GhostMark, Wordmark } from '@/components/ghost-mark';
+import card from '@/components/card-page.module.css';
 
-import styles from './system-check.module.css';
+import hood from '../_public/hood.webp';
 import { SystemCheck } from './system-check';
 
 /** Public page shared with participants before the event (ADR-007): browser, connection, screen. Sends no data. */
 export default function SystemCheckPage() {
   return (
-    <main className={styles.page}>
-      <div className={styles.card}>
-        <GhostMark size={64} />
-        <h1 className={styles.title}><Wordmark /></h1>
-        <h2 className={styles.subtitle}>System check</h2>
+    <main className={card.page}>
+      <div className={`${card.card} ${card.wide} ${card.center}`}>
+        <div className={`${card.arch} ${card.archFloat}`}><img src={hood.src} alt="" width={120} height={120} /></div>
+        <p className={card.eyebrow}>CodeHaunt · before the event</p>
+        <h1 className={card.title}>System check</h1>
+        <p className={card.lead}>Checks this browser, your connection to CodeHaunt and your screen size. Nothing is sent or stored.</p>
         <SystemCheck />
       </div>
     </main>

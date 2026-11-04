@@ -1,13 +1,75 @@
-/* Projector board: large type for a room, design tokens only (docs: design-system). */
-.screen { min-height: 100dvh; background: var(--bg); color: var(--text); padding: var(--space-8); box-sizing: border-box; display: grid; gap: var(--space-6); align-content: start; }
-.header { display: flex; align-items: center; gap: var(--space-6); flex-wrap: wrap; }
-.title { font-size: var(--text-display); line-height: var(--leading-display); margin: 0; }
-.clock { margin-left: auto; display: grid; justify-items: end; font-family: var(--font-mono); font-size: var(--text-display); line-height: var(--leading-display); }
-.phase { font-family: var(--font-sans); font-size: var(--text-lg); color: var(--accent); text-transform: uppercase; letter-spacing: 0.08em; }
-.frozen { margin: 0; padding: var(--space-3) var(--space-4); border: 1px solid var(--brand); border-radius: var(--radius-md); color: var(--brand); font-size: var(--text-lg); }
-.note { color: var(--text-muted); font-size: var(--text-lg); }
-.board { width: 100%; border-collapse: collapse; font-size: var(--text-xl); line-height: var(--leading-xl); }
-.board th { text-align: left; color: var(--text-muted); font-size: var(--text-base); font-weight: 600; border-bottom: 1px solid var(--border-strong); padding: var(--space-2) var(--space-4); }
-.board td { padding: var(--space-3) var(--space-4); border-bottom: 1px solid var(--border); }
-.board tbody tr:nth-child(-n + 3) .rank { color: var(--accent); font-weight: 700; }
-.rank { font-family: var(--font-mono); width: 4rem; }
+/*
+ * Projector board (ADR-008/028; WP-07 Part 2): read from the back of a room on a projector. Dark ground with the
+ * poster texture, Creepster event title over the double rule, one row per participant with the rank in an arch
+ * (podium filled), solved as pips + numbers. Ambient: three bats drift by the title (nobody types here, ADR-037).
+ */
+.screen {
+  min-height: 100dvh; box-sizing: border-box; display: grid; gap: var(--space-6); align-content: start;
+  padding: clamp(24px, 3vw, 56px);
+  color: var(--text);
+  background: radial-gradient(1400px 600px at 50% -260px, rgb(78 30 97 / 0.45), transparent 70%), var(--bg);
+  position: relative; isolation: isolate;
+}
+.screen::before {
+  content: ''; position: fixed; inset: 0; z-index: -1; pointer-events: none;
+  background: url('../../_public/texture.webp') center / cover; opacity: 0.25;
+}
+.header {
+  position: relative; display: flex; align-items: center; gap: var(--space-6); flex-wrap: wrap;
+  padding-bottom: var(--space-4); border-bottom: 1px solid var(--border); box-shadow: 0 4px 0 -2px rgb(236 91 28 / 0.45);
+}
+.title { font-size: clamp(2.5rem, 4.2vw, 4.5rem); line-height: 1; margin: 0; letter-spacing: 0.03em; }
+.clock {
+  margin-left: auto; display: grid; justify-items: end; gap: var(--space-1);
+  font-family: var(--font-mono); font-weight: 600; font-size: clamp(2.5rem, 4.2vw, 4.5rem); line-height: 1; font-variant-numeric: tabular-nums;
+}
+.phase {
+  display: inline-flex; align-items: center; gap: var(--space-2);
+  font-family: var(--font-sans); font-size: var(--text-lg); font-weight: 600; color: var(--accent); text-transform: uppercase; letter-spacing: 0.14em;
+}
+.phase::before { content: ''; width: 12px; height: 12px; border-radius: 50%; background: currentColor; animation: live 1.6s var(--ease) infinite; }
+.bats { position: absolute; left: 38%; top: -6px; display: flex; gap: 28px; color: var(--brand); opacity: 0.7; pointer-events: none; }
+.bats svg { animation: drift 7s ease-in-out infinite alternate; }
+.bats svg:nth-child(2) { animation-duration: 9s; animation-delay: -3s; margin-top: 22px; }
+.bats svg:nth-child(3) { animation-duration: 8s; animation-delay: -5s; margin-top: 6px; }
+.frozen {
+  margin: 0; padding: var(--space-3) var(--space-4); border: 2px solid var(--brand); border-radius: var(--radius-lg);
+  color: var(--brand); font-size: var(--text-xl); font-weight: 600;
+}
+.note { color: var(--text-muted); font-size: var(--text-xl); }
+
+.board { width: 100%; border-collapse: separate; border-spacing: 0 10px; font-size: clamp(1.5rem, 2vw, 2.25rem); line-height: 1.2; }
+.board th {
+  text-align: left; color: var(--text-muted); font-size: var(--text-base); font-weight: 600; letter-spacing: 0.14em;
+  text-transform: uppercase; padding: 0 var(--space-6);
+}
+.board tbody tr { animation: rowIn var(--duration-slow) var(--ease-out) both; }
+.board td { padding: var(--space-3) var(--space-6); background: var(--surface); border-block: 1px solid var(--border); }
+.board td:first-child { border-left: 1px solid var(--border); border-radius: var(--radius-lg) 0 0 var(--radius-lg); width: 6rem; }
+.board td:last-child { border-right: 1px solid var(--border); border-radius: 0 var(--radius-lg) var(--radius-lg) 0; }
+.board tr[data-podium] td { border-color: rgb(236 91 28 / 0.55); }
+.board tr[data-podium='1'] td { background: color-mix(in srgb, var(--accent) 12%, var(--surface)); }
+.rank {
+  display: inline-grid; place-items: center; width: 56px; height: 64px; padding-top: 6px; box-sizing: border-box;
+  border: 2px solid var(--border-strong); border-radius: var(--radius-arch);
+  font-family: var(--font-mono); font-weight: 700; font-size: 1.6rem; color: var(--text-muted);
+}
+.board tr[data-podium] .rank { border-color: var(--accent); color: var(--accent); }
+.board tr[data-podium='1'] .rank { background: var(--accent); color: var(--on-accent); }
+.name { font-weight: 600; }
+.solved { font-family: var(--font-mono); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.pips { display: inline-flex; gap: 6px; margin-right: var(--space-4); vertical-align: middle; }
+.pips span { width: 14px; height: 14px; border-radius: 50%; border: 2px solid var(--border-strong); box-sizing: border-box; }
+.pips span[data-on] { background: var(--success); border-color: var(--success); }
+.score { font-family: var(--font-mono); font-weight: 700; color: var(--accent); }
+
+@keyframes rowIn { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: none; } }
+@keyframes live { 0%, 100% { opacity: 1; } 50% { opacity: 0.3; } }
+@keyframes drift { from { transform: translate(0, 0) rotate(-4deg); } to { transform: translate(60px, -10px) rotate(6deg); } }
+@media (prefers-reduced-motion: reduce) {
+  .board tbody tr, .bats svg, .phase::before { animation: none; }
+}
+@media (max-width: 720px) {
+  .board td, .board th { padding-inline: var(--space-3); }
+  .pips, .bats { display: none; }
+}

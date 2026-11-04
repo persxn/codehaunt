@@ -9,7 +9,10 @@ import type { ContestState, ParticipantProblem, ProblemSummary, Workspace } from
 
 import { Banner } from '@/components/banner';
 import { Wordmark } from '@/components/ghost-mark';
-import { Check } from '@/components/icons';
+import { Check, Clock } from '@/components/icons';
+import ornaments from '@/components/ornaments.module.css';
+
+import hood from '../_public/hood.webp';
 import { Meter } from '@/components/meter';
 
 import { getJSON } from './api';
@@ -86,11 +89,15 @@ export function ContestApp() {
       <header className={styles.topBar}>
         <Wordmark />
         <span className={styles.eventName}>{state.event.name}</span>
-        <span className={styles.timer} aria-label="Time left">{phase === 'running' || phase === 'paused' ? clock(msLeft) : '—'}</span>
-        <a href="/account" className={styles.accountLink}>Account</a>
-        <div className={styles.tokenMeter}>
-          <Meter label="Tokens" used={state.tokens.total - state.tokens.remaining} total={Math.max(1, state.tokens.total)} warnAtPercent={90} />
+        <div className={styles.timer} data-low={phase === 'running' && msLeft < 10 * 60_000 ? '' : undefined}>
+          <Clock aria-hidden="true" />
+          <span className={styles.timerValue} aria-label="Time left">{phase === 'running' || phase === 'paused' ? clock(msLeft) : '—'}</span>
+          <span className={styles.timerLabel}>{phase === 'paused' ? 'paused' : 'left'}</span>
         </div>
+        <div className={styles.tokenMeter}>
+          <Meter compact label="Tokens" used={state.tokens.total - state.tokens.remaining} total={Math.max(1, state.tokens.total)} warnAtPercent={90} />
+        </div>
+        <a href="/account" className={styles.accountLink}>Account</a>
       </header>
       {phase === 'not_started' && (
         <Banner tone="info">
@@ -105,14 +112,18 @@ export function ContestApp() {
       {error && <Banner tone="danger" art="connection-lost">{error}</Banner>}
 
       <div className={styles.columns}>
-        <section className={`${styles.pane} ${tab === 'statement' ? styles.tabActive : styles.tabInactive}`} aria-label="Problems">
+        <section className={`${styles.pane} ${ornaments.cornered} ${tab === 'statement' ? styles.tabActive : styles.tabInactive}`} aria-label="Problems">
+          <h2 className={styles.paneTitle}>
+            Problems <span className={styles.paneCount}>{problems.filter((p) => p.solved).length} / {problems.length} solved</span>
+          </h2>
           <nav aria-label="Problem list">
             <ul className={styles.problemList}>
               {problems.map((p) => (
                 <li key={p.id}>
                   <button type="button" aria-current={p.id === selected} className={styles.problemButton} onClick={() => { setSelected(p.id); setTab('statement'); }}>
-                    <span>{p.practice ? 'Warm-up' : `${p.ord + 1}.`} {p.title}</span>
-                    <span className={styles.muted}>{p.difficulty.toLowerCase()}</span>
+                    <span className={styles.problemNo} aria-hidden="true">{p.practice ? 'W' : p.ord + 1}</span>
+                    <span className={styles.problemTitle}>{p.practice ? 'Warm-up: ' : ''}{p.title}</span>
+                    <span className={styles.difficulty} data-level={p.difficulty.toLowerCase()}>{p.difficulty.toLowerCase()}</span>
                     {p.solved && <span className={styles.solved}><Check aria-hidden="true" /> Solved</span>}
                   </button>
                 </li>
@@ -120,16 +131,22 @@ export function ContestApp() {
             </ul>
           </nav>
           {statement && (
-            <article className={styles.statement}>
-              <h2>{statement.title}</h2>
-              <p className={styles.muted}>Time limit {statement.timeLimitMs} ms · memory {statement.memoryLimitMb} MB</p>
+            <article className={styles.statement} key={statement.id}>
+              <h3 className={styles.statementTitle}>{statement.title}</h3>
+              <p className={styles.limits}>
+                <span>Time {statement.timeLimitMs} ms</span><span>Memory {statement.memoryLimitMb} MB</span>
+              </p>
               <div className={styles.statementText}>{statement.statement}</div>
               {statement.visibleTests.map((t, i) => (
-                <div key={i} className={styles.sample}>
-                  <h3 className={styles.subhead}>Sample {i + 1}</h3>
-                  <pre className={styles.inlineCode}>{t.input}</pre>
-                  <pre className={styles.inlineCode}>{t.expectedOutput}</pre>
-                </div>
+                <figure key={i} className={styles.sample}>
+                  <figcaption className={styles.sampleTitle}>Sample {i + 1}</figcaption>
+                  <div className={styles.sampleGrid}>
+                    <span className={styles.ioLabel}>Input</span>
+                    <span className={styles.ioLabel}>Output</span>
+                    <pre className={styles.inlineCode}>{t.input}</pre>
+                    <pre className={styles.inlineCode}>{t.expectedOutput}</pre>
+                  </div>
+                </figure>
               ))}
             </article>
           )}
@@ -148,7 +165,11 @@ export function ContestApp() {
             <CodePanel key={selected} problemId={selected} state={state} workspace={workspace} canWork={canWork} reload={reload} />
           </>
         ) : (
-          <p className={styles.placeholder}>{problems.length ? 'Pick a problem to start.' : 'No problems are open right now.'}</p>
+          <div className={styles.placeholder}>
+            <div className={styles.placeholderArch}><img src={hood.src} alt="" width={180} height={180} /></div>
+            <p className={styles.placeholderTitle}>{problems.length ? 'Pick a problem to start' : 'No problems are open right now'}</p>
+            <p className={styles.muted}>{problems.length ? 'The statement opens on the left, the tutor in the middle and your editor on the right.' : 'They appear here when the organizers open them.'}</p>
+          </div>
         )}
       </div>
     </div>

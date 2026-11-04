@@ -13,10 +13,12 @@
 | `field.module.css` | Input styles; inputs are `box-sizing: border-box` so they never overflow their container |
 | `verdict-badge.tsx` | Verdict badge component |
 | `verdict-badge.module.css` | Badge styles |
-| `meter.tsx` | Token usage meter |
+| `meter.tsx` | Token usage meter; `compact` = one line for top bars and pane headers; the bar fills with `scaleX` (no layout per poll) |
 | `meter.module.css` | Meter styles |
-| `banner.tsx` | Contest banner component |
+| `banner.tsx` | Contest banner: a framed strip with a tone stripe and the state art in a small arch; enters once |
 | `banner.module.css` | Banner styles |
+| `ornaments.tsx` / `ornaments.module.css` | ADR-037 Halloween ornaments: `Bat`, `BatBurst` (the Accepted moment, off under reduced motion), `GhostAvatar` (tutor replies); `.cornered` = the poster's bracket corners on any box (CSS backgrounds, no DOM) |
+| `card-page.module.css` | one centred card on the poster ground (account, system check, 404): textured ground, cornered card with an entrance, arch frame, eyebrow, Creepster title, back link |
 | `state-art/` | state illustrations beside state text (ADR-032; `state-art/README.md`) |
 
 ## Affects / depends on

@@ -7,6 +7,9 @@ import type { ContestState } from '@codehaunt/contracts';
 import { Button } from '@/components/button';
 
 import { postJSON } from './api';
+import { GhostAvatar } from '@/components/ornaments';
+import ornaments from '@/components/ornaments.module.css';
+
 import styles from './contest.module.css';
 
 export function ConsentDialog({ consent, onAccepted }: { consent: NonNullable<ContestState['consent']>; onAccepted: () => void }) {
@@ -46,8 +49,14 @@ export function ConsentDialog({ consent, onAccepted }: { consent: NonNullable<Co
   const ready = agree && (!consent.guardianRequired || guardian);
   return (
     <div className={styles.backdrop}>
-      <div ref={dialog} className={styles.dialog} role="dialog" aria-modal="true" aria-labelledby="consent-title" onKeyDown={trap}>
-        <h2 id="consent-title">Before you start</h2>
+      <div ref={dialog} className={`${styles.dialog} ${ornaments.cornered}`} role="dialog" aria-modal="true" aria-labelledby="consent-title" onKeyDown={trap}>
+        <div className={styles.dialogHead}>
+          <GhostAvatar size={34} />
+          <div>
+            <p className={styles.dialogEyebrow}>One step before the contest</p>
+            <h2 id="consent-title" className={styles.dialogTitle}>Before you start</h2>
+          </div>
+        </div>
         <p className={styles.consentText}>{consent.text}</p>
         <label className={styles.check}>
           <input type="checkbox" checked={agree} onChange={(e) => setAgree(e.target.checked)} required /> I agree

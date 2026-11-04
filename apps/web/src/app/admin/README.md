@@ -6,14 +6,14 @@ Who may open what is decided per path in `packages/auth/src/policy.ts` (voluntee
 ## Contents
 | Path | What it does |
 |---|---|
-| `layout.tsx` | shell: header (wordmark, user, sign out), role-based nav, content (max 1200 px); participants are sent away |
-| `nav.tsx` | `Nav` (links by role, keeps `?event=`), `SignOut` |
+| `layout.tsx` | shell: sticky header (wordmark, "Admin console", user, sign out), role-based nav, content (max 1240 px); participants are sent away |
+| `nav.tsx` | `Nav`: links by role in three groups (run the contest · set up · at the door) with line icons, keeps `?event=`; a scrolling strip below 900 px; `SignOut` |
 | `page.tsx` | overview route (ADMIN, ORGANIZER) |
-| `overview.tsx` | counts by participant status for the selected event, links to the pages |
+| `overview.tsx` | live counts by participant status (polled every 10 s), the door funnel chart (registered → checked in → consented → badge), action tiles to the next pages |
 | `event-picker.tsx` | `useEventId()` (from `?event=`) and `EventPicker` |
-| `ops.tsx` | WP-05 shared: `usePoll` (5 s boards), `clock`, `time`, `ActionForm` (action + optional number + required reason; idempotency key kept until success) |
+| `ops.tsx` | WP-05 shared: `usePoll` (5 s boards), `clock`, `time`, `ActionForm` (action as large choice buttons + optional number + required reason; Apply names the action; idempotency key kept until success) |
 | `api.ts` | typed fetch helpers (`getJSON`, `postJSON`, `putJSON`, `patchJSON`, `deleteJSON`) and `eventOptions()` |
-| `admin.module.css` | shared classes: shell, table, stack, row, card, fieldset, cards, muted, error, success, pre |
+| `admin.module.css` | WP-07 Part 2 look: shell (texture ground, grouped nav, Creepster titles over the double rule, page entrance), shared classes (table, stack, row, cornered card, fieldset, cards with staggered entrance, choices, hero, funnel, tiles, muted, error, success, pre); grid children shrink so wide tables scroll inside themselves |
 | `event/` | Event editor (ADMIN) |
 | `problems/` | problem editor + calibration (ADMIN) |
 | `participants/` | list, CSV import, export/delete |

@@ -1,62 +1,37 @@
-/* apps/web/src/app/admin/checkin/checkin.module.css */
-
-/* Container – single column, centered, with spacing */
+/* Check-in (volunteer phones first, WP-04; WP-07 Part 2 look): one cornered card, big touch targets, a success
+   moment (art pops in an arch, bats) and a shake on failure. Tokens only; reduced motion drops the travel. */
 .container {
-  display: flex;
-  flex-direction: column;
-  width: 100%;
-  max-width: 28rem;
-  margin: 0 auto;
-  gap: var(--space-2);
-  padding: var(--space-2);
+  box-sizing: border-box; display: flex; flex-direction: column; width: 100%; max-width: 28rem; margin: 0 auto;
+  gap: var(--space-2); padding: var(--space-6) var(--space-4);
+  background-color: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-lg);
 }
+.button { min-height: 48px; font-weight: 600; }
+.video { width: 100%; border: 2px solid var(--accent); border-radius: var(--radius-lg); }
+.hidden { display: none; }
+.fallback { display: flex; flex-direction: column; gap: var(--space-2); padding-top: var(--space-3); border-top: 1px solid var(--border); }
 
-/* Button – enforce minimum touch target */
-.button {
-  min-height: 44px;
-}
-
-/* Video – full width, with border and rounded corners */
-.video {
-  width: 100%;
-  border: 1px solid var(--border);
-  border-radius: var(--radius-md);
-}
-
-/* Hidden – used to hide elements (video, canvas) */
-.hidden {
-  display: none;
-}
-
-/* Fallback – manual entry area */
-.fallback {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-2);
-}
-
-/* Result panel – after check-in attempt */
 .result {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: var(--space-2);
+  display: flex; flex-direction: column; align-items: center; gap: var(--space-3); text-align: center;
+  margin-top: var(--space-2); padding: var(--space-4); border: 1px solid var(--danger); border-radius: var(--radius-lg); background: var(--bg);
+  animation: shake 420ms var(--ease-out) both;
 }
+.result[data-ok] { border-color: var(--success); animation: rise var(--duration-slow) var(--ease-out) both; }
+.arch {
+  position: relative; width: 132px; height: 158px; display: grid; place-items: end center; box-sizing: border-box;
+  border: 2px solid var(--success); border-radius: var(--radius-arch); background: var(--violet);
+}
+.arch img { animation: pop var(--duration-moment) var(--ease-spring) both; }
+.okLabel {
+  margin: 0; display: inline-flex; align-items: center; gap: var(--space-2);
+  font-size: var(--text-xs); font-weight: 600; letter-spacing: 0.14em; text-transform: uppercase; color: var(--success);
+}
+.okLabel svg { width: 1rem; height: 1rem; }
+.big { margin: 0; font-size: var(--text-xl); font-weight: 600; }
+.successIcon { color: var(--success); }
+.errorIcon { color: var(--danger); }
+.error { color: var(--danger); }
 
-/* Large text for successful check-in */
-.big {
-  font-size: var(--text-xl);
-}
-
-/* Icons */
-.successIcon {
-  color: var(--success);
-}
-.errorIcon {
-  color: var(--danger);
-}
-
-/* Error text */
-.error {
-  color: var(--danger);
-}
+@keyframes rise { from { opacity: 0; transform: translateY(var(--rise)); } to { opacity: 1; transform: none; } }
+@keyframes pop { 0% { transform: scale(0.6); opacity: 0; } 60% { transform: scale(1.08); opacity: 1; } 100% { transform: scale(1); } }
+@keyframes shake { 0%, 100% { transform: none; } 20% { transform: translateX(-6px); } 40% { transform: translateX(5px); } 60% { transform: translateX(-3px); } 80% { transform: translateX(2px); } }
+@media (prefers-reduced-motion: reduce) { .result, .result[data-ok], .arch img { animation: none; } }

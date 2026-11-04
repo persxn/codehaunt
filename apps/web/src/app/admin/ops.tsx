@@ -96,11 +96,18 @@ export function ActionForm({ id, choices, run, compact = false }: {
   return (
     <form className={styles.row} onSubmit={submit} aria-label={compact ? 'Actions' : undefined}>
       {choices.length > 1 && (
-        <Field label="Action" id={`${id}-action`}>
-          <select id={`${id}-action`} className={inputClass} value={action} onChange={(e) => setAction(e.target.value)}>
-            {choices.map((c) => <option key={c.value} value={c.value}>{c.label}</option>)}
-          </select>
-        </Field>
+        // The choices as large buttons (WP-07 Part 2): one is picked, then the reason, then Apply. Same state as before.
+        <div role="radiogroup" aria-label="Action" className={`${styles.choices} ${compact ? styles.choicesCompact : ''}`}>
+          {choices.map((c) => (
+            <button
+              key={c.value} type="button" role="radio" aria-checked={c.value === action}
+              className={styles.choice} data-danger={c.danger || undefined}
+              onClick={() => setAction(c.value)}
+            >
+              {c.label}
+            </button>
+          ))}
+        </div>
       )}
       {choice.number && (
         <Field label={choice.number.label} id={`${id}-value`}>
@@ -114,7 +121,7 @@ export function ActionForm({ id, choices, run, compact = false }: {
       <Field label="Reason (audit log)" id={`${id}-reason`}>
         <input id={`${id}-reason`} className={inputClass} required maxLength={500} value={reason} onChange={(e) => setReason(e.target.value)} />
       </Field>
-      <Button type="submit" variant={choice.danger ? 'danger' : 'primary'} busy={busy}>{choices.length > 1 ? 'Apply' : choice.label}</Button>
+      <Button type="submit" variant={choice.danger ? 'danger' : 'primary'} busy={busy}>{choices.length > 1 ? `Apply: ${choice.label.replace(/ \(.*\)$/, '')}` : choice.label}</Button>
       {message && <p role={message.ok ? 'status' : 'alert'} className={message.ok ? styles.success : styles.error}>{message.text}</p>}
     </form>
   );

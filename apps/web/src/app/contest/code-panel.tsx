@@ -10,6 +10,7 @@ import type { ContestState, Language, RunView, Workspace } from '@codehaunt/cont
 
 import { Button } from '@/components/button';
 import { History, Play, Send } from '@/components/icons';
+import ornaments from '@/components/ornaments.module.css';
 
 import { getJSON, postJSON } from './api';
 import { CodeEditor } from './code-editor';
@@ -129,16 +130,17 @@ export function CodePanel({ problemId, state, workspace, canWork, reload }: {
   const dirty = source !== savedRef.current.source || language !== savedRef.current.language;
 
   return (
-    <section className={styles.pane} aria-label="Your code and runs">
-      <div className={styles.sessionBar}>
+    <section className={`${styles.pane} ${styles.codePane} ${ornaments.cornered}`} aria-label="Your code and runs">
+      <div className={styles.paneHead}>
+        <h2 className={styles.paneTitle}>Your code</h2>
         <label className={styles.inline}>
-          Language
+          <span className="visually-hidden">Language</span>
           <select value={language} onChange={(e) => setLanguage(e.target.value as Language)} disabled={!canWork || !!older}>
             {state.languages.map((l) => <option key={l} value={l}>{LABELS[l]}</option>)}
           </select>
         </label>
-        <p className={styles.muted} aria-live="polite">
-          {saved.error ? `Not saved: ${saved.error}` : dirty ? 'Unsaved changes' : saved.at ? `Saved ${saved.at.toLocaleTimeString()}` : ''}
+        <p className={styles.savePill} aria-live="polite" data-state={saved.error ? 'error' : dirty ? 'dirty' : saved.at ? 'saved' : 'idle'}>
+          {saved.error ? `Not saved: ${saved.error}` : dirty ? 'Unsaved changes' : saved.at ? `Saved ${saved.at.toLocaleTimeString()}` : 'Autosaves every 20 s'}
         </p>
       </div>
       {older ? (
@@ -180,7 +182,7 @@ export function CodePanel({ problemId, state, workspace, canWork, reload }: {
           </ol>
         </details>
       )}
-      <h3 className={styles.subhead}>Runs</h3>
+      <h3 className={styles.runsTitle}>Runs</h3>
       <RunsPanel runs={runs} />
     </section>
   );

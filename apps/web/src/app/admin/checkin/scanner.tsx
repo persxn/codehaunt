@@ -5,7 +5,10 @@ import { Button } from '@/components/button';
 import { Check, Alert } from '@/components/icons';
 import { postJSON } from '../api';
 import jsQR from 'jsqr';
+import { BatBurst } from '@/components/ornaments';
 import { StateArt } from '@/components/state-art/state-art';
+import ornaments from '@/components/ornaments.module.css';
+
 import styles from './checkin.module.css';
 
 interface CheckInResult {
@@ -124,7 +127,7 @@ export default function Scanner() {
   };
 
   return (
-    <div className={styles.container}>
+    <div className={`${styles.container} ${ornaments.cornered}`}>
       <Field label="Seat label" id="seatLabel">
         <input id="seatLabel" className={inputClass} value={seatLabel} onChange={(e) => setSeatLabel(e.target.value)} required />
       </Field>
@@ -146,11 +149,15 @@ export default function Scanner() {
         </Button>
       </div>
       {result && (
-        <div className={styles.result}>
+        <div className={styles.result} data-ok={result.success || undefined} key={result.success ? result.data.enrolmentNo : result.error}>
           {result.success ? (
             <>
-              <StateArt kind="checked-in" size={140} />
-              <Check className={styles.successIcon} />
+              {/* The volunteer's moment (ADR-037): the art pops in its arch, bats fly out; still under reduced motion. */}
+              <span className={styles.arch}>
+                <StateArt kind="checked-in" size={120} />
+                <BatBurst />
+              </span>
+              <p className={styles.okLabel}><Check className={styles.successIcon} /> Checked in</p>
               <p className={styles.big}>
                 {result.data.name} ({result.data.enrolmentNo}), seat {result.data.seatLabel}
               </p>

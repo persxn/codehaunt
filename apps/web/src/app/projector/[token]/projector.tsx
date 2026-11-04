@@ -5,6 +5,7 @@ import { useEffect, useState } from 'react';
 import type { ProjectorView } from '@codehaunt/contracts';
 import { Wordmark } from '@/components/ghost-mark';
 
+import { Bat } from '@/components/ornaments';
 import styles from './projector.module.css';
 
 function clock(ms: number): string {
@@ -48,6 +49,7 @@ export function Projector({ token }: { token: string }) {
     <main className={styles.screen}>
       <header className={styles.header}>
         <Wordmark />
+        <span className={styles.bats} aria-hidden="true"><Bat size={64} /><Bat size={44} /><Bat size={52} /></span>
         <h1 className={styles.title}>{view.title}</h1>
         <div className={styles.clock}>
           <span className={styles.phase}>{view.final ? 'Final results' : PHASE[view.phase]}</span>
@@ -60,11 +62,16 @@ export function Projector({ token }: { token: string }) {
         <thead><tr><th>#</th><th>Name</th><th>Solved</th>{view.final && <th>Score</th>}</tr></thead>
         <tbody>
           {view.rows.map((r, i) => (
-            <tr key={`${r.rank}-${i}`}>
-              <td className={styles.rank}>{r.rank}</td>
-              <td>{r.name}</td>
-              <td>{r.solved} / {view.problems}</td>
-              {view.final && <td>{r.total?.toFixed(2)}</td>}
+            <tr key={`${r.rank}-${i}`} data-podium={r.rank <= 3 ? r.rank : undefined} style={{ animationDelay: `${Math.min(i, 12) * 40}ms` }}>
+              <td><span className={styles.rank}>{r.rank}</span></td>
+              <td className={styles.name}>{r.name}</td>
+              <td className={styles.solved}>
+                <span className={styles.pips} aria-hidden="true">
+                  {Array.from({ length: Math.min(view.problems, 12) }, (_, k) => <span key={k} data-on={k < r.solved || undefined} />)}
+                </span>
+                {r.solved} / {view.problems}
+              </td>
+              {view.final && <td className={styles.score}>{r.total?.toFixed(2)}</td>}
             </tr>
           ))}
         </tbody>

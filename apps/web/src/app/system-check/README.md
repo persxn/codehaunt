@@ -5,9 +5,9 @@ detection, connection latency to this server, screen size, device clock.
 ## Contents
 | Path | What it does |
 |---|---|
-| `page.tsx` | card layout with the ghost mark and the check |
+| `page.tsx` | the shared card (`components/card-page.module.css`): the hooded coder in an arch, title, the check |
 | `system-check.tsx` | runs the checks in the browser: 10 sequential `/healthz` requests (median/worst), user-agent SEB check, screen size |
-| `system-check.module.css` | styles (tokens only) |
+| `system-check.module.css` | button and results list (rows rise in turn; colour stripe per result), tokens only |
 
 ## Affects / depends on
 - Public in `packages/auth/src/policy.ts` (`/system-check`); calls only `/healthz`.

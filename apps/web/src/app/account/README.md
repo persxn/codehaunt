@@ -4,9 +4,9 @@
 ## Contents
 | Path | What it does |
 |---|---|
-| `page.tsx` | server page: name, username, the form; sends anonymous visitors to `/login` |
+| `page.tsx` | server page in the shared card (`components/card-page.module.css`): name, username, the form; sends anonymous visitors to `/login` |
 | `password-form.tsx` | current + new + repeat; POST `/api/account/password`; shows the server's plain-language refusal |
-| `account.module.css` | styles (tokens only) |
+| `account.module.css` | form styles (tokens only); the page layout comes from the shared card |
 
 ## Affects / depends on
 - Calls `POST /api/account/password` (`checkPasswordStrength`, ends the user's other sessions).

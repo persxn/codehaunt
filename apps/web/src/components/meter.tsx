@@ -8,6 +8,7 @@ export function Meter({
   warnAtPercent,
   unit = 'tokens',
   warning,
+  compact = false,
 }: {
   label: string;
   used: number;
@@ -15,6 +16,8 @@ export function Meter({
   warnAtPercent?: number;
   unit?: string;
   warning?: string;
+  /** One line (label, numbers, thin bar) for top bars and pane headers. */
+  compact?: boolean;
 }) {
   const percent = Math.min(100, (used / total) * 100);
   let token = '--info';
@@ -22,7 +25,7 @@ export function Meter({
   else if (warnAtPercent && percent >= warnAtPercent) token = '--warning';
 
   return (
-    <div className={styles.wrapper}>
+    <div className={`${styles.wrapper} ${compact ? styles.compact : ''}`} data-tone={token.slice(2)}>
       <div className={styles.label}>{label}</div>
       <div className={styles.numbers}>
         {used.toLocaleString('en-IN')} / {total.toLocaleString('en-IN')} {unit}
@@ -37,7 +40,7 @@ export function Meter({
       >
         <div
           className={styles.bar}
-          style={{ width: `${percent}%`, backgroundColor: `var(${token})` }}
+          style={{ transform: `scaleX(${percent / 100})`, backgroundColor: `var(${token})` }}
         ></div>
       </div>
       {warning && token === '--warning' && (

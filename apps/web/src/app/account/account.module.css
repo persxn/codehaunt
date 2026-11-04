@@ -1,8 +1,5 @@
-/* Account page: the login card layout (tokens only). */
-.page { min-height: 100vh; display: grid; place-items: center; padding: var(--space-4); }
-.card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-md); padding: var(--space-8); width: 100%; max-width: 26rem; display: grid; gap: var(--space-4); box-sizing: border-box; }
-.title { margin: 0; font-size: var(--text-xl); }
-.muted { margin: 0; color: var(--text-muted); }
+/* Account page: the password form inside the shared card (components/card-page.module.css). Tokens only. */
 .form { display: grid; gap: var(--space-4); }
 .full { width: 100%; }
 .success { color: var(--success); margin: 0; }
+.muted { margin: 0; color: var(--text-muted); }

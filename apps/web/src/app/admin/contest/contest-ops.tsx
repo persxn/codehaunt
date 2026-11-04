@@ -87,12 +87,17 @@ export function ContestOps({ admin }: { admin: boolean }) {
       {status.error && <p className={styles.error} role="alert">{status.error}</p>}
       {s && (
         <>
-          <div className={styles.cards}>
-            <div className={styles.card}><div className={styles.muted}>Status</div><div className={styles.big}>{s.status.toLowerCase().replace('_', '-')}</div></div>
-            <div className={styles.card}><div className={styles.muted}>Time left</div><div className={styles.big} aria-live="off">{s.phase === 'not_started' ? '—' : clock(msLeft)}</div></div>
-            <div className={styles.card}><div className={styles.muted}>Started · ends</div><div>{s.status === 'DRAFT' || s.status === 'CHECK_IN' ? 'not started' : `${time(s.startedAt)} · ${time(s.endsAt)}`}</div></div>
-            <div className={styles.card}><div className={styles.muted}>Projector freeze</div><div>{s.frozen ? 'frozen' : `from ${time(s.freezesAt)}`}</div></div>
-            <div className={styles.card}><div className={styles.muted}>Length</div><div>{s.durationMinutes} min</div></div>
+          <div className={styles.hero}>
+            <div>
+              <div className={styles.heroLabel}>Time left</div>
+              <div className={styles.heroClock} aria-live="off">{s.phase === 'not_started' ? '—' : clock(msLeft)}</div>
+            </div>
+            <span className={styles.phase} data-status={s.status}>{s.status.toLowerCase().replace('_', '-')}</span>
+            <dl className={styles.heroFacts}>
+              <dt>Started · ends</dt><dd>{s.status === 'DRAFT' || s.status === 'CHECK_IN' ? 'not started' : `${time(s.startedAt)} · ${time(s.endsAt)}`}</dd>
+              <dt>Projector freeze</dt><dd>{s.frozen ? 'frozen' : `from ${time(s.freezesAt)}`}</dd>
+              <dt>Length</dt><dd>{s.durationMinutes} min</dd>
+            </dl>
           </div>
 
           {CONTROLS[s.status] && (

@@ -5,8 +5,8 @@ The projector page for one token.
 | Path | What it does |
 |---|---|
 | `page.tsx` | server route; `referrer: no-referrer` so the token never leaks in a Referer |
-| `projector.tsx` | client board: polls every 5 s, local clock tick, frozen banner, totals once final |
-| `projector.module.css` | large type for a room, design tokens only |
+| `projector.tsx` | client board: polls every 5 s, local clock tick, frozen banner, totals once final; rank in an arch (top 3 podium), solved as dots + numbers, three drifting bats by the title |
+| `projector.module.css` | large type for a room (scales with the screen), texture ground, row cards with a staggered entrance, live dot; reduced motion stops the drift and pulses; design tokens only |
 
 ## Affects / depends on
 - Depends on `ProjectorView` (`@codehaunt/contracts`) and `Wordmark` (`src/components`).

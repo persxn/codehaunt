@@ -7,8 +7,8 @@
 | File | Description |
 |------|-------------|
 | `page.tsx` | Server page that renders the `Scanner` component inside a `<Suspense>` wrapper. |
-| `scanner.tsx` | Client component handling camera QR scanning, manual code entry, and displaying results. |
-| `checkin.module.css` | Local CSS styles for the scanner page. |
+| `scanner.tsx` | Client component handling camera QR scanning, manual code entry, and displaying results: success = the art pops in a green arch with bats (ADR-037), failure = the card shakes. |
+| `checkin.module.css` | One cornered card, 48 px touch targets, the success/failure moments (off under reduced motion). |
 
 ## Affects / Depends On
 

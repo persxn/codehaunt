@@ -1,14 +1,21 @@
-/* System check page: the login card layout plus a results list (tokens only). */
-.page { min-height: 100vh; display: grid; place-items: center; padding: var(--space-4); }
-.card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-md); padding: var(--space-8); width: 100%; max-width: 30rem; display: grid; justify-items: center; gap: var(--space-4); box-sizing: border-box; }
-.title { margin: 0; font-size: var(--text-xl); }
-.subtitle { margin: 0; font-size: var(--text-lg); }
-.check { width: 100%; display: grid; gap: var(--space-4); }
+/* System check: the run button and the results list inside the shared card (components/card-page.module.css). */
+.check { width: 100%; display: grid; gap: var(--space-4); text-align: left; }
 .full { width: 100%; }
-.results { list-style: none; margin: 0; padding: 0; display: grid; gap: var(--space-3); }
-.results li { display: flex; gap: var(--space-3); align-items: flex-start; border: 1px solid var(--border); border-radius: var(--radius-sm); padding: var(--space-2) var(--space-3); }
+.results { list-style: none; margin: 0; padding: 0; display: grid; gap: var(--space-2); }
+.results li {
+  display: flex; gap: var(--space-3); align-items: flex-start; padding: var(--space-2) var(--space-3);
+  background: var(--bg); border: 1px solid var(--border); border-left-width: 3px; border-radius: var(--radius-sm);
+  animation: rise var(--duration-slow) var(--ease-out) both;
+}
+.results li:nth-child(2) { animation-delay: 60ms; }
+.results li:nth-child(3) { animation-delay: 120ms; }
+.results li:nth-child(4) { animation-delay: 180ms; }
 .icon { width: 1.25rem; height: 1.25rem; flex: none; margin-top: 0.125rem; }
 .detail { margin: var(--space-1) 0 0; color: var(--text-muted); font-size: var(--text-sm); }
+.pass { border-left-color: var(--success) !important; }
+.warn { border-left-color: var(--warning) !important; }
+.fail { border-left-color: var(--danger) !important; }
 .pass .icon, .pass strong { color: var(--success); }
 .warn .icon, .warn strong { color: var(--warning); }
 .fail .icon, .fail strong { color: var(--danger); }
+@keyframes rise { from { opacity: 0; transform: translateY(var(--rise)); } to { opacity: 1; transform: none; } }
