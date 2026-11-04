@@ -21,4 +21,6 @@ deny-by-default route policy. Ported from JojoCode @ a8f4056 (see `/VENDORED.md`
 ## Gotchas
 - A route missing from `ROUTE_POLICY` is denied (401 without a session, 403 with one). Add a row when you add a route.
 - One active session per participant: a new login ends the old one and writes `auth.session_replaced` to `audit_log`.
+- A participant's correct password from outside SEB is refused (`seb_required`) and writes `auth.seb_refused` (no IP,
+  ADR-010), listed on the admin Incidents page (audit R16-6).
 - Throttling state is in process memory; it resets on restart and is per web instance. It delays, never refuses (ADR-020).

@@ -69,7 +69,14 @@ export async function login(
 
   if (!user.active) return { ok: false, reason: 'account_inactive' };
   // Outside SEB a participant's login would end their SEB session (one session each), so it is refused here.
-  if (user.role === 'PARTICIPANT' && context.sebVerified === false) return { ok: false, reason: 'seb_required' };
+  if (user.role === 'PARTICIPANT' && context.sebVerified === false) {
+    // A correct password from outside SEB: shared or guessed credentials, so the console lists it (audit R16-6). No IP
+    // in the append-only log (ADR-010).
+    await prisma.auditLog.create({
+      data: { actorId: user.id, action: 'auth.seb_refused', targetType: 'user', targetId: user.id, requestId: context.requestId ?? null },
+    });
+    return { ok: false, reason: 'seb_required' };
+  }
 
   clearLoginRate(username, context.ipAddress);
 

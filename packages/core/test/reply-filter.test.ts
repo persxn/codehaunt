@@ -68,3 +68,63 @@ test('code detection', () => {
   for (const prose of ['An int holds up to 2.1 billion.', 'For example, think about overflow.', 'Why does it fail?', ''])
     assert.ok(!looksLikeCode(prose), prose);
 });
+
+// Audit R16-1: a 9-line solution written without a fence, or one line per backtick / number / bullet / quote.
+const SOL = [
+  'import sys',
+  'n, q = map(int, input().split())',
+  'a = list(map(int, input().split()))',
+  'p = [0] * (n + 1)',
+  'for i in range(n):',
+  '    p[i + 1] = p[i] + a[i]',
+  'for _ in range(q):',
+  '    l, r = map(int, input().split())',
+  '    print(p[r] - p[l - 1])',
+];
+const CPP = [
+  '#include <bits/stdc++.h>',
+  'using namespace std;',
+  'int main() {',
+  '  int n, q; cin >> n >> q;',
+  '  vector<long long> p(n + 1);',
+  '  for (int i = 0; i < n; i++) { long long x; cin >> x; p[i + 1] = p[i] + x; }',
+  '  while (q--) { int l, r; cin >> l >> r; cout << p[r] - p[l - 1] << "\\n"; }',
+  '  return 0;',
+  '}',
+];
+
+test('R16-1: wrapped or prefixed solution lines are removed', () => {
+  const cases: Record<string, string> = {
+    plain: SOL.join('\n'),
+    backticks: SOL.map((l) => '`' + l + '`').join('\n'),
+    doubleBackticks: SOL.map((l) => '``' + l + '``').join('\n'),
+    numbered: SOL.map((l, i) => `${i + 1}. ${l}`).join('\n'),
+    numberedColon: SOL.map((l, i) => `${i + 1}: ${l}`).join('\n'),
+    lineNumbers: SOL.map((l, i) => `${String(i + 1).padStart(2)} ${l}`).join('\n'),
+    bullets: SOL.map((l) => `- ${l}`).join('\n'),
+    stars: SOL.map((l) => `* ${l}`).join('\n'),
+    quotedFence: `> ${F}python\n` + SOL.map((l) => '> ' + l).join('\n') + `\n> ${F}`,
+    listFence: `1. ${F}python\n` + SOL.join('\n') + `\n${F}`,
+    cppBackticks: CPP.map((l) => '`' + l + '`').join('\n'),
+    cppNumbered: CPP.map((l, i) => `${i + 1}: ${l}`).join('\n'),
+  };
+  for (const [name, reply] of Object.entries(cases)) {
+    for (const out of [filterReply(reply, 6), streamed(reply, 6, 5)]) {
+      assert.ok(out.includes(REMOVED_EXAMPLE), name);
+      const visible = [...SOL, ...CPP].filter((l) => l.trim().length > 3 && out.includes(l.trim()));
+      assert.deepEqual(visible, [], name);
+    }
+  }
+});
+
+test('R16-1: unwrapped classification', () => {
+  for (const code of ['n, q = map(int, input().split())', 'l, r = map(int, input().split())', '`a.sort()`', '3. solve(n)', '> x = y', '- print(p[r])', '12 total += a[i]', 'p[r] - p[l - 1]'])
+    assert.ok(looksLikeCode(code), code);
+  for (const prose of ['1. Build the prefix array first.', '- Think about what p[0] should be.', '> Why does it overflow?', 'Use `sorted()` when you need a copy.', 'Time is O(n) for building and O(1) per query, which is fast enough here.'])
+    assert.ok(!looksLikeCode(prose), prose);
+});
+
+test('R16-4: the per-reply character cap is 300', () => {
+  const wide = Array.from({ length: 5 }, (_, i) => `x${i} = ${'a'.repeat(60)};`); // 5 lines, ~335 chars
+  assert.equal(filterReply(`${F}\n${wide.join('\n')}\n${F}`, 6), `${REMOVED_EXAMPLE}\n`);
+});

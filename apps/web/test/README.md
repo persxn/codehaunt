@@ -9,7 +9,7 @@ Tests for the web app: access control (policy, middleware, CSP) without a server
 | `middleware.test.ts` | the real `middleware()` on real `NextRequest`s: 401s, public pass-through, path tricks, cross-site POST 403, nonce CSP per request, SEB gate (exact URL, staff/public exempt, half config fails closed) |
 | `config.test.ts` | startup config: an empty `COOKIE_SECURE` is accepted and cookies stay Secure in production; SEB settings both or neither |
 | `support/` | Node resolve hook for `next/server`, and test fixtures (`support/README.md`) |
-| `participant-flow.test.ts` | prompt → code with exact settlement; failures uncharged and discarded; budget exhausted; practice; consent; sessions/revert; runs; hidden-test payload scan and SQL-level check |
+| `participant-flow.test.ts` | prompt → code with exact settlement; failures uncharged and discarded; budget exhausted; practice; consent; sessions/revert; save/revert limits (R16-2); runs; hidden-test payload scan and SQL-level check |
 | `admin-flow.test.ts` | import + waitlist, badges, single-use check-in, cap, live budget change, event lock, problems, staff rules, role change, anonymise |
 | `budget-concurrency.test.ts` | real Postgres (`TEST_POSTGRES_URL`): live budget changes during reserve/settle loops: no deadlock, exact final balances |
 | `gateway-client.test.ts` | `GatewayClient` with a fake fetch: split SSE chunks, usage required, b only on connection failure or Traefik text 502/503/504, no retry after a timeout or a JSON error |

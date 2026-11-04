@@ -10,20 +10,52 @@
  */
 
 export const REMOVED_EXAMPLE = '[example removed: too long]';
-export const CHARS_PER_LINE = 80;
+// 6 lines × 50 = 300 characters per reply (audit R16-4: 480 let a compact 3-line solution through more easily).
+export const CHARS_PER_LINE = 50;
 
 const FENCE = /^\s*(```|~~~)/;
 const ENDS_LIKE_CODE = /[;{}]\s*$/;
 const STARTS_LIKE_CODE =
   /^\s*(#include\b|#define\b|import\s|from\s+\S+\s+import\b|def\s|class\s|public\s|private\s|protected\s|static\s|const\s|let\s|var\s|int\s|long\s|short\s|unsigned\s|void\s|char\s|bool\s|boolean\s|double\s|float\s|string\s|String\s|auto\s|vector<|std::|using\s|template\s*<|for\s*\(|while\s*\(|if\s*\(|else\b|elif\b|return\b|print\(|printf\(|scanf\(|cout\b|cin\b|System\.|Scanner\b)/;
 const PY_BLOCK = /^\s*(if|for|while|def|elif|else|try|except|with|class)\b.*:\s*$/;
-const ASSIGNMENT = /^\s*[A-Za-z_]\w*(\[[^\]]*\])*\s*(=|\+=|-=|\*=|\/=|%=|<<=|>>=)\s*\S/;
+// One target, or several (`a, b =`, `self.x, y[i] =`), then an assignment operator (audit R16-1).
+const TARGET = String.raw`[A-Za-z_][\w.]*(\[[^\]]*\])*`;
+const ASSIGNMENT = new RegExp(String.raw`^\s*${TARGET}(\s*,\s*${TARGET})*\s*(=|\+=|-=|\*=|\/=|%=|<<=|>>=|:=)\s*\S`);
+// A bare call or method call: `solve()`, `a.sort(key=f)`, `sys.stdout.write(x)`.
+const CALL = /^\s*[A-Za-z_][\w.]*\s*\(.*\)\s*;?\s*$/;
+const BRACKETS = /[()[\]{}]/g;
+const WORDS = /\b[A-Za-z]{3,}\b/g;
 
-/** A line that reads as code rather than prose. Blank lines are neither. */
-export function looksLikeCode(line: string): boolean {
+/**
+ * The line with its Markdown wrapping taken off, for classifying (audit R16-1): leading `>` quotes, list markers
+ * (`-`, `*`, `+`, `1.`, `1)`, `1:`), bare line numbers (`12 `, `12|`) and every backtick. A model asked to dodge the
+ * fence writes code one line per backtick, or numbered; this sees the code underneath.
+ */
+export function unwrapLine(line: string): string {
+  let s = line.replace(/`/g, '');
+  for (;;) {
+    const next = s.replace(/^\s*(>\s?|[-*+]\s+|\d{1,4}\s*[.):|]\s*|\d{1,4}\s+(?=\S))/, '');
+    if (next === s) return s;
+    s = next;
+  }
+}
+
+/** A fence line, also when quoted or in a list (`> ```py`, `1. ````). */
+export function isFence(line: string): boolean {
+  return FENCE.test(line) || FENCE.test(line.replace(/^\s*((>\s?)+|[-*+]\s+|\d{1,4}[.):]\s+)+/, ''));
+}
+
+/** A line that reads as code rather than prose, after unwrapping. Blank lines are neither. */
+export function looksLikeCode(raw: string): boolean {
+  const line = unwrapLine(raw);
   if (!line.trim()) return false;
   if (ENDS_LIKE_CODE.test(line) || STARTS_LIKE_CODE.test(line) || PY_BLOCK.test(line) || ASSIGNMENT.test(line)) return true;
-  return (line.match(/;/g)?.length ?? 0) >= 2;
+  if (CALL.test(line)) return true;
+  if ((line.match(/;/g)?.length ?? 0) >= 2) return true;
+  // Bracket-heavy and word-poor: an expression or statement, not a sentence.
+  const brackets = line.match(BRACKETS)?.length ?? 0;
+  const words = line.match(WORDS)?.length ?? 0;
+  return brackets >= 4 && words < 6;
 }
 
 interface Held {
@@ -72,7 +104,7 @@ export function createReplyFilter(maxLines: number): ReplyFilter {
   const line = (text: string): string => {
     const bare = text.replace(/\r?\n$/, '');
     if (fence) {
-      if (FENCE.test(bare)) {
+      if (isFence(bare)) {
         const f = fence;
         fence = null;
         if (f.dropped) return '';
@@ -82,7 +114,7 @@ export function createReplyFilter(maxLines: number): ReplyFilter {
       if (addToFence(fence, bare, text)) return `${REMOVED_EXAMPLE}\n`;
       return '';
     }
-    if (FENCE.test(bare)) {
+    if (isFence(bare)) {
       const before = closeRun();
       fence = { held: [text], lines: 0, chars: 0, dropped: false };
       return before;

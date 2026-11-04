@@ -20,6 +20,7 @@ interface Incident {
 interface Dashboard {
   incidents: Incident[];
   sessionsReplaced: Array<{ id: string; createdAt: string; participant: Who; ipChanged: boolean }>;
+  sebRefusals: Array<{ id: string; createdAt: string; participant: Who }>;
   loginSlowdowns: Array<{ username: string; failures: number; delayMs: number; participant: Who }>;
   deadLetters: Array<{ id: string; kind: string; createdAt: string; problem: string; participant: Who }>;
 }
@@ -84,6 +85,15 @@ export function Incidents({ admin }: { admin: boolean }) {
             <table className={styles.table}>
               <thead><tr><th>When</th><th>Participant</th><th>Network changed</th></tr></thead>
               <tbody>{data.sessionsReplaced.map((r) => <tr key={r.id}><td>{time(r.createdAt)}</td><td>{who(r.participant)}</td><td>{r.ipChanged ? <span className={styles.error}>yes</span> : 'no'}</td></tr>)}</tbody>
+            </table>
+          </section>
+
+          <section className={styles.stack} aria-labelledby="seb-refused">
+            <h2 id="seb-refused">Correct password outside SEB ({data.sebRefusals.length})</h2>
+            <p className={styles.muted}>Someone signed in with this participant&apos;s right password from a normal browser and was refused: shared or guessed credentials. Check the participant.</p>
+            <table className={styles.table}>
+              <thead><tr><th>When</th><th>Participant</th></tr></thead>
+              <tbody>{data.sebRefusals.map((r) => <tr key={r.id}><td>{time(r.createdAt)}</td><td>{who(r.participant)}</td></tr>)}</tbody>
             </table>
           </section>
 

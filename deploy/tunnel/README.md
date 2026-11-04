@@ -29,7 +29,7 @@ Cloudflare Tunnel that publishes the DGX web service (`127.0.0.1:3100`) as `code
 
 ## Entry points & how to test
 ```sh
-systemctl --user start codehaunt-tunnel        # enable --now for the event
+systemctl --user start codehaunt-tunnel codehaunt-tunnel-2   # both connectors; enable --now for the event
 curl -sI https://codehaunt.jojocode.in/login   # HTTP/2 200, server: cloudflare (502 while stopped)
 echo '{}' > /tmp/empty.yml
 cloudflared --config /tmp/empty.yml tunnel info 2f3d5e18-83a2-47c6-8e27-12b11f04fa7b   # shows a connector
@@ -43,7 +43,8 @@ cloudflared --config /tmp/empty.yml tunnel info 2f3d5e18-83a2-47c6-8e27-12b11f04
 - Never add hostnames to another tunnel or edit `~/.cloudflared/`; never restart `cjudge-*` units.
 
 ## Teardown (do not run casually)
-1. `systemctl --user disable --now codehaunt-tunnel codehaunt-preview`; remove both unit files; `daemon-reload`.
+1. `systemctl --user disable --now codehaunt-tunnel codehaunt-tunnel-2 codehaunt-preview`; remove the three unit files;
+   `daemon-reload`.
 2. As `uem`: `cloudflared --config /tmp/empty.yml tunnel delete -f 2f3d5e18-83a2-47c6-8e27-12b11f04fa7b`.
 3. Delete the `codehaunt.jojocode.in` CNAME in the Cloudflare dashboard (cloudflared cannot delete DNS).
 4. `rm -r ~/.cloudflared-codehaunt ~/.config/codehaunt-preview.env`.

@@ -169,3 +169,18 @@ test('audit R14-2/R15-2: idling before a paste does not hide it; fast sustained 
   const normal = Array.from({ length: 30 }, (_, k) => ({ atMs: (k + 1) * 20_000, source: grow(100 * (k + 1)) }));
   assert.deepEqual(saveBursts([{ atMs: 0, source: base }, ...normal]), []);
 });
+
+// Audit R16-1: a shown example wrapped in backticks or numbered still matches the same line in the final code.
+test('aiCopy matches lines shown wrapped in backticks or numbered', () => {
+  const code = ['n, q = map(int, input().split())', 'a = list(map(int, input().split()))', 'p = [0] * (n + 1)'];
+  for (const reply of [code.map((l) => '`' + l + '`').join('\n'), code.map((l, i) => `${i + 1}. ${l}`).join('\n'), code.map((l) => `> ${l}`).join('\n')]) {
+    const res = aiCopy(code.join('\n') + '\nprint(sum(a))', [reply]);
+    assert.equal(res.copiedLines, 3, reply);
+    assert.equal(res.flagged, true, reply);
+  }
+});
+
+test('shownCodeLines sees code inside a quoted fence', () => {
+  const reply = '> ```python\n> total = 0\n> ```';
+  assert.deepEqual(shownCodeLines([reply]), ['> total = 0']);
+});

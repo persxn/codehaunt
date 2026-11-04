@@ -1,5 +1,5 @@
 # incidents
-Incident dashboard (ADR-021, ADR-028): judge errors after the re-check, sandbox refusals, replaced sessions, slowed logins, runs that failed twice.
+Incident dashboard (ADR-021, ADR-028): judge errors after the re-check, sandbox refusals, replaced sessions, correct passwords refused outside SEB (`auth.seb_refused`), slowed logins, runs that failed twice.
 
 ## Contents
 | Path | What it does |

@@ -14,9 +14,9 @@ import {
   type RevertRequest,
   type SaveCodeRequest,
 } from '@codehaunt/contracts';
-import { tokenBalance, type PrismaClient } from '@codehaunt/db';
+import { tokenBalance, type PrismaClient, type Tx } from '@codehaunt/db';
 
-import { badRequest, notFound } from './errors.ts';
+import { AppError, badRequest, notFound } from './errors.ts';
 import { openProblem, visible, type ParticipantContext } from './contest.ts';
 
 export async function contestState(prisma: PrismaClient, ctx: ParticipantContext, eventName: string): Promise<ContestState> {
@@ -191,6 +191,7 @@ export async function saveCode(prisma: PrismaClient, ctx: ParticipantContext, in
       select: { id: true, language: true, source: true },
     });
     if (latest && latest.source === input.source && latest.language === language) return { id: latest.id };
+    await checkCodeStorage(tx, ctx.participantId, input.source.length);
     const session =
       (await tx.chatSession.findFirst({
         where: { participantId: ctx.participantId, problemId: problem.id, closedAt: null },
@@ -208,17 +209,44 @@ export async function saveCode(prisma: PrismaClient, ctx: ParticipantContext, in
 /** Revert = a new version copying an older one, so history stays append-only and "current" is always the newest. */
 export async function revert(prisma: PrismaClient, ctx: ParticipantContext, input: RevertRequest): Promise<{ id: string }> {
   const problem = await openProblem(prisma, ctx, input.problemId, true);
-  const old = await prisma.codeVersion.findFirst({
-    where: { id: input.codeVersionId, chatSession: { participantId: ctx.participantId, problemId: problem.id } },
+  return prisma.$transaction(async (tx) => {
+    await tx.$queryRaw`SELECT id FROM participants WHERE id = ${ctx.participantId} FOR UPDATE`;
+    const old = await tx.codeVersion.findFirst({
+      where: { id: input.codeVersionId, chatSession: { participantId: ctx.participantId, problemId: problem.id } },
+    });
+    if (!old) throw notFound('That code version');
+    await checkCodeStorage(tx, ctx.participantId, old.source.length);
+    const session = await tx.chatSession.findFirst({
+      where: { participantId: ctx.participantId, problemId: problem.id, closedAt: null },
+      orderBy: { createdAt: 'desc' },
+      select: { id: true },
+    });
+    return tx.codeVersion.create({
+      data: { chatSessionId: session?.id ?? old.chatSessionId, promptTurnId: null, language: old.language, source: old.source },
+      select: { id: true },
+    });
   });
-  if (!old) throw notFound('That code version');
-  const session = await prisma.chatSession.findFirst({
-    where: { participantId: ctx.participantId, problemId: problem.id, closedAt: null },
-    orderBy: { createdAt: 'desc' },
-    select: { id: true },
-  });
-  return prisma.codeVersion.create({
-    data: { chatSessionId: session?.id ?? old.chatSessionId, promptTurnId: null, language: old.language, source: old.source },
-    select: { id: true },
-  });
+}
+
+/**
+ * Limits on stored code per participant (audit R16-2). Autosave writes at most 3 versions a minute and a run or a
+ * restore adds one or two, so these only stop a script: it could otherwise fill the shared Postgres and every
+ * backup dump. Call under the participant row lock.
+ */
+export const CODE_SAVES_PER_MINUTE = 30;
+export const CODE_VERSIONS_PER_PARTICIPANT = 3000;
+export const CODE_CHARS_PER_PARTICIPANT = 8_000_000;
+
+
+async function checkCodeStorage(tx: Tx, participantId: string, adding: number): Promise<void> {
+  const [row] = await tx.$queryRaw<Array<{ recent: bigint; total: bigint; chars: bigint | null }>>`
+    SELECT count(*) FILTER (WHERE cv."createdAt" > now() - interval '60 seconds') AS recent,
+           count(*) AS total,
+           sum(length(cv.source)) AS chars
+      FROM code_versions cv JOIN chat_sessions cs ON cs.id = cv."chatSessionId"
+     WHERE cs."participantId" = ${participantId}`;
+  if (Number(row?.recent ?? 0) >= CODE_SAVES_PER_MINUTE)
+    throw new AppError(429, 'too_many_saves', 'Too many saves in the last minute. Wait a moment, then try again.');
+  if (Number(row?.total ?? 0) >= CODE_VERSIONS_PER_PARTICIPANT || Number(row?.chars ?? 0) + adding > CODE_CHARS_PER_PARTICIPANT)
+    throw new AppError(409, 'code_storage_full', 'Your saved code has reached its limit. Ask an invigilator for help.');
 }

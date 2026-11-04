@@ -92,7 +92,8 @@ test('a second participant login ends the first and is audit-logged', async () =
 test('outside SEB a participant is refused after the password check and keeps their SEB session (ADR-013)', async () => {
   const inSeb = await login(db.prisma, 'p1', PASSWORD, { sebVerified: true });
   assert.ok(inSeb.ok);
-  assert.deepEqual(await login(db.prisma, 'p1', PASSWORD, { sebVerified: false }), { ok: false, reason: 'seb_required' });
+  assert.deepEqual(await login(db.prisma, 'p1', PASSWORD, { sebVerified: false, requestId: 'req-seb' }), { ok: false, reason: 'seb_required' });
+  assert.ok(await db.prisma.auditLog.findFirst({ where: { action: 'auth.seb_refused', requestId: 'req-seb' } }), 'refusal is audit-logged (R16-6)');
   assert.ok(await resolveSession(db.prisma, inSeb.session.token));
   // A wrong password still reads as a wrong password, SEB or not.
   assert.deepEqual(await login(db.prisma, 'p1', 'wrong-password', { sebVerified: false }), { ok: false, reason: 'invalid_credentials' });

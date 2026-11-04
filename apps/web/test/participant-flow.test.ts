@@ -13,7 +13,17 @@ import { tokenBalance } from '@codehaunt/db';
 import { createTestDatabase, type TestDatabase } from '@codehaunt/db/testing';
 
 import { startPrompt } from '../src/server/prompt-service.ts';
-import { contestState, listProblems, newSession, problemStatement, revert, saveCode, workspace } from '../src/server/participant-service.ts';
+import {
+  CODE_CHARS_PER_PARTICIPANT,
+  CODE_SAVES_PER_MINUTE,
+  contestState,
+  listProblems,
+  newSession,
+  problemStatement,
+  revert,
+  saveCode,
+  workspace,
+} from '../src/server/participant-service.ts';
 import { createRun, runView } from '../src/server/submission-service.ts';
 import { participantContext } from '../src/server/contest.ts';
 import { AppError } from '../src/server/errors.ts';
@@ -115,6 +125,28 @@ test('saving code: unchanged saves add nothing; the first save opens a chat; lan
   assert.ok(ws.codeVersions.every((v) => v.turnId === null));
   await db.prisma.event.update({ where: { id: f.event.id }, data: { config: { ...f.event.config as object, languages: ['cpp'] } } });
   await assert.rejects(save(f, 'print(3)\n'), (e: unknown) => e instanceof AppError && e.status === 400);
+});
+
+test('code saves and reverts are limited per minute and in total (audit R16-2)', async () => {
+  const f = await setup(db.prisma);
+  const first = await save(f, 'print(0)\n');
+  for (let i = 1; i < CODE_SAVES_PER_MINUTE; i++) await save(f, `print(${i % 2})\n#${i}`);
+  await assert.rejects(save(f, 'print(99)\n'), (e: unknown) => e instanceof AppError && e.status === 429);
+  await assert.rejects(
+    revert(db.prisma, await f.ctx(), { problemId: f.problem.id, codeVersionId: first.id }),
+    (e: unknown) => e instanceof AppError && e.status === 429,
+  );
+  // Unchanged saves still answer: the editor saves before every run.
+  assert.ok((await save(f, `print(${(CODE_SAVES_PER_MINUTE - 1) % 2})\n#${CODE_SAVES_PER_MINUTE - 1}`)).id);
+  // Older than a minute: the rate limit clears, the total cap does not.
+  const { participantId } = await f.ctx();
+  await db.prisma.codeVersion.updateMany({ where: { chatSession: { participantId } }, data: { createdAt: new Date(Date.now() - 120_000) } });
+  assert.ok((await save(f, 'print(100)\n')).id);
+  const session = await db.prisma.chatSession.findFirstOrThrow({ where: { participantId } });
+  await db.prisma.codeVersion.create({
+    data: { chatSessionId: session.id, language: 'PYTHON', source: 'x'.repeat(CODE_CHARS_PER_PARTICIPANT), createdAt: new Date(Date.now() - 120_000) },
+  });
+  await assert.rejects(save(f, 'print(101)\n'), (e: unknown) => e instanceof AppError && e.status === 409 && e.code === 'code_storage_full');
 });
 
 test('a reply without usage is discarded and costs nothing', async () => {

@@ -45,6 +45,12 @@ export async function listIncidents(prisma: PrismaClient, eventId: string, viewe
     take: 500,
     select: { id: true, targetId: true, after: true, createdAt: true },
   });
+  const sebRefused = await prisma.auditLog.findMany({
+    where: { action: 'auth.seb_refused', targetId: { in: [...byUser.keys()] }, createdAt: { gte: event.createdAt } },
+    orderBy: { createdAt: 'desc' },
+    take: 500,
+    select: { id: true, targetId: true, createdAt: true },
+  });
   const failed = await prisma.submission.findMany({
     where: { status: 'FAILED', problem: { eventId } },
     orderBy: { createdAt: 'desc' },
@@ -78,6 +84,7 @@ export async function listIncidents(prisma: PrismaClient, eventId: string, viewe
       participant: who(byUser.get(a.targetId ?? '')),
       ipChanged: Boolean((a.after as { ipChanged?: unknown } | null)?.ipChanged),
     })),
+    sebRefusals: sebRefused.map((a) => ({ id: String(a.id), createdAt: a.createdAt.toISOString(), participant: who(byUser.get(a.targetId ?? '')) })),
     loginSlowdowns: slowedUsernames().map((s) => ({ ...s, participant: who(byUsername.get(s.username)) })),
     deadLetters: failed.map((f) => ({ id: f.id, kind: f.kind, createdAt: f.createdAt.toISOString(), problem: f.problem.title, participant: who(f.participant) })),
   };

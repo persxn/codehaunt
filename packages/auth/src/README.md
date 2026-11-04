@@ -7,7 +7,7 @@ Implementation of `@codehaunt/auth`.
 | `index.ts` | barrel |
 | `password.ts` | argon2id hash/verify (OWASP params), random password generator, length limits (12–200) |
 | `session.ts` | create/resolve/destroy DB sessions; only SHA-256 of the token is stored; cookie options |
-| `login.ts` | login (timing-safe, throttled), single participant session, `seb_required` for participants outside SEB (after the password check, old session kept), `checkPasswordStrength`, audit-logged `setAccountActive`, `changePassword` (current password throttled like a login, one at a time per account), `setPassword` (staff reset) |
+| `login.ts` | login (timing-safe, throttled), single participant session, `seb_required` for participants outside SEB (after the password check, old session kept; audit-logged `auth.seb_refused`), `checkPasswordStrength`, audit-logged `setAccountActive`, `changePassword` (current password throttled like a login, one at a time per account), `setPassword` (staff reset) |
 | `rate-limit.ts` | in-memory login throttling per username, per IP and globally; slows down, never refuses (ADR-020); `slowedUsernames()` for the incident dashboard (usernames only, no IPs) |
 | `common-passwords.ts` | generated: SecLists 10k common passwords, lowercased (see `/VENDORED.md`) |
 | `seb.ts` | `[claude]` SEB Config Key check (ADR-013 §3): `sebConfig` (env `SEB_CONFIG_KEY` + `PUBLIC_ORIGIN`, both or neither, throws on half config), `sebHash`, `sebHeaderValid` (public origin + path + query, timing-safe) |

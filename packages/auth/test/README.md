@@ -5,7 +5,7 @@ Tests for `@codehaunt/auth`.
 | Path | What it does |
 |---|---|
 | `policy.test.ts` | public routes, 401 without session, 403 for unknown routes and wrong roles, traversal |
-| `login.test.ts` | argon2, login, inactive accounts, single participant session + audit, delay-only throttling, password rules, audited deactivation (PGlite) |
+| `login.test.ts` | argon2, login, inactive accounts, single participant session + audit, SEB refusal + audit, delay-only throttling, password rules, audited deactivation (PGlite) |
 | `seb.test.ts` | Config Key hash: exact URL and key, header case, malformed headers, both-or-neither config |
 | `login-race.test.ts` | 8 concurrent logins leave one live participant session (real Postgres, `TEST_POSTGRES_URL`) |
 

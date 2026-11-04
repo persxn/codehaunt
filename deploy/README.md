@@ -5,7 +5,7 @@ Deployment manifests for what does not run under `docker-compose.yml`, and the r
 | Path | What it does |
 |---|---|
 | `tunnel/` | Cloudflare tunnel `codehaunt` → web on 127.0.0.1:3100: user unit, ingress, teardown (`tunnel/README.md`) |
-| `release/` | DGX compose stack: pre-deploy check, `deploy.sh <tag>`, `rollback.sh` (`release/README.md`) |
+| `release/` | DGX compose stack: pre-deploy check, `deploy.sh <tag>`, `rollback.sh`, `backup.sh` + its 5-minute timer, `restore.sh`, `retire-backups.sh` (`release/README.md`) |
 | `seb/` | Safe Exam Browser settings for the event's `.seb` file, built by the client in the SEB Config Tool (`seb/README.md`) |
 | `gpu-cluster/` | k3s manifests for the inference tier: model servers, gateway, network policy, full-GPU switch (`gpu-cluster/README.md`) |
 

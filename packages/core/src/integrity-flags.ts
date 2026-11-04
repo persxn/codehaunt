@@ -3,7 +3,7 @@
  * Provides detection of burst saves, AI‑copied code, and code‑heavy questions.
  */
 
-import { looksLikeCode } from './reply-filter.ts';
+import { isFence, looksLikeCode, unwrapLine } from './reply-filter.ts';
 
 export const SAVE_BURST_CHARS = 400;
 /** Growth over any 60 s of saves above this is faster than sustained typing, ~12.5 chars/s (audit R15-2). */
@@ -55,13 +55,11 @@ export function saveBursts(
  */
 export function shownCodeLines(replies: readonly string[]): string[] {
   const result: string[] = [];
-  const fenceRegex = /^\s*(```|~~~)/;
-
   for (const reply of replies) {
     const lines = reply.split(/\r?\n/);
     let inFence = false;
     for (const line of lines) {
-      if (fenceRegex.test(line)) {
+      if (isFence(line)) {
         inFence = !inFence;
         continue; // fence line itself not returned
       }
@@ -80,7 +78,8 @@ export function shownCodeLines(replies: readonly string[]): string[] {
  * Returns count of copied lines, total considered lines, and whether flagged.
  */
 export function aiCopy(finalCode: string, replies: readonly string[]): { copiedLines: number; totalLines: number; flagged: boolean } {
-  const norm = (s: string) => s.trim().replace(/\s+/g, ' ');
+  // Both sides unwrapped, so a line shown as `` `x = 1` `` or `3. x = 1` matches `x = 1` (audit R16-1).
+  const norm = (s: string) => unwrapLine(s).trim().replace(/\s+/g, ' ');
 
   const shown = shownCodeLines(replies)
     .map(norm)

@@ -11,6 +11,8 @@ SERVICES=(migrate web worker docker-proxy)
 
 [[ "$(git describe --exact-match --tags HEAD 2>/dev/null)" == "$TAG" ]] || { echo "HEAD is not tag $TAG"; exit 1; }
 [[ -z "$(git status --porcelain)" ]] || { echo "working tree not clean"; exit 1; }
+# Re-deploying the running tag would make :previous the running release, so rollback would go back to itself (R16-7).
+[[ "$(cat deploy/release/.current 2>/dev/null)" != "$TAG" ]] || { echo "$TAG is already deployed; tag a new release"; exit 1; }
 deploy/release/predeploy-check.sh
 
 for s in "${SERVICES[@]}"; do
