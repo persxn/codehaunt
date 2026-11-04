@@ -104,7 +104,7 @@ test('a live budget change applies from now on, is audit-logged, and never overd
   assert.equal(await db.prisma.auditLog.count({ where: { action: 'event.config_updated', targetId: id } }), 2);
   // Locked: scoring weights (and problems) are frozen.
   await assert.rejects(
-    updateEvent(db.prisma, id, { config: { ...ev.config, scoring: { ...ev.config.scoring, wrongSubmissionPenalty: 1 } } }, a),
+    updateEvent(db.prisma, id, { config: { ...ev.config, scoring: { ...ev.config.scoring, wrongSubmissionPenaltyPct: 1 } } }, a),
     (e) => code(e, 'event_locked'),
   );
 });
@@ -195,7 +195,7 @@ test('audit run-10: the lock holds without lockedAt (status or start time), and 
   await assert.rejects(updateProblem(db.prisma, problemId, { ...input, title: 'Changed' }, a), (e) => code(e, 'event_locked'));
   await assert.rejects(calibrate(db.prisma, problemId, a), (e) => code(e, 'event_locked'));
   await assert.rejects(
-    updateEvent(db.prisma, id, { config: { ...past, scoring: { ...past.scoring, wrongSubmissionPenalty: 1 } } }, a),
+    updateEvent(db.prisma, id, { config: { ...past, scoring: { ...past.scoring, wrongSubmissionPenaltyPct: 1 } } }, a),
     (e) => code(e, 'event_locked'),
   );
 });

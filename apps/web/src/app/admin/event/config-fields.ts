@@ -45,7 +45,7 @@ export const SECTIONS: Array<{ key: keyof EventConfig; title: string; fields: Fi
     { path: 'scoring.weights.tokenEfficiency', label: 'Token efficiency weight', kind: 'number', step: 0.05 },
     { path: 'scoring.weights.resourceEfficiency', label: 'Memory + runtime weight', kind: 'number', step: 0.05 },
     { path: 'scoring.weights.processQuality', label: 'Process quality weight', kind: 'number', step: 0.05 },
-    { path: 'scoring.wrongSubmissionPenalty', label: 'Wrong submission penalty', kind: 'number' },
+    { path: 'scoring.wrongSubmissionPenaltyPct', label: 'Wrong submission penalty (% of the problem value)', kind: 'number', hint: 'Each wrong submission, solved or not (ADR-034).' },
     { path: 'scoring.decayPerMinute', label: 'Decay per minute (points per 500)', kind: 'number', step: 0.1 },
   ] },
   { key: 'leaderboard', title: 'Leaderboard', fields: [
@@ -107,7 +107,7 @@ export function defaultConfig(name: string): EventConfig {
     budget: { tokensPerParticipant: 60000, contextTokens: 8192, contextWarnPercent: 80, maxPromptChars: 1000, replyTokens: 1024 },
     model: { baseUrl: 'http://gateway.invalid', name: 'junior', systemPromptVersion: 'tutor-v1', maxExampleLines: 6, temperature: 0.2, hostedAllowed: false },
     judge: { rubricVersion: 'v1', model: 'gpt-oss:120b' },
-    scoring: { weights: { correctness: 0.55, tokenEfficiency: 0.15, resourceEfficiency: 0.1, processQuality: 0.2 }, wrongSubmissionPenalty: 50, decayPerMinute: 2 },
+    scoring: { weights: { correctness: 0.55, tokenEfficiency: 0.15, resourceEfficiency: 0.1, processQuality: 0.2 }, wrongSubmissionPenaltyPct: 20, decayPerMinute: 2 },
     leaderboard: { projectorEnabled: true, appealMinutes: 30 },
     access: { sebRequired: true, checkInCap: 40, allowMinors: false },
     consent: { text: 'I agree that my prompts, replies and code are logged and judged. Traffic passes through Cloudflare.', retentionDays: 30 },

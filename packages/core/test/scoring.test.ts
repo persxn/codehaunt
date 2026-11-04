@@ -5,7 +5,7 @@ import { computeStandings, decayedPoints, type ScoringParticipant, type ScoringS
 
 const rules = {
   weights: { correctness: 0.55, tokenEfficiency: 0.15, resourceEfficiency: 0.1, processQuality: 0.2 },
-  wrongSubmissionPenalty: 50,
+  wrongSubmissionPenaltyPct: 20,
   decayPerMinute: 2,
 };
 const problems = [{ id: 'a', difficulty: 'EASY' as const }, { id: 'b', difficulty: 'HARD' as const }];
@@ -18,13 +18,28 @@ const person = (id: string, submissions: ScoringSubmission[], tokens = 1000, ext
   id, name: id, disqualified: false, submissions, tokens, judgeScore: null, overrides: {}, ...extra,
 });
 
-test('decay: full value at 0, 2 points per minute per 500, floor 30%, 50 per rejection', () => {
+test('decay: full value at 0, 2 points per minute per 500, floor 30%; each rejection 20% of the value after the floor', () => {
   assert.equal(decayedPoints(500, 0, 0, rules), 500);
   assert.equal(decayedPoints(500, 10 * MIN, 0, rules), 480);
   assert.equal(decayedPoints(1500, 10 * MIN, 0, rules), 1440);
-  assert.equal(decayedPoints(500, 10 * MIN, 2, rules), 380);
+  assert.equal(decayedPoints(500, 10 * MIN, 2, rules), 480 - 200);
   assert.equal(decayedPoints(500, 180 * MIN, 0, rules), 150);
-  assert.equal(decayedPoints(500, 0, 20, rules), 150);
+  // ADR-034: the floor covers decay only, so every rejection keeps costing its full 20%.
+  assert.equal(decayedPoints(500, 180 * MIN, 1, rules), 150 - 100);
+  assert.equal(decayedPoints(500, 0, 5, rules), 0);
+  assert.equal(decayedPoints(500, 0, 6, rules), -100);
+  assert.equal(decayedPoints(1500, 0, 1, { ...rules, wrongSubmissionPenaltyPct: 10 }), 1350);
+});
+
+test('rejections on unsolved problems cost 20% of the value each; the correctness total never goes below 0', () => {
+  const run = (subs: ScoringSubmission[]) => computeStandings({ problems, references: new Map(), rules, participants: [person('p', subs)] })[0]!;
+  assert.equal(run([sub('b', 'WA', 1)]).problems[1]!.points, -300);
+  assert.equal(run([sub('b', 'WA', 1), sub('b', 'WA', 2)]).problems[1]!.points, -600);
+  assert.equal(run([sub('b', 'CE', 1), sub('b', 'TLE', 2, { counts: false })]).problems[1]!.points, 0, 'CE and reversed cost nothing');
+  // 500 for a (AC at 0) − 300 for one WA on b = 200 of 2000.
+  assert.equal(run([sub('a', 'AC', 0), sub('b', 'WA', 1)]).correctness, 10);
+  // 500 − 6 × 300 < 0 → 0, never negative.
+  assert.equal(run([sub('a', 'AC', 0), ...Array.from({ length: 6 }, (_, i) => sub('b', 'WA', i + 1))]).correctness, 0);
 });
 
 test('penalties: only judged non-AC non-CE submits before the first AC, unless reversed', () => {
@@ -36,12 +51,12 @@ test('penalties: only judged non-AC non-CE submits before the first AC, unless r
     ])],
   });
   assert.equal(s!.problems[0]!.rejected, 2); // WA + IE
-  assert.equal(s!.problems[0]!.points, 500 - 20 - 100);
+  assert.equal(s!.problems[0]!.points, 500 - 20 - 2 * 100);
   assert.equal(s!.problems[0]!.attempts, 7);
-  assert.equal(s!.correctness, Math.round((100 * 380) / 2000 * 100) / 100);
+  assert.equal(s!.correctness, Math.round((100 * 280) / 2000 * 100) / 100);
 });
 
-test('unsolved problems earn nothing however many attempts', () => {
+test('unsolved problems earn nothing, and wrong tries take the total no lower than 0', () => {
   const [s] = computeStandings({ problems, references: new Map(), rules, participants: [person('p', [sub('b', 'WA', 1), sub('b', 'WA', 2)])] });
   assert.equal(s!.correctness, 0);
   assert.equal(s!.tokenEfficiency, 0);

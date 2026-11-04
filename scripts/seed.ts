@@ -56,7 +56,7 @@ try {
     judge: { rubricVersion: 'v1', model: 'gpt-oss:120b' },
     scoring: {
       weights: { correctness: 0.55, tokenEfficiency: 0.15, resourceEfficiency: 0.10, processQuality: 0.20 },
-      wrongSubmissionPenalty: 50,
+      wrongSubmissionPenaltyPct: 20,
       decayPerMinute: 2,
     },
     leaderboard: { projectorEnabled: true },

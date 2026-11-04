@@ -3,7 +3,8 @@
  * implementation backs the live board, the projector and the results export.
  *
  * Correctness is ported from JojoCode `packages/db/src/contest.ts` @ a8f4056 (`decayedPoints`): Codeforces-style decay
- * with a 30% floor and a fixed cost per rejected submission. CodeHaunt adds the token, resource and judge components.
+ * with a 30% floor. ADR-034 replaces JojoCode's fixed cost per rejection: each counted rejection costs a share of the
+ * problem's value, after the floor and on unsolved problems too. CodeHaunt adds the token, resource and judge components.
  */
 
 export type Difficulty = 'EASY' | 'MEDIUM' | 'HARD';
@@ -11,7 +12,7 @@ export type ScoreComponentName = 'correctness' | 'tokenEfficiency' | 'resourceEf
 
 /** A problem's value before decay (ADR-028). */
 export const PROBLEM_VALUE: Readonly<Record<Difficulty, number>> = { EASY: 500, MEDIUM: 1000, HARD: 1500 };
-/** A solved problem never drops below this share of its value (JojoCode). */
+/** Time decay never takes a solved problem below this share of its value (JojoCode); penalties can (ADR-034). */
 export const DECAY_FLOOR = 0.3;
 /** Runtime and memory get this much slack so timer noise on tiny tests doesn't decide anything. */
 const TIME_SLACK_MS = 10;
@@ -19,7 +20,8 @@ const MEMORY_SLACK_KB = 10 * 1024;
 
 export interface ScoringRules {
   weights: Readonly<Record<ScoreComponentName, number>>;
-  wrongSubmissionPenalty: number;
+  /** Percent of the problem's value lost per counted rejection before its first AC (ADR-034: 20). */
+  wrongSubmissionPenaltyPct: number;
   /** Points lost per contest minute per 500 points of value (Codeforces). */
   decayPerMinute: number;
 }
@@ -86,11 +88,19 @@ export interface Standing {
   overridden: ScoreComponentName[];
 }
 
-export function decayedPoints(value: number, elapsedMs: number, rejected: number, rules: Pick<ScoringRules, 'wrongSubmissionPenalty' | 'decayPerMinute'>): number {
+/** What one counted rejection costs on a problem of this value (ADR-034). */
+export function rejectionCost(value: number, rules: Pick<ScoringRules, 'wrongSubmissionPenaltyPct'>): number {
+  return Math.round((value * rules.wrongSubmissionPenaltyPct) / 100);
+}
+
+/**
+ * A solved problem's points: time decay down to the floor, then every counted rejection before the AC at its full
+ * cost (ADR-034), so repeated rejections never become free. Can be negative.
+ */
+export function decayedPoints(value: number, elapsedMs: number, rejected: number, rules: Pick<ScoringRules, 'wrongSubmissionPenaltyPct' | 'decayPerMinute'>): number {
   const minutes = Math.max(0, elapsedMs) / 60_000;
-  const decayed = value - (value / 500) * rules.decayPerMinute * minutes;
-  const penalised = decayed - rules.wrongSubmissionPenalty * rejected;
-  return Math.max(Math.round(value * DECAY_FLOOR), Math.round(penalised));
+  const decayed = Math.max(Math.round(value * DECAY_FLOOR), Math.round(value - (value / 500) * rules.decayPerMinute * minutes));
+  return decayed - rejected * rejectionCost(value, rules);
 }
 
 /** A judged submit that isn't AC or CE is a wrong attempt (a counted IE is WA, ADR-021), unless its penalty was reversed. */
@@ -130,7 +140,12 @@ export function computeStandings(input: ScoreInput): Standing[] {
       const acIndex = attempts.findIndex((s) => s.verdict === 'AC');
       const accepted = acIndex >= 0 ? attempts[acIndex]! : null;
       const rejected = attempts.slice(0, acIndex >= 0 ? acIndex : attempts.length).filter(isRejection).length;
-      if (!accepted) return { problemId: problem.id, solved: false, points: 0, rejected, attempts: attempts.length, solvedAtMs: null };
+      if (!accepted) {
+        // Unsolved: every counted rejection still costs (ADR-034), so guessing at hidden tests isn't free.
+        const lost = 0 - rejected * rejectionCost(PROBLEM_VALUE[problem.difficulty], input.rules);
+        points += lost;
+        return { problemId: problem.id, solved: false, points: lost, rejected, attempts: attempts.length, solvedAtMs: null };
+      }
 
       const earned = decayedPoints(PROBLEM_VALUE[problem.difficulty], accepted.contestMs, rejected, input.rules);
       points += earned;
@@ -153,7 +168,8 @@ export function computeStandings(input: ScoreInput): Standing[] {
       solved,
       lastAcceptMs,
       missingReference,
-      correctness: maxPoints ? (100 * points) / maxPoints : 0,
+      // The total never goes below 0 (ADR-034), so the component stays 0–100.
+      correctness: maxPoints ? (100 * Math.max(0, points)) / maxPoints : 0,
       resourceEfficiency: resource.length ? (100 * resource.reduce((a, b) => a + b, 0)) / resource.length : 0,
       tokensPerSolve: solved ? p.tokens / solved : null,
     };
@@ -163,7 +179,9 @@ export function computeStandings(input: ScoreInput): Standing[] {
   const w = input.rules.weights;
 
   const standings: Standing[] = rows.map((r) => {
-    const tokenEfficiency = r.tokensPerSolve === null ? 0 : med ? clamp(100 - (50 * r.tokensPerSolve) / med) : 100;
+    // ADR-033: fewer tutor tokens per solve is better. With a median of 0, needing no help scores 100 and any help 50.
+    const tokenEfficiency =
+      r.tokensPerSolve === null ? 0 : med ? clamp(100 - (50 * r.tokensPerSolve) / med) : r.tokensPerSolve === 0 ? 100 : 50;
     const computed: Record<ScoreComponentName, number | null> = {
       correctness: r.correctness,
       tokenEfficiency,

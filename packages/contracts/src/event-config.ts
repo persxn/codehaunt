@@ -81,7 +81,9 @@ export const EventConfig = z.object({
       const sum = w.correctness + w.tokenEfficiency + w.resourceEfficiency + w.processQuality;
       return Math.abs(sum - 1) < 1e-6;
     }, { message: 'weights must sum to 1' }).prefault({}),
-    wrongSubmissionPenalty: z.number().int().min(0).max(1000).default(50),
+    /** Percent of the problem's value lost per counted rejection, solved or not (ADR-034). An old
+     *  `wrongSubmissionPenalty` (points) key is dropped by parsing, so stored configs read as the default 20. */
+    wrongSubmissionPenaltyPct: z.number().min(0).max(100).default(20),
     decayPerMinute: z.number().min(0).max(100).default(2),
   }).prefault({}),
   leaderboard: z.object({
