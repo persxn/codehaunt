@@ -1,0 +1,10 @@
+[Unit]
+Description=CodeHaunt — database backup every 5 minutes (ADR-036)
+
+[Timer]
+OnBootSec=2min
+OnUnitActiveSec=5min
+Persistent=true
+
+[Install]
+WantedBy=timers.target

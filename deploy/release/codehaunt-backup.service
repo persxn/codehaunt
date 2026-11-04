@@ -1,0 +1,6 @@
+[Unit]
+Description=CodeHaunt — database backup (ADR-036)
+
+[Service]
+Type=oneshot
+ExecStart=%h/Desktop/codehaunt/deploy/release/backup.sh

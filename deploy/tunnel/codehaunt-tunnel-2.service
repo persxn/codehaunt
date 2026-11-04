@@ -1,0 +1,11 @@
+[Unit]
+Description=CodeHaunt — Cloudflare tunnel, second connector (ADR-036: a crashed or stuck connector never takes the site down)
+After=network-online.target
+
+[Service]
+ExecStart=%h/.local/bin/cloudflared --no-autoupdate --config %h/.cloudflared-codehaunt/config.yml tunnel run
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=default.target

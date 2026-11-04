@@ -10,6 +10,7 @@ questions, filtered replies that can't be copied), sample runs and submissions, 
 | `contest-app.tsx` | screen shell: polls `/api/contest/state` every 5 s, local clock, banner, problem list + statement, tabs below 1280 px |
 | `chat-panel.tsx` | tutor chat: turns, live streamed (already filtered) reply, context meter, new chat, question box (Ctrl+Enter, `maxPromptChars`, paste blocked); replies not selectable or copyable; `ModelText` (plain text + code blocks, never HTML) |
 | `code-panel.tsx` | the draft (language picker, editor), autosave when changed every 20 s / on hide / on unmount, save-then-run for Run samples / Submit (confirm names the 20% penalty), saved versions + restore, polls unfinished runs every second |
+| `tutor-thinking.tsx` / `tutor-thinking.module.css` | the tutor's thinking state: a floating, blinking ghost with rosy cheeks and a three-dot thought bubble; still under reduced motion |
 | `code-editor.tsx` | `CodeEditor`: transparent textarea over highlight.js output (4 languages), line numbers, Tab = 4 spaces, Enter keeps indent; `noClipboard` handlers (paste, drop, copy, cut, drag, context menu, paste-type `beforeinput`); the only `dangerouslySetInnerHTML` (hljs output) |
 | `runs-panel.tsx` | runs newest first: verdict badge, counts, time, memory, compile log, per-sample results |
 | `consent-dialog.tsx` | blocking consent dialog (ADR-010): required agree, guardian when the event allows minors, optional reuse |

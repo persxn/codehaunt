@@ -1,0 +1,35 @@
+/* Tutor "thinking" (see tutor-thinking.tsx). Tokens only (ADR-032). */
+.wrap { display: inline-flex; align-items: center; gap: var(--space-2); color: var(--text-muted); font-size: var(--text-sm); }
+.ghost { flex: none; overflow: visible; animation: float 2.4s var(--ease) infinite; transform-origin: 50% 90%; }
+.body { fill: var(--text); stroke: var(--accent); stroke-width: 1.6; stroke-linejoin: round; }
+.eyes { fill: var(--bg); transform-origin: 17px 15px; animation: blink 3.6s infinite; }
+.cheek { fill: var(--accent-hi); opacity: 0.55; }
+.mouth { fill: none; stroke: var(--bg); stroke-width: 1.4; stroke-linecap: round; }
+
+.bubble {
+  display: inline-flex; align-items: center; gap: 4px;
+  padding: 6px 9px; border-radius: 999px 999px 999px 4px;
+  background: var(--raised); border: 1px solid var(--border);
+}
+.dot { width: 6px; height: 6px; border-radius: 50%; background: var(--brand); animation: pop 1.2s var(--ease) infinite; }
+.dot:nth-child(2) { animation-delay: 0.18s; }
+.dot:nth-child(3) { animation-delay: 0.36s; }
+.label { font-style: italic; }
+
+@keyframes float {
+  0%, 100% { transform: translateY(0) rotate(-3deg); }
+  50% { transform: translateY(-4px) rotate(3deg); }
+}
+@keyframes blink {
+  0%, 92%, 100% { transform: scaleY(1); }
+  95% { transform: scaleY(0.1); }
+}
+@keyframes pop {
+  0%, 60%, 100% { transform: translateY(0) scale(1); opacity: 0.45; }
+  30% { transform: translateY(-4px) scale(1.15); opacity: 1; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ghost, .eyes, .dot { animation: none; }
+  .dot { opacity: 0.8; }
+}

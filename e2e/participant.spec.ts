@@ -72,7 +72,7 @@ for (const lang of ['c', 'cpp', 'java', 'python']) {
     const reply = page.getByRole('region', { name: 'Ask the tutor' }).locator('ol li').last().locator('div').last();
     // The question box clears when the reply is done; then the turn's reply is on screen.
     await expect(question).toHaveValue('', { timeout: 90_000 });
-    await expect(reply).not.toHaveText(/Thinking/, { timeout: 90_000 });
+    await expect(reply).not.toHaveText(/thinking/i, { timeout: 90_000 });
     await expect(reply).not.toBeEmpty();
     await expect(editor).toHaveValue(SOLUTIONS[lang]!);
     const copied = await reply.evaluate((el) => el.dispatchEvent(new ClipboardEvent('copy', { bubbles: true, cancelable: true })));

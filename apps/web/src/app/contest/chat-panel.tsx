@@ -15,6 +15,7 @@ import { Meter } from '@/components/meter';
 import { postJSON, streamPrompt } from './api';
 import { noClipboard } from './code-editor';
 import styles from './contest.module.css';
+import { TutorThinking } from './tutor-thinking';
 
 /** Model text as plain text, with fenced blocks shown as code. Never HTML. */
 export function ModelText({ text }: { text: string }) {
@@ -101,7 +102,7 @@ export function ChatPanel({ problemId, state, workspace, canWork, reload }: {
         {live !== null && (
           <li>
             <div className={styles.mine}>{sent}</div>
-            <div className={styles.theirs} aria-live="polite">{live ? <ModelText text={live} /> : <em>Thinking…</em>}</div>
+            <div className={styles.theirs} aria-live="polite">{live ? <ModelText text={live} /> : <TutorThinking />}</div>
           </li>
         )}
       </ol>

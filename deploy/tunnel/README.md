@@ -6,16 +6,20 @@ Cloudflare Tunnel that publishes the DGX web service (`127.0.0.1:3100`) as `code
 |---|---|
 | `codehaunt-tunnel.service` | systemd **user** unit (user `uem`, linger on); copy to `~/.config/systemd/user/` |
 | `config.yml` | full-launch ingress (everything → web on 3100); live copy `~/.cloudflared-codehaunt/config.full.yml` |
-| `config-preview.yml` | **active now**: landing-page-only ingress; only `/`, `/_next/static/…`, `/icon.png`, `/opengraph-image.jpg` reach the preview server, everything else is 404 at the edge; live copy `~/.cloudflared-codehaunt/config.yml` |
+| `config-preview.yml` | retired at the full launch (2026-11-04), live copy kept as `~/.cloudflared-codehaunt/config.preview.backup.yml`: landing-page-only ingress; only `/`, `/_next/static/…`, `/icon.png`, `/opengraph-image.jpg` reach the preview server, everything else is 404 at the edge; live copy `~/.cloudflared-codehaunt/config.yml` |
+| `codehaunt-tunnel-2.service` | user unit: a second connector of the same tunnel on the DGX (ADR-036), so a crashed or stuck connector never takes the site down (drill: stop one, 20/20 requests still served) |
 | `codehaunt-preview.service` | user unit: `next start` on 127.0.0.1:3200 from `apps/web/.next-preview` (env `~/.config/codehaunt-preview.env`, mode 600) |
 
 ## Facts
 - Tunnel `codehaunt`, UUID `2f3d5e18-83a2-47c6-8e27-12b11f04fa7b`; CNAME `codehaunt.jojocode.in` → this tunnel (2026-11-03).
 - Credentials: `~/.cloudflared-codehaunt/2f3d5e18-….json` (mode 600). Never in git. `cert.pem` stays in `~/.cloudflared/`.
 - Kept apart from JojoCode: `~/.cloudflared/config.yml` is the `cjudge` tunnel; `jojoai` and `junction` have their own.
-- State (2026-11-04, client approved): **landing-page-only preview live**: `codehaunt-tunnel` and
-  `codehaunt-preview` enabled. Full launch (swap to `config.full.yml`, port 3100) waits for WP-06 gating (SEB keys,
-  WAF, Access on `/admin`, login rate limit) and the practice-DB wipe (WP-08).
+- State (2026-11-04): **full launch**. `~/.cloudflared-codehaunt/config.yml` = `config.full.yml` (everything →
+  127.0.0.1:3100); `codehaunt-tunnel` + `codehaunt-tunnel-2` enabled (two connectors); `codehaunt-preview` disabled.
+  SEB enforced in the app (`SEB_CONFIG_KEY` + `PUBLIC_ORIGIN`) and at Cloudflare (WAF rule on `/contest*`,
+  `/api/contest*`); login rate limit at Cloudflare. No Cloudflare Access (ADR-036).
+- Back to the preview: copy `config.preview.backup.yml` over `config.yml`, `systemctl --user enable --now codehaunt-preview`,
+  restart both tunnel units.
 - Updating the preview: `NEXT_DIST_DIR=.next-preview` build in `apps/web` (env from `~/.config/codehaunt-preview.env`),
   restore `apps/web/tsconfig.json` + `next-env.d.ts` (the build rewrites them), `systemctl --user restart codehaunt-preview`.
 
