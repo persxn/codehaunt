@@ -97,10 +97,23 @@ export function ActionForm({ id, choices, run, compact = false }: {
     <form className={styles.row} onSubmit={submit} aria-label={compact ? 'Actions' : undefined}>
       {choices.length > 1 && (
         // The choices as large buttons (WP-07 Part 2): one is picked, then the reason, then Apply. Same state as before.
-        <div role="radiogroup" aria-label="Action" className={`${styles.choices} ${compact ? styles.choicesCompact : ''}`}>
+        // Radio semantics (audit R17-2): one Tab stop (the picked choice), arrows / Home / End move and pick.
+        <div
+          role="radiogroup" aria-label="Action" className={`${styles.choices} ${compact ? styles.choicesCompact : ''}`}
+          onKeyDown={(e) => {
+            const step = { ArrowRight: 1, ArrowDown: 1, ArrowLeft: -1, ArrowUp: -1 }[e.key];
+            const at = choices.findIndex((c) => c.value === action);
+            const to = e.key === 'Home' ? 0 : e.key === 'End' ? choices.length - 1 : step === undefined ? -1 : (at + step + choices.length) % choices.length;
+            if (to < 0) return;
+            e.preventDefault();
+            setAction(choices[to]!.value);
+            (e.currentTarget.querySelectorAll<HTMLButtonElement>('[role="radio"]')[to])?.focus();
+          }}
+        >
           {choices.map((c) => (
             <button
               key={c.value} type="button" role="radio" aria-checked={c.value === action}
+              tabIndex={c.value === action ? 0 : -1}
               className={styles.choice} data-danger={c.danger || undefined}
               onClick={() => setAction(c.value)}
             >

@@ -26,7 +26,7 @@ export function Overview({ admin }: { admin: boolean }) {
   const total = rows?.length ?? 0;
   const checkedIn = count((r) => r.status === 'CHECKED_IN');
   const funnel = [
-    { label: 'Registered', n: total - count((r) => r.status === 'WAITLISTED') },
+    { label: 'All registered', n: total - count((r) => r.status === 'WAITLISTED') },
     { label: 'Checked in', n: checkedIn },
     { label: 'Consented', n: count((r) => r.consented) },
     { label: 'Badge issued', n: count((r) => r.badgeIssued) },
@@ -50,7 +50,8 @@ export function Overview({ admin }: { admin: boolean }) {
         <>
           <div className={styles.cards}>
             {[
-              ['Registered', count((r) => r.status === 'REGISTERED')],
+              // Not the funnel's first step (all registrations): these are still waiting at the door (audit R17-5).
+              ['Not checked in', count((r) => r.status === 'REGISTERED')],
               ['Waitlisted', count((r) => r.status === 'WAITLISTED')],
               ['Checked in', checkedIn],
               ['Consented', count((r) => r.consented)],

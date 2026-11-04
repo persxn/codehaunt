@@ -217,7 +217,7 @@
   height: clamp(15rem, calc(100dvh - 32rem), 40rem); font-family: var(--font-mono); font-size: var(--text-sm); line-height: 1.6; -webkit-user-select: none; user-select: none; }
 .codeView:focus-within { border-color: var(--accent); }
 .codeView[data-readonly] { opacity: 0.85; }
-.gutter { margin: 0; padding: var(--space-2); color: var(--text-muted); opacity: 0.6; text-align: right; border-right: 1px solid var(--border); user-select: none; }
+.gutter { margin: 0; padding: var(--space-2); color: var(--text-muted); text-align: right; border-right: 1px solid var(--border); user-select: none; }
 /* The editor: highlighted code and a transparent textarea in one grid cell, same font and padding (ADR-033). */
 .editorStack { display: grid; flex: 1; min-width: max-content; }
 .editorStack > * { grid-area: 1 / 1; }
@@ -257,7 +257,6 @@
 .runArt img { width: 68px; height: 68px; }
 /* Verdict moments: only when the verdict arrives live (runs-panel.tsx), once. */
 .run[data-moment] { animation: drop var(--duration-slow) var(--ease-out) both; }
-.run[data-moment='judging'] .runArt img { animation: float 1.6s var(--ease) infinite; }
 .run[data-moment='accepted'] { animation: drop var(--duration-slow) var(--ease-out) both, glowOk var(--duration-moment) var(--ease-out) both; }
 .run[data-moment='accepted'] .runArt img { animation: pop var(--duration-moment) var(--ease-spring) both; }
 .run[data-moment='rejected'] { animation: shake 420ms var(--ease-out) both; }
@@ -313,7 +312,7 @@
 @keyframes glowOk { 0% { box-shadow: 0 0 0 0 rgb(123 226 154 / 0.0); } 30% { box-shadow: 0 0 0 3px rgb(123 226 154 / 0.45); } 100% { box-shadow: 0 0 0 0 rgb(123 226 154 / 0); } }
 
 @media (prefers-reduced-motion: reduce) {
-  .placeholderArch img, .run[data-moment='judging'] .runArt img, .timer[data-low] svg { animation: none; }
+  .placeholderArch img, .timer[data-low] svg { animation: none; }
   .run[data-moment='rejected'], .run[data-moment='accepted'] .runArt img { animation: none; }
   .run[data-moment='accepted'] { animation: fade 120ms linear both; }
 }

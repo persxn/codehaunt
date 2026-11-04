@@ -1,6 +1,6 @@
 'use client';
 /** Sample runs and submissions, newest first, with the projected verdict (never hidden-test detail). */
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 
 import type { RunView } from '@codehaunt/contracts';
 
@@ -18,13 +18,30 @@ function artFor(run: RunView): StateArtKind {
   return run.verdict === 'AC' ? 'accepted' : 'wrong-answer';
 }
 
+/** The longest verdict moment (bats: 1.3 × 900 ms + delay), plus a margin. */
+const MOMENT_MS = 1500;
 const keyOf = (r: RunView) => `${r.submissionId}-${r.verdict ?? r.status}`;
 
 export function RunsPanel({ runs }: { runs: RunView[] }) {
-  // Runs (and verdicts) already on screen when the panel opened never replay their moment; only a change seen live does.
+  // Runs (and verdicts) already on screen when the panel opened never replay their moment; only a change seen live
+  // does. A new key gets a moment that lasts MOMENT_MS whatever re-renders happen meanwhile (audit R17-1: keystrokes
+  // and polls used to cut it short); the timer re-renders once when it ends.
   const seen = useRef<Set<string> | null>(null);
+  const until = useRef(new Map<string, number>());
+  const [, setTick] = useState(0);
   seen.current ??= new Set(runs.map(keyOf));
-  useEffect(() => { for (const r of runs) seen.current!.add(keyOf(r)); }, [runs]);
+  const now = Date.now();
+  for (const r of runs) {
+    const k = keyOf(r);
+    if (!seen.current.has(k)) { seen.current.add(k); until.current.set(k, now + MOMENT_MS); }
+  }
+  useEffect(() => {
+    const next = Math.min(...[...until.current.values()].filter((t) => t > Date.now()));
+    if (!Number.isFinite(next)) return;
+    const t = setTimeout(() => setTick((n) => n + 1), next - Date.now() + 20);
+    return () => clearTimeout(t);
+  });
+  const live = (r: RunView) => (until.current.get(keyOf(r)) ?? 0) > now;
 
   if (!runs.length) return <p className={styles.muted}>No runs yet. Run the samples to check the current code.</p>;
   return (
@@ -35,12 +52,12 @@ export function RunsPanel({ runs }: { runs: RunView[] }) {
           key={keyOf(r)}
           className={styles.run}
           data-newest={i === 0 || undefined}
-          data-moment={i === 0 && !seen.current!.has(keyOf(r)) ? (r.verdict ? (r.verdict === 'AC' ? 'accepted' : 'rejected') : 'judging') : undefined}
+          data-moment={i === 0 && live(r) ? (r.verdict ? (r.verdict === 'AC' ? 'accepted' : 'rejected') : 'judging') : undefined}
         >
           {i === 0 && (
             <span className={styles.runArt}>
               <StateArt kind={artFor(r)} size={88} />
-              {r.verdict === 'AC' && !seen.current!.has(keyOf(r)) && <BatBurst />}
+              {r.verdict === 'AC' && live(r) && <BatBurst />}
             </span>
           )}
           <div className={styles.runHead}>
