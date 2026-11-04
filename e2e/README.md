@@ -9,6 +9,7 @@ host (Docker runner images), the live inference gateway and CodeHaunt's own Post
 | `global-setup.ts` | creates a fresh running E2E event, one problem, a checked-in participant per language and an admin; logins to `.state.json` |
 | `admin.spec.ts` | WP-04: admin creates an event + 2 problems in the UI and calibrates; import, badges, inactive until scanned, single-use check-in; participant solves; live budget change; volunteer pages, add/remove, weak passwords |
 | `participant.spec.ts` | ADR-033: login → consent → type the solution → real paste/drop change nothing → ask the tutor (code unchanged, reply not copyable) → sample run → submit → Accepted in C, C++, Java, Python; token and context meters equal the ledger; no response carries a hidden test; weak new passwords refused with their reason; public system check |
+| `contest-ops.spec.ts` | WP-05 controls (WP-08): pause stops participants and resume restarts them; extend adds time; the projector freezes in the last minutes |
 
 ## Affects / depends on
 - Depends on: `.env` (`DATABASE_URL`, `GATEWAY_URL`, `GATEWAY_FALLBACK_URL`, `GATEWAY_TOKEN`), runner images (`make runners`),
