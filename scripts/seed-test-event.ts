@@ -1,7 +1,8 @@
 // A repeatable test event for pre-event checks (WP-08), on any CodeHaunt database (the live one too): slug `test-…`,
 // the two demo problems, N checked-in participants with one shared password shown once, and their token grants, in one
 // transaction. Remove it with delete-test-event.ts.
-//   node --env-file=.env --experimental-strip-types scripts/seed-test-event.ts [--slug test-x] [--participants N] [--running]
+//   node --env-file=.env --experimental-strip-types scripts/seed-test-event.ts [--slug test-x] [--participants N] [--minutes M] [--running]
+// --participants 0 makes an event for named accounts only (attach them with test-accounts.ts, WP-10).
 import { createPrismaClient } from '@codehaunt/db';
 import { generatePassword, hashPassword } from '@codehaunt/auth';
 import { EventConfig, ProblemInput } from '@codehaunt/contracts';
@@ -11,12 +12,15 @@ const args = process.argv.slice(2);
 let slugArg: string | undefined;
 let participantsArg = '3';
 let running = false;
+let minutesArg = '60';
 for (let i = 0; i < args.length; i++) {
   const a = args[i];
   if (a === '--slug' && i + 1 < args.length) {
     slugArg = args[++i];
   } else if (a === '--participants' && i + 1 < args.length) {
     participantsArg = args[++i]!;
+  } else if (a === '--minutes' && i + 1 < args.length) {
+    minutesArg = args[++i]!;
   } else if (a === '--running') {
     running = true;
   } else {
@@ -33,8 +37,14 @@ if (!/^test-[a-z0-9-]{1,32}$/.test(slug)) {
 }
 
 const participantsCount = Number(participantsArg);
-if (!Number.isInteger(participantsCount) || participantsCount < 1 || participantsCount > 60) {
-  console.error('seed-test-event: participants must be an integer between 1 and 60');
+if (!Number.isInteger(participantsCount) || participantsCount < 0 || participantsCount > 60) {
+  console.error('seed-test-event: participants must be an integer between 0 and 60');
+  process.exit(1);
+}
+
+const durationMinutes = Number(minutesArg);
+if (!Number.isInteger(durationMinutes) || durationMinutes < 10 || durationMinutes > 1440) {
+  console.error('seed-test-event: minutes must be an integer between 10 and 1440');
   process.exit(1);
 }
 
@@ -59,7 +69,7 @@ const prisma = createPrismaClient();
 
     const configObj = {
       branding: { title: 'Test event' },
-      schedule: { checkInAt, startsAt, durationMinutes: 60, freezeMinutes: 10 },
+      schedule: { checkInAt, startsAt, durationMinutes, freezeMinutes: 10 },
       model: { baseUrl: process.env.GATEWAY_URL ?? 'http://gateway.invalid', name: 'junior', systemPromptVersion: 'tutor-v1' },
       judge: { rubricVersion: 'v1' },
       consent: { text: 'Test event: prompts, replies and code are logged.' },
@@ -216,8 +226,10 @@ const prisma = createPrismaClient();
     console.log('event id:', eventId);
     console.log('slug:', slug);
     console.log('usernames:', usernames.join(', '));
-    console.log('Shown once: give it to the tester; it is not stored in clear.');
-    console.log(`password: ${password}`);
+    if (usernames.length) {
+      console.log('Shown once: give it to the tester; it is not stored in clear.');
+      console.log(`password: ${password}`);
+    }
     console.log('Remove it with: node --env-file=.env --experimental-strip-types scripts/delete-test-event.ts', slug);
   } catch (e) {
     console.error('seed-test-event: failed', e);

@@ -13,7 +13,7 @@ Repository tooling: README enforcement, test wrappers, dev seed and CI entry poi
 | `create-staff.ts` | `[claude]` creates one staff account (default ADMIN) in the database `.env` points at and prints a one-time 16-character password once; the person changes it at `/account` (WP-10) |
 | `set-staff-password.ts` | `[claude]` sets a staff account's password from `NEW_PASSWORD` (same rules as `/account`), ends its sessions, audit-logged (WP-10) |
 | `test-accounts.ts` | `[claude]` attaches named test accounts (`sebtest…`/`test-…`) to an existing `test-`/`sebtest-` event, checked in, with the shared password from `TEST_ACCOUNT_PASSWORD` (ADR-040); idempotent; re-run per test event |
-| `seed-test-event.ts` | creates a repeatable test event with configurable participants; for pre‑event checks |
+| `seed-test-event.ts` | creates a repeatable test event with configurable participants (0–60) and length (`--minutes`, 10–1440); for pre‑event checks |
 | `delete-test-event.ts` | `[claude]` removes a test event (`test-`/`sebtest-`/`e2e-`/`ui-` slug, ≤ 60 participants) and all it created: dry run by default, `--yes` deletes in one transaction (append-only triggers off only inside it), participant accounts of that event only, their own audit rows; leaves one `event.test_deleted` audit row |
 
 ## Affects / depends on
