@@ -25,6 +25,7 @@ USER node
 # copy built standalone app and static assets
 COPY --from=build /app/apps/web/.next/standalone .
 COPY --from=build /app/apps/web/.next/static ./apps/web/.next/static
+COPY --from=build /app/apps/web/public ./apps/web/public
 ENV HOSTNAME=0.0.0.0 PORT=3100
 EXPOSE 3100
 HEALTHCHECK CMD node -e "fetch('http://127.0.0.1:3100/healthz').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"

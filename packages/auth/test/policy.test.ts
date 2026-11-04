@@ -14,6 +14,13 @@ test('/ is public (ADR-029) but only itself, not everything under it', () => {
   assert.deepEqual(authorize('/nope', null), { allow: false, status: 401 });
 });
 
+test('the SEB config file is public, the rest of public/ is not (ADR-039)', () => {
+  assert.deepEqual(authorize('/CodeHaunt.seb', null), { allow: true });
+  for (const path of ['/README.md', '/CodeHaunt.sebx', '/other.seb']) {
+    assert.deepEqual(authorize(path, null), { allow: false, status: 401 }, path);
+  }
+});
+
 test('every other route is 401 without a session, including unknown ones', () => {
   for (const path of ['/contest', '/admin', '/api/admin/events', '/api/contest/prompt', '/nope', '/loginx', '/healthzz']) {
     assert.deepEqual(authorize(path, null), { allow: false, status: 401 }, path);

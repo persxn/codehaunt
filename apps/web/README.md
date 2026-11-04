@@ -9,6 +9,7 @@ Next.js application serving the participant UI and admin console.
 | `next.config.mjs` | Next.js configuration |
 | `next-env.d.ts` | TypeScript env declarations |
 | `package.json` | workspace package for the web app |
+| `public/` | static files at the site root (the SEB config for the login handoff, ADR-039) |
 | `src/` | source code (pages, API routes, lib) |
 | `test/` | access-control tests: policy per route and the real middleware (no server, no DB) |
 | `tsconfig.json` | TypeScript config for the web workspace |

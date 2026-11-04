@@ -3,7 +3,9 @@ import { useState, type FormEvent } from 'react';
 import type { ApiError, Me } from '@codehaunt/contracts';
 import { Field, inputClass } from '@/components/field';
 import { Button } from '@/components/button';
+import { LockIcon } from '../_public/icons';
 import styles from './page.module.css';
+import { SebHandoff } from './seb-handoff';
 
 /** Staff land on /admin, participants on /contest. */
 function homeFor(user: Me): string {
@@ -11,7 +13,35 @@ function homeFor(user: Me): string {
   return user.role === 'PARTICIPANT' ? '/contest' : user.role === 'VOLUNTEER' ? '/admin/checkin' : '/admin';
 }
 
-export function LoginForm() {
+/** The sign-in panel body: the form, or the SEB handoff after a `seb_required` refusal (ADR-039). */
+export function SignIn() {
+  const [handoff, setHandoff] = useState(false);
+  if (handoff) return <SebHandoff onBack={() => setHandoff(false)} />;
+  return (
+    <>
+      <h1 className={styles.title}>Sign in</h1>
+      <p className={styles.intro}>Use the username and password from your registration.</p>
+      <LoginForm onSebRequired={() => setHandoff(true)} />
+      <ul className={styles.notes}>
+        <li>
+          <LockIcon />
+          <span>
+            <strong>Participants</strong> sign in inside Safe Exam Browser. Signing in from another browser offers to
+            open it for you.
+          </span>
+        </li>
+        <li>
+          <LockIcon />
+          <span>
+            <strong>Organisers and volunteers</strong> can use any browser.
+          </span>
+        </li>
+      </ul>
+    </>
+  );
+}
+
+function LoginForm({ onSebRequired }: { onSebRequired: () => void }) {
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
@@ -29,6 +59,7 @@ export function LoginForm() {
     if (!response) return setError('Network error. Try again.');
     if (!response.ok) {
       const body = (await response.json().catch(() => null)) as ApiError | null;
+      if (body?.error.code === 'seb_required') return onSebRequired();
       return setError(body?.error.message ?? 'Sign-in failed.');
     }
     window.location.assign(homeFor((await response.json()) as Me));

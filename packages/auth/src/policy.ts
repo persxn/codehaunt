@@ -36,6 +36,8 @@ export const ROUTE_POLICY: ReadonlyArray<readonly [prefix: string, access: Acces
   // App icon and link-preview image (Next file conventions in src/app).
   ['/icon.png', 'public'],
   ['/opengraph-image.jpg', 'public'],
+  // SEB config for the login page's sebs:// link (ADR-039): every participant receives it anyway; no data.
+  ['/CodeHaunt.seb', 'public'],
 
   ['/api/auth/logout', ROLES],
   ['/api/auth/me', ROLES],

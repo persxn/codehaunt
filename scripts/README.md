@@ -10,6 +10,9 @@ Repository tooling: README enforcement, test wrappers, dev seed and CI entry poi
 | `seed.ts` | seeds a demo event, admin and participants for dev; idempotent; random password unless `SEED_PASSWORD` is set |
 | `judge-golden.ts` | WP-07 task 7: 10 golden tutor-mode transcripts (3 honest, 3 integrity cases, 4 injection attempts) through the real judge (GPT-OSS in Ollama); checks schema, injection flags and score order; prints time per transcript. Never during the event |
 | `ci.sh` | CI entry point: `npm ci`, README check, typecheck, all tests; starts Postgres for the concurrency tests |
+| `create-staff.ts` | `[claude]` creates one staff account (default ADMIN) in the database `.env` points at and prints a one-time 16-character password once; the person changes it at `/account` (WP-10) |
+| `set-staff-password.ts` | `[claude]` sets a staff account's password from `NEW_PASSWORD` (same rules as `/account`), ends its sessions, audit-logged (WP-10) |
+| `test-accounts.ts` | `[claude]` attaches named test accounts (`sebtest…`/`test-…`) to an existing `test-`/`sebtest-` event, checked in, with the shared password from `TEST_ACCOUNT_PASSWORD` (ADR-040); idempotent; re-run per test event |
 | `seed-test-event.ts` | creates a repeatable test event with configurable participants; for pre‑event checks |
 | `delete-test-event.ts` | `[claude]` removes a test event (`test-`/`sebtest-`/`e2e-`/`ui-` slug, ≤ 60 participants) and all it created: dry run by default, `--yes` deletes in one transaction (append-only triggers off only inside it), participant accounts of that event only, their own audit rows; leaves one `event.test_deleted` audit row |
 
