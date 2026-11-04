@@ -122,6 +122,8 @@ services:
       JUDGE_OLLAMA_URL: ${JUDGE_OLLAMA_URL:-http://127.0.0.1:11434}
       JUDGE_RELAY_SOCKET: /run/judge/ollama.sock
     volumes: ["judge-socket:/run/judge"]
+    # The worker image's health check probes the worker's HTTP port, which these one-shot services don't serve.
+    healthcheck: { disable: true }
     mem_limit: 128m
     restart: "no"
 
@@ -137,6 +139,7 @@ services:
       JUDGE_THINK: ${JUDGE_THINK:-low}
     volumes: ["judge-socket:/run/judge"]
     networks: [db]
+    healthcheck: { disable: true }
     mem_limit: 512m
     restart: "no"
 

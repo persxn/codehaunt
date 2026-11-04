@@ -20,6 +20,7 @@ import {
   filterReply,
   fromDbLanguage,
   saveBursts,
+  untrustedJson,
   type ReferenceResult,
 } from '@codehaunt/core';
 import type { PrismaClient } from '@codehaunt/db';
@@ -28,10 +29,11 @@ const TRUNCATED = '\n[truncated]';
 
 /**
  * The whole judge input must fit the model's context with room for the rubric, a repair turn, reasoning and the reply
- * (audit R14-3, R14-NV1): 70,000 characters of JSON is at most ~23k tokens even at 3 chars per token, inside
- * OllamaJudgeModel's 32k context. Over the context Ollama drops the system message (measured), so this is a hard limit.
+ * (audit R14-3, R14-NV1, R15-1). Measured as sent (`untrustedJson`, where each `<`, `>`, `&` is six characters):
+ * 56,000 characters stay under ~24k tokens even for escape-dense code (~2.3 chars per token), inside the 32k context.
+ * Over the context Ollama cuts the prompt silently (measured), so this is a hard limit.
  */
-export const MAX_INPUT_CHARS = 70_000;
+export const MAX_INPUT_CHARS = 56_000;
 
 export class InputTooLarge extends Error {
   readonly chars: number;
@@ -41,7 +43,8 @@ export class InputTooLarge extends Error {
   }
 }
 
-const size = (input: JudgeInputV2) => JSON.stringify(input).length;
+/** The size the model receives: the escaped document inside the prompt, not plain JSON (audit R15-1). */
+const size = (input: JudgeInputV2) => untrustedJson(input).length;
 const cut = (text: string, max: number) => (text.length <= max ? text : text.slice(0, max - TRUNCATED.length) + TRUNCATED);
 
 /**

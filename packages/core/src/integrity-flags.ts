@@ -6,10 +6,9 @@
 import { looksLikeCode } from './reply-filter.ts';
 
 export const SAVE_BURST_CHARS = 400;
-/** Sustained typing ceiling (audit R14-2): about 120 wpm of code is already fast. */
-export const MAX_TYPING_CHARS_PER_S = 10;
-/** The editor autosaves at most this often (code-panel AUTOSAVE_MS), so a shorter gap counts as this long. */
-export const MIN_SAVE_INTERVAL_MS = 20_000;
+/** Growth over any 60 s of saves above this is faster than sustained typing, ~12.5 chars/s (audit R15-2). */
+export const SUSTAINED_CHARS_PER_MINUTE = 750;
+const MINUTE_MS = 60_000;
 
 export interface SavedVersion {
   /** Milliseconds timestamp */
@@ -19,43 +18,34 @@ export interface SavedVersion {
 }
 
 /**
- * Saves that grew faster than anyone types: more than `maxGrowth` chars, at a rate above `maxCharsPerSecond` over the
- * time since the previous save (never shorter than one autosave interval). A rate, not a window: idling before a
- * paste doesn't hide it (audit R14-2). The first save counts as growth from '' and is flagged above `maxGrowth`;
- * a save equal to an earlier version (a restore) never is. Returns the timestamps of flagged saves.
+ * Saves that grew faster than anyone types (ADR-033). Autosave writes only changed code, every 20 s, so the gap since
+ * the previous save is idle time, not typing time: what a save adds was typed within about one autosave interval
+ * (audit R15-2). A save is flagged when it alone grows by more than `maxGrowth` (the first save counts from ''), or
+ * when the growth of the saves in the minute up to it exceeds `perMinute`. A save equal to an earlier version (a
+ * restore) never counts. Returns the timestamps of flagged saves, ascending.
  */
 export function saveBursts(
   versions: readonly SavedVersion[],
-  opts?: { maxGrowth?: number; maxCharsPerSecond?: number },
+  opts?: { maxGrowth?: number; perMinute?: number },
 ): number[] {
   const maxGrowth = opts?.maxGrowth ?? SAVE_BURST_CHARS;
-  const rate = opts?.maxCharsPerSecond ?? MAX_TYPING_CHARS_PER_S;
-
-  // copy and sort by atMs ascending (stable sort)
+  const perMinute = opts?.perMinute ?? SUSTAINED_CHARS_PER_MINUTE;
   const sorted = [...versions].sort((a, b) => a.atMs - b.atMs);
-
   const flagged: number[] = [];
   const seen = new Set<string>();
-
+  // Growth of each typed (non-restore) save, for the one-minute window.
+  const growths: Array<{ atMs: number; growth: number }> = [];
   for (let i = 0; i < sorted.length; i++) {
     const cur = sorted[i]!;
-    const prev = i > 0 ? sorted[i - 1]! : undefined;
-
-    const isRestore = seen.has(cur.source);
-    if (!isRestore) {
-      if (i === 0) {
-        if (cur.source.length > maxGrowth) flagged.push(cur.atMs);
-      } else if (prev) {
-        const growth = cur.source.length - prev.source.length;
-        const seconds = Math.max(cur.atMs - prev.atMs, MIN_SAVE_INTERVAL_MS) / 1000;
-        if (growth > maxGrowth && growth > rate * seconds) {
-          flagged.push(cur.atMs);
-        }
-      }
-    }
+    const restore = seen.has(cur.source);
     seen.add(cur.source);
+    if (restore) continue;
+    const growth = cur.source.length - (i > 0 ? sorted[i - 1]!.source.length : 0);
+    growths.push({ atMs: cur.atMs, growth: Math.max(0, growth) });
+    const lastMinute = growths.filter((g) => g.atMs > cur.atMs - MINUTE_MS).reduce((n, g) => n + g.growth, 0);
+    // Only a save that added code can be the fast one; a shrink in the same minute as a burst is not.
+    if (growth > 0 && (growth > maxGrowth || lastMinute > perMinute)) flagged.push(cur.atMs);
   }
-
   return flagged;
 }
 

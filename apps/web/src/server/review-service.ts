@@ -41,7 +41,8 @@ export async function requeueJudgeJob(prisma: PrismaClient, jobId: string, reaso
   return prisma.$transaction(async (tx) => {
     const moved = await tx.judgeJob.updateMany({
       where: { id: jobId, status: { in: ['DONE', 'NEEDS_MANUAL'] } },
-      data: { status: 'QUEUED', error: null, startedAt: null, finishedAt: null },
+      // A fresh run gets fresh attempts, or one earlier crash would count against it.
+      data: { status: 'QUEUED', error: null, attempts: 0, startedAt: null, finishedAt: null },
     });
     if (moved.count === 0) throw conflict('judge_busy', 'That participant is already queued or being judged.');
     await tx.auditLog.create({ data: { actorId: actor.id, action: 'judge.requeued', targetType: 'participant', targetId: job.participantId, reason, requestId: actor.requestId } });

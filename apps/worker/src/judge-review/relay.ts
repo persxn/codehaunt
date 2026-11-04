@@ -9,8 +9,33 @@ import { createServer, request } from 'node:http';
 
 const SOCKET = process.env.JUDGE_RELAY_SOCKET ?? '/run/judge/ollama.sock';
 const OLLAMA = new URL(process.env.JUDGE_OLLAMA_URL ?? 'http://127.0.0.1:11434');
-/** Largest request accepted: the judge input budget (80k chars) with room for the rubric and a repair turn. */
+const MODEL = process.env.JUDGE_MODEL ?? 'gpt-oss:120b';
+/** Largest request accepted: the judge input budget (56k chars as sent) with room for the rubric and a repair turn. */
 export const MAX_BODY_BYTES = 1024 * 1024;
+
+/**
+ * Rebuilds the request from the fields the judge uses only (audit R15-5): the configured model, messages, the output
+ * schema, `think`, and two options. No `keep_alive`, no other model, no other option reaches the shared Ollama.
+ */
+function sanitize(raw: Buffer): Buffer | null {
+  let body: Record<string, unknown>;
+  try {
+    body = JSON.parse(raw.toString('utf8')) as Record<string, unknown>;
+  } catch {
+    return null;
+  }
+  if (body.model !== MODEL || !Array.isArray(body.messages)) return null;
+  const options = (body.options && typeof body.options === 'object' ? body.options : {}) as Record<string, unknown>;
+  const think = ['low', 'medium', 'high'].includes(body.think as string) ? body.think : 'low';
+  return Buffer.from(JSON.stringify({
+    model: MODEL,
+    messages: body.messages,
+    stream: false,
+    format: body.format,
+    think,
+    options: { temperature: Number(options.temperature) || 0, num_ctx: 32_768 },
+  }));
+}
 
 const log = (entry: Record<string, unknown>) => console.log(JSON.stringify(entry));
 
@@ -37,7 +62,11 @@ const server = createServer((req, res) => {
   req.on('error', () => {});
   req.on('end', () => {
     if (refused || res.writableEnded) return;
-    const body = Buffer.concat(chunks);
+    const body = sanitize(Buffer.concat(chunks));
+    if (!body) {
+      res.writeHead(400, { 'content-type': 'application/json' }).end('{"error":"not a judge chat request"}');
+      return;
+    }
     const upstream = request(
       { host: OLLAMA.hostname, port: OLLAMA.port, path: '/api/chat', method: 'POST', headers: { 'content-type': 'application/json', 'content-length': body.length } },
       (up) => {
@@ -46,8 +75,13 @@ const server = createServer((req, res) => {
       },
     );
     upstream.on('error', () => {
+      if (res.writableEnded) return;
       if (!res.headersSent) res.writeHead(502, { 'content-type': 'application/json' });
       res.end('{"error":"ollama unreachable"}');
+    });
+    // The judge gave up (timeout) or died: stop the generation on the shared Ollama too (audit R15-5).
+    res.on('close', () => {
+      if (!res.writableFinished) upstream.destroy();
     });
     upstream.end(body);
   });

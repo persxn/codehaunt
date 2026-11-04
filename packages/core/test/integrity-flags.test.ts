@@ -33,10 +33,12 @@ test('saveBursts burst detection', () => {
   assert.deepEqual(saveBursts(saves), [20000]);
 });
 
-// 3. slow growth
+// 3. slow growth: typing for a minute autosaves every 20 s (R15-2: a single +500 save is no longer "slow")
 test('saveBursts slow growth not flagged', () => {
   const saves = [
     { atMs: 0, source: src(100) },
+    { atMs: 20000, source: src(260) },
+    { atMs: 40000, source: src(420) },
     { atMs: 60000, source: src(600) },
   ];
   assert.deepEqual(saveBursts(saves), []);
@@ -155,10 +157,15 @@ test('codeHeavyQuestions identifies heavy code question', () => {
   assert.deepEqual(res, [1]);
 });
 
-test('audit R14-2: idling before a paste does not hide it; slow honest growth is not flagged', () => {
+test('audit R14-2/R15-2: idling before a paste does not hide it; fast sustained typing is caught; normal typing is not', () => {
   const base = 'x'.repeat(100);
-  assert.deepEqual(saveBursts([{ atMs: 0, source: base }, { atMs: 40_000, source: base + 'y'.repeat(2400) }]), [40_000], '2400 chars after a 40 s idle');
-  assert.deepEqual(saveBursts([{ atMs: 0, source: base }, { atMs: 10 * 60_000, source: base + 'y'.repeat(2400) }]), [], '2400 chars over 10 minutes (offline typing) is 4 chars/s');
-  assert.deepEqual(saveBursts([{ atMs: 0, source: base }, { atMs: 5_000, source: base + 'y'.repeat(450) }]), [5_000], 'a gap under one autosave counts as 20 s');
+  const grow = (n: number) => base + 'y'.repeat(n);
+  assert.deepEqual(saveBursts([{ atMs: 0, source: base }, { atMs: 40_000, source: grow(2400) }]), [40_000], '2400 chars after a 40 s idle');
+  assert.deepEqual(saveBursts([{ atMs: 0, source: base }, { atMs: 4 * 60_000, source: grow(2400) }]), [240_000], 'after a 4-minute idle too (R15-2)');
+  // 390 chars per autosave (19.5 chars/s): each save is under 400, the minute is not.
+  const fast = Array.from({ length: 4 }, (_, k) => ({ atMs: (k + 1) * 20_000, source: grow(390 * (k + 1)) }));
+  assert.ok(saveBursts([{ atMs: 0, source: base }, ...fast]).length > 0, 'sustained 20 chars/s');
+  // 100 chars per autosave (5 chars/s) for ten minutes: never flagged.
+  const normal = Array.from({ length: 30 }, (_, k) => ({ atMs: (k + 1) * 20_000, source: grow(100 * (k + 1)) }));
+  assert.deepEqual(saveBursts([{ atMs: 0, source: base }, ...normal]), []);
 });
-

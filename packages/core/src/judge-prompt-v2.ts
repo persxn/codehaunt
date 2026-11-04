@@ -57,16 +57,17 @@ Reply with ONE JSON object and nothing else, exactly this shape:
 {"problems":[{"problemId":"<id from input>","score":0,"criteria":{"questionQuality":0,"independence":0,
 "debugging":0,"improvement":0,"complexity":0,"tokenEconomy":0},"complexityAchieved":"O(...)",
 "complexityOptimal":"O(...)","rationale":"..."}],"overall":{"score":0,"rationale":"..."},
-"injectionFlag":false,"injectionEvidence":"","rubricCheck":"<the session check code below>"}
+"injectionFlag":false,"injectionEvidence":"","rubricCheck":"<the session check code at the top>"}
 Include every problemId from the input exactly once. Use "n/a" for complexityAchieved when there is no final code.`;
 
 /**
- * `check` is a fresh random code per judging call, placed last in the rubric: the reply must echo it in `rubricCheck`
- * (audit R14-NV1). Participant data never contains it, so only a model that read the rubric can.
+ * `check` is a fresh random code per judging call, placed FIRST in the rubric: Ollama cuts an over-long prompt from
+ * the start, so any cut that reaches the rubric removes the code, and the reply must echo it in `rubricCheck`
+ * (audit R14-NV1, R15-NV1). Participant data never contains it, so only a model that read the whole rubric can.
  */
 export function buildJudgeMessagesV2(input: JudgeInputV2, check: string): ChatMessage[] {
   return [
-    { role: 'system', content: `${JUDGE_SYSTEM_PROMPT_V2}\nSession check code: ${check}` },
+    { role: 'system', content: `Session check code: ${check}\n${JUDGE_SYSTEM_PROMPT_V2}` },
     { role: 'user', content: `<participant_data>${untrustedJson(input)}</participant_data>` },
   ];
 }
@@ -93,17 +94,44 @@ const CONFUSABLES: Readonly<Record<string, string>> = {
   α: 'a', ο: 'o', ρ: 'p', ν: 'v', ε: 'e', ι: 'i', κ: 'k', τ: 't', υ: 'u', Α: 'A', Β: 'B', Ε: 'E', Ι: 'I', Κ: 'K', Μ: 'M', Ν: 'N', Ο: 'O', Ρ: 'P', Τ: 'T', Χ: 'X',
 };
 
-/** NFKC (full-width forms), invisible format characters removed (zero-width spaces, joiners), look-alikes folded. */
+/**
+ * NFKC (full-width forms), invisible format characters removed (zero-width spaces, joiners), accents dropped
+ * (NFKD + combining marks, audit R15-4), look-alikes folded.
+ */
 export function normalizeForHints(text: string): string {
   return text
     .normalize('NFKC')
     .replace(/\p{Cf}/gu, '')
+    .normalize('NFKD')
+    .replace(/\p{M}/gu, '')
     .replace(/[^\x00-\x7F]/g, (ch) => CONFUSABLES[ch] ?? ch);
 }
 
+const LEET: Readonly<Record<string, string>> = { '0': 'o', '1': 'i', '3': 'e', '4': 'a', '5': 's', '7': 't', '@': 'a', '$': 's', '|': 'i' };
+
+/** Lowercase letters only, leetspeak undone: "J u-d_g 3", "j.u.d.g.e" and "jUdG3" all become "judge" (audit R15-4). */
+function squash(normal: string): string {
+  return normal.toLowerCase().replace(/[013457@$|]/g, (ch) => LEET[ch] ?? ch).replace(/[^a-z]/g, '');
+}
+
+/** Key phrases checked in the squashed form (spacing and leetspeak can't hide them). */
+const SQUASHED_PATTERNS: readonly RegExp[] = [
+  /(^|[^d])judge(?!ment)/, /grader/, /evaluator/, /ignore(all|any|the)?(previous|prior|above|earlier)instructions/,
+  /fullmarks/, /topmarks/, /perfectscore/, /systemprompt/, /participantdata/, /injectionflag/,
+];
+
+/** The same intent in Bengali and Hindi (the event's other likely languages, audit R15-4). */
+const INDIC_PATTERNS: readonly RegExp[] = [
+  /বিচারক|পরীক্ষক|মূল্যায়নকারী|পূর্ণ\s*নম্বর|আগের\s*নির্দেশ/u,
+  /न्यायाधीश|परीक्षक|मूल्यांकनकर्ता|पूरे\s*अंक|पिछले\s*निर्देश/u,
+];
+
 const suspicious = (text: string) => {
+  if (INDIC_PATTERNS.some((p) => p.test(text))) return true;
   const normal = normalizeForHints(text);
-  return INJECTION_PATTERNS.some((p) => p.test(normal));
+  if (INJECTION_PATTERNS.some((p) => p.test(normal))) return true;
+  const squashed = squash(normal);
+  return SQUASHED_PATTERNS.some((p) => p.test(squashed));
 };
 
 /**

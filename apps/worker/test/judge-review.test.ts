@@ -10,6 +10,8 @@ import { after, before, test } from 'node:test';
 import type { JudgeInputV2 } from '@codehaunt/contracts';
 import { createTestDatabase, type TestDatabase } from '@codehaunt/db/testing';
 
+import { untrustedJson } from '@codehaunt/core';
+
 import { buildJudgeInput, fitToBudget, InputTooLarge, MAX_INPUT_CHARS } from '../src/judge-review/build-input.ts';
 import type { JudgeMessage, JudgeModel } from '../src/judge-review/ollama.ts';
 import { claimJudgeJob, drainJudgeQueue, judgeJob, MAX_CALLS, MAX_JOB_ATTEMPTS, parseJudgeReply, requeueStuckJudgeJobs, RUNNING_TIMEOUT_MS } from '../src/judge-review/review.ts';
@@ -230,7 +232,7 @@ test('audit R14-3: a heavy participant is trimmed to the budget in a fixed order
   };
   assert.ok(JSON.stringify(heavy).length > 150_000);
   const fitted = fitToBudget(heavy);
-  assert.ok(JSON.stringify(fitted.input).length <= MAX_INPUT_CHARS);
+  assert.ok(untrustedJson(fitted.input).length <= MAX_INPUT_CHARS, 'measured as sent (R15-1)');
   assert.deepEqual(fitted.trimmed.slice(0, 1), ['replies'], 'replies go first');
   assert.equal(fitted.input.problems[0]!.transcript.filter((e) => e.kind === 'question').length, 6, 'every question survives');
   assert.deepEqual(fitToBudget(input).trimmed, [], 'a normal participant is untouched');
@@ -262,5 +264,32 @@ test('audit R14-NV1: a model that lost the rubric (no check code) never produces
   assert.equal(calls.length, MAX_CALLS);
   assert.match(checkOf(calls[0]!), /^[0-9a-f]{12}$/, 'a fresh 12-hex code is in the system message');
   assert.equal(await db.prisma.judgeReview.count({ where: { participantId: f.participant.id } }), 0);
+});
+
+test('audit R15-1: escape-dense code is measured as sent, so it cannot slip past the budget', () => {
+  const lt = '&lt;'.repeat(1500); // 6000 chars of the cheapest-to-type, most-expensive-to-send text
+  const input = {
+    participantRef: 'p',
+    problems: Array.from({ length: 6 }, (_, i) => ({
+      problemId: `p${i}`, title: 't', statement: 's', language: 'cpp' as const,
+      metrics: { accepted: false, prompts: 0, tokens: 0, attempts: 0, rejectedBeforeAccept: 0, timeToAcceptMs: null, tokensAfterAccept: 0, timeRatio: null, memoryRatio: null },
+      transcript: [], codeSnapshots: [], finalCode: lt,
+      flags: { saveBursts: 0, aiCopiedLines: 0, codeHeavyQuestions: 0 },
+    })),
+  };
+  assert.ok(JSON.stringify(input).length < MAX_INPUT_CHARS, 'plain JSON looks small');
+  assert.ok(untrustedJson(input).length > MAX_INPUT_CHARS, 'but it is big as sent');
+  const fitted = fitToBudget(input);
+  assert.ok(untrustedJson(fitted.input).length <= MAX_INPUT_CHARS);
+  assert.ok(fitted.trimmed.includes('code'));
+});
+
+test('audit R15-6: an error never stores a key the model invented', () => {
+  const input = { participantRef: 'p', problems: [{ problemId: 'A' }] } as unknown as JudgeInputV2;
+  const output = JSON.parse(validOutput(input, false, 'c0de')) as Record<string, unknown>;
+  output['Real Name of student 4242'] = 'x';
+  const result = parseJudgeReply(input, JSON.stringify(output), 'c0de');
+  assert.equal(result.ok, false);
+  assert.doesNotMatch(!result.ok ? result.error : '', /Real Name|4242/);
 });
 

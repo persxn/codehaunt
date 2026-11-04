@@ -28,6 +28,14 @@ export const MAX_JOB_ATTEMPTS = 3;
 
 const OUTPUT_SCHEMA = z.toJSONSchema(JudgeOutputV2);
 
+/** Keys the output schema knows; any other path segment in an error is the model's own text (audit R15-6). */
+const KNOWN_KEYS = new Set([
+  'problems', 'overall', 'injectionFlag', 'injectionEvidence', 'rubricCheck', 'problemId', 'score', 'criteria', 'complexityAchieved',
+  'complexityOptimal', 'rationale', 'questionQuality', 'independence', 'debugging', 'improvement', 'complexity', 'tokenEconomy',
+]);
+const safePath = (path: readonly PropertyKey[]) =>
+  path.map((p) => (typeof p === 'number' || KNOWN_KEYS.has(String(p)) ? String(p) : '<other key>')).join('.');
+
 export interface Log {
   (entry: Record<string, unknown>): void;
 }
@@ -47,7 +55,8 @@ export function parseJudgeReply(input: JudgeInputV2, text: string, check: string
   const parsed = JudgeOutputV2.safeParse(json);
   if (!parsed.success) {
     const issue = parsed.error.issues[0]!;
-    return { ok: false, error: `schema: ${issue.path.join('.')}: ${issue.message}`.slice(0, 200) };
+    // Path and zod's issue code only: zod's message can echo an unexpected key the model invented.
+    return { ok: false, error: `schema: ${safePath(issue.path)}: ${issue.code}`.slice(0, 200) };
   }
   if (parsed.data.rubricCheck !== check) return { ok: false, error: 'rubric check missing: the model may not have seen the rubric' };
   const mismatch = judgeOutputMismatch(input, parsed.data);
@@ -76,7 +85,8 @@ export async function askJudge(model: JudgeModel, input: JudgeInputV2): Promise<
     error = result.error;
     // Second call repairs the first reply; the third starts over (a confused conversation rarely repairs twice).
     messages = call === 1
-      ? [...base, { role: 'assistant', content: text.slice(0, 20_000) }, { role: 'user', content: `That reply was not valid (${error}). Reply with the corrected JSON object only.` }]
+      // The bad reply is capped, so the repair turn can't push the prompt past the context (audit R15-1).
+      ? [...base, { role: 'assistant', content: text.slice(0, 4_000) }, { role: 'user', content: `That reply was not valid (${error}). Reply with the corrected JSON object only.` }]
       : base;
   }
   return { ok: false, error, calls: MAX_CALLS };
