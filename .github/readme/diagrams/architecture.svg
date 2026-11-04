@@ -1,0 +1,184 @@
+<svg xmlns="http://www.w3.org/2000/svg" fill="#F7F5FB" viewBox="0 0 1200 860" width="1200" height="860" role="img" aria-labelledby="t d">
+  <title id="t">CodeHaunt system architecture</title>
+  <desc id="d">Participant laptops in Safe Exam Browser reach Cloudflare, which tunnels to the DGX Spark running the web app, worker, sandbox, Postgres and the batch judge. The DGX reaches a k3s GPU cluster over Tailscale for the tutor model.</desc>
+  <defs>
+    <style>
+      .bg{fill:#14101F}
+      .zone{fill:#1E1930;stroke:#3A3352;stroke-width:1.5}
+      .zone-dgx{fill:#1E1930;stroke:#F59E0B;stroke-width:1.5}
+      .zone-cf{fill:#1E1930;stroke:#B79CFF;stroke-width:1.5}
+      .box{fill:#2A2440;stroke:#8C82A8;stroke-width:1.2}
+      .hot{fill:#2A2440;stroke:#F59E0B;stroke-width:1.6}
+      .safe{fill:#2A2440;stroke:#4ADE80;stroke-width:1.4}
+      .info{fill:#2A2440;stroke:#60A5FA;stroke-width:1.4}
+      .danger{fill:#2a1a24;stroke:#F87171;stroke-width:1.4;stroke-dasharray:5 4}
+      text{font-family:'JetBrains Mono','SFMono-Regular',Menlo,Consolas,monospace}
+      .h{font-size:15px;font-weight:700;letter-spacing:.06em}
+      .zt{font-size:12px;font-weight:700;letter-spacing:.14em}
+      .s{font-size:11.5px;fill:#B4AAC9}
+      .xs{font-size:10.5px;fill:#B4AAC9}
+      .amber{fill:#F59E0B}.violet{fill:#B79CFF}.green{fill:#4ADE80}.blue{fill:#60A5FA}.red{fill:#F87171}
+      .line{stroke:#8C82A8;stroke-width:1.6;fill:none}
+      .lh{stroke:#F59E0B;stroke-width:2;fill:none}
+      .lb{stroke:#60A5FA;stroke-width:1.8;fill:none;stroke-dasharray:6 4}
+      .lv{stroke:#B79CFF;stroke-width:1.8;fill:none}
+    </style>
+    <marker id="a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" fill="#8C82A8"/></marker>
+    <marker id="ah" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" fill="#F59E0B"/></marker>
+    <marker id="ab" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" fill="#60A5FA"/></marker>
+    <marker id="av" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" fill="#B79CFF"/></marker>
+    <symbol id="ghost" viewBox="0 0 24 24"><path d="M12 2a8 8 0 0 0-8 8v12l3-3 2.5 2.5L12 19l2.5 2.5L17 19l3 3V10a8 8 0 0 0-8-8z" fill="none" stroke="#F59E0B" stroke-width="2" stroke-linejoin="round"/><ellipse cx="9" cy="10" rx="1" ry="1.5" fill="#F59E0B"/><ellipse cx="15" cy="10" rx="1" ry="1.5" fill="#F59E0B"/></symbol>
+  </defs>
+  <rect class="bg" width="1200" height="860" rx="18"/>
+  <use href="#ghost" x="32" y="26" width="28" height="28"/>
+  <text x="70" y="47" class="h" style="font-size:20px">CODE<tspan class="amber">HAUNT</tspan> · SYSTEM ARCHITECTURE</text>
+  <text x="1168" y="47" class="s" text-anchor="end">everything the participant touches is untrusted</text>
+
+  <!-- Clients -->
+  <rect class="zone" x="32" y="80" width="250" height="300" rx="12"/>
+  <text x="50" y="106" class="zt violet">PEOPLE</text>
+  <rect class="hot" x="50" y="122" width="214" height="86" rx="8"/>
+  <text x="64" y="146" class="h" style="font-size:13px">Participant laptop</text>
+  <text x="64" y="166" class="s">Safe Exam Browser kiosk</text>
+  <text x="64" y="183" class="s">sends Config-Key hash</text>
+  <text x="64" y="199" class="xs">on every request</text>
+  <rect class="box" x="50" y="220" width="214" height="66" rx="8"/>
+  <text x="64" y="244" class="h" style="font-size:13px">Organisers · volunteers</text>
+  <text x="64" y="264" class="s">any browser, phone camera</text>
+  <text x="64" y="279" class="xs">QR check-in · admin console</text>
+  <rect class="box" x="50" y="298" width="214" height="66" rx="8"/>
+  <text x="64" y="322" class="h" style="font-size:13px">Hall projector</text>
+  <text x="64" y="342" class="s">/projector/&lt;token&gt;, no login</text>
+  <text x="64" y="357" class="xs">freezes in the last minutes</text>
+
+  <!-- Cloudflare -->
+  <rect class="zone-cf" x="322" y="80" width="250" height="300" rx="12"/>
+  <text x="340" y="106" class="zt violet">CLOUDFLARE EDGE</text>
+  <rect class="box" x="340" y="122" width="214" height="56" rx="8"/>
+  <text x="354" y="145" class="h" style="font-size:13px">TLS + DNS</text>
+  <text x="354" y="164" class="s">codehaunt.&lt;domain&gt;</text>
+  <rect class="box" x="340" y="188" width="214" height="72" rx="8"/>
+  <text x="354" y="211" class="h" style="font-size:13px">WAF custom rule</text>
+  <text x="354" y="230" class="s">/contest*, /api/contest*</text>
+  <text x="354" y="246" class="s">need the SEB header</text>
+  <rect class="box" x="340" y="270" width="214" height="52" rx="8"/>
+  <text x="354" y="292" class="h" style="font-size:13px">Rate limit</text>
+  <text x="354" y="310" class="s">login + password: 60/10 s/IP</text>
+  <rect class="box" x="340" y="332" width="214" height="36" rx="8"/>
+  <text x="354" y="355" class="s">Tunnel · 2 connectors</text>
+
+  <path class="lh" d="M264 165 H332" marker-end="url(#ah)"/>
+  <path class="line" d="M264 253 H332" marker-end="url(#a)"/>
+  <path class="line" d="M264 331 H332" marker-end="url(#a)"/>
+  <text x="298" y="157" class="xs" text-anchor="middle">HTTPS</text>
+
+  <!-- DGX -->
+  <rect class="zone-dgx" x="612" y="80" width="556" height="480" rx="12"/>
+  <text x="630" y="106" class="zt amber">DGX SPARK · DOCKER COMPOSE (127.0.0.1 only)</text>
+  <path class="lh" d="M554 350 C590 350 590 160 640 160" marker-end="url(#ah)"/>
+  <text x="592" y="412" class="xs" text-anchor="middle">cloudflared ×2</text>
+
+  <rect class="hot" x="642" y="122" width="250" height="110" rx="8"/>
+  <text x="656" y="146" class="h" style="font-size:13px">apps/web · Next.js</text>
+  <text x="656" y="166" class="s">participant UI · admin · API</text>
+  <text x="656" y="183" class="s">deny-by-default route policy</text>
+  <text x="656" y="200" class="s">SEB check · token ledger</text>
+  <text x="656" y="217" class="s">tutor reply filter</text>
+
+  <rect class="info" x="642" y="250" width="250" height="84" rx="8"/>
+  <text x="656" y="274" class="h" style="font-size:13px">Postgres 16</text>
+  <text x="656" y="294" class="s">per-service roles</text>
+  <text x="656" y="311" class="s">append-only audit + ledger</text>
+  <text x="656" y="327" class="xs">job queue = a table (SKIP LOCKED)</text>
+
+  <rect class="box" x="642" y="352" width="250" height="84" rx="8"/>
+  <text x="656" y="376" class="h" style="font-size:13px">apps/worker</text>
+  <text x="656" y="396" class="s">sample runs · hidden tests</text>
+  <text x="656" y="413" class="s">no internet, no Docker socket</text>
+  <text x="656" y="428" class="xs">networks: db + sandbox only</text>
+
+  <rect class="safe" x="912" y="352" width="236" height="84" rx="8"/>
+  <text x="926" y="376" class="h" style="font-size:13px">apps/docker-proxy</text>
+  <text x="926" y="396" class="s">7 allowed Docker calls</text>
+  <text x="926" y="413" class="s">rebuilds every container</text>
+  <text x="926" y="428" class="xs">from the sandbox template</text>
+
+  <rect class="danger" x="912" y="454" width="236" height="88" rx="8"/>
+  <text x="926" y="478" class="h red" style="font-size:13px">Sandbox runners</text>
+  <text x="926" y="497" class="s">C · C++ · Java · Python</text>
+  <text x="926" y="514" class="s">--network=none, read-only,</text>
+  <text x="926" y="530" class="xs">uid 65534, no caps, cgroup caps</text>
+
+  <rect class="box" x="912" y="122" width="236" height="110" rx="8"/>
+  <text x="926" y="146" class="h" style="font-size:13px">judge-review</text>
+  <text x="926" y="166" class="s">one-shot, after the contest</text>
+  <text x="926" y="183" class="s">rubric judge-v2, JSON schema</text>
+  <text x="926" y="200" class="s">→ judge-relay (unix socket)</text>
+  <text x="926" y="217" class="xs">POST /api/chat only</text>
+
+  <rect class="box" x="912" y="250" width="236" height="84" rx="8"/>
+  <text x="926" y="274" class="h" style="font-size:13px">GPT-OSS-120B</text>
+  <text x="926" y="294" class="s">Ollama on the DGX</text>
+  <text x="926" y="311" class="s">process-quality judge</text>
+  <text x="926" y="327" class="xs">+ test-case drafts</text>
+
+  <rect class="box" x="642" y="454" width="250" height="88" rx="8"/>
+  <text x="656" y="478" class="h" style="font-size:13px">Backups + releases</text>
+  <text x="656" y="498" class="s">pg_dump every 5 min, 2 hosts</text>
+  <text x="656" y="515" class="s">tagged images, rollback ~33 s</text>
+  <text x="656" y="531" class="xs">deploy.sh · rollback.sh · restore.sh</text>
+
+  <path class="line" d="M767 232 V250" marker-end="url(#a)"/>
+  <path class="line" d="M767 334 V352" marker-start="url(#a)"/>
+  <path class="line" d="M892 394 H912" marker-end="url(#a)"/>
+  <path class="line" d="M1030 436 V454" marker-end="url(#a)"/>
+  <path class="line" d="M1030 232 V250" marker-end="url(#a)"/>
+  <path class="line" d="M912 160 C900 160 902 300 892 300" marker-end="url(#a)"/>
+  <path class="line" d="M767 436 V454" marker-end="url(#a)"/>
+
+  <!-- GPU cluster -->
+  <rect class="zone" x="32" y="420" width="540" height="300" rx="12"/>
+  <text x="50" y="446" class="zt blue">GPU CLUSTER · k3s · namespace codehaunt</text>
+  <rect class="info" x="50" y="464" width="240" height="104" rx="8"/>
+  <text x="64" y="488" class="h" style="font-size:13px">gateway-a / gateway-b</text>
+  <text x="64" y="508" class="s">counts prompt tokens</text>
+  <text x="64" y="525" class="s">caps replies · least-busy node</text>
+  <text x="64" y="542" class="s">merges tokens per 100 ms</text>
+  <text x="64" y="558" class="xs">b is the DGX's fallback</text>
+  <g>
+    <rect class="box" x="314" y="464" width="240" height="40" rx="8"/><text x="328" y="489" class="s">model-0 · vLLM · RTX 5070</text>
+    <rect class="box" x="314" y="512" width="240" height="40" rx="8"/><text x="328" y="537" class="s">model-1 · vLLM · RTX 5070</text>
+    <rect class="box" x="314" y="560" width="240" height="40" rx="8"/><text x="328" y="585" class="s">model-2 · vLLM · RTX 5070</text>
+    <rect class="box" x="314" y="608" width="240" height="40" rx="8"/><text x="328" y="633" class="s">model-3 · vLLM · RTX 5070</text>
+  </g>
+  <path class="lb" d="M290 516 H314" marker-end="url(#ab)"/>
+  <rect class="box" x="50" y="586" width="240" height="118" rx="8"/>
+  <text x="64" y="610" class="h" style="font-size:13px">The tutor</text>
+  <text x="64" y="630" class="s">Qwen3-4B-Instruct FP8</text>
+  <text x="64" y="647" class="s">prompt tutor-v1</text>
+  <text x="64" y="664" class="s">never sees code/statement</text>
+  <text x="64" y="681" class="s">examples ≤ 3 lines</text>
+  <text x="64" y="697" class="xs">TTFT p95 ≈ 1 s at 50 sessions</text>
+  <text x="314" y="680" class="xs">weights on node-local scratch</text>
+  <text x="314" y="697" class="xs">one full GPU per node</text>
+
+  <path class="lb" d="M642 215 C600 215 610 440 290 470" marker-end="url(#ab)"/>
+  <text x="420" y="404" class="xs blue" text-anchor="middle">Tailscale relay · ~78 ms</text>
+
+  <!-- legend -->
+  <rect class="zone" x="612" y="580" width="556" height="140" rx="12"/>
+  <text x="630" y="606" class="zt">KEY</text>
+  <rect class="hot" x="630" y="620" width="22" height="14" rx="3"/><text x="662" y="632" class="s">participant-facing path</text>
+  <rect class="safe" x="630" y="644" width="22" height="14" rx="3"/><text x="662" y="656" class="s">security choke point</text>
+  <rect class="danger" x="630" y="668" width="22" height="14" rx="3"/><text x="662" y="680" class="s">runs untrusted code</text>
+  <path class="lb" d="M630 699 H652"/><text x="662" y="704" class="s">model traffic</text>
+  <text x="900" y="632" class="s">Only docker-proxy holds the</text>
+  <text x="900" y="649" class="s">Docker socket; only migrate</text>
+  <text x="900" y="666" class="s">holds the DB owner password.</text>
+  <text x="900" y="690" class="s">Hidden tests never leave</text>
+  <text x="900" y="707" class="s">the DGX.</text>
+
+  <text x="32" y="770" class="s">Read top-left to right: a participant's request crosses Cloudflare's checks, the tunnel, and lands on apps/web.</text>
+  <text x="32" y="790" class="s">Code runs only in the sandbox; the tutor runs on the GPU cluster; the judge model runs after the contest on the DGX.</text>
+  <text x="32" y="826" class="xs">Diagram: .github/readme/diagrams/architecture.svg</text>
+</svg>

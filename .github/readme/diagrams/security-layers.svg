@@ -1,0 +1,61 @@
+<svg xmlns="http://www.w3.org/2000/svg" fill="#F7F5FB" viewBox="0 0 1200 560" width="1200" height="560" role="img" aria-labelledby="t d">
+  <title id="t">Defence in depth: what stops a participant at each layer</title>
+  <desc id="d">Six nested layers: Safe Exam Browser, Cloudflare WAF and rate limit, the app's deny-by-default route policy and sessions, the token ledger and tutor guardrails, the database roles and append-only tables, and the docker-proxy sandbox.</desc>
+  <defs>
+    <style>
+      text{font-family:'JetBrains Mono','SFMono-Regular',Menlo,Consolas,monospace}
+      .h{font-size:13px;font-weight:700}
+      .s{font-size:11.5px;fill:#B4AAC9}
+      .n{font-size:12px;font-weight:700;fill:#14101F}
+    </style>
+  </defs>
+  <rect width="1200" height="560" rx="18" fill="#14101F"/>
+  <text x="32" y="44" class="h" style="font-size:18px">DEFENCE IN DEPTH · <tspan fill="#F59E0B">assume every layer above has failed</tspan></text>
+
+  <g transform="translate(32 70)">
+    <rect x="0" y="0" width="470" height="460" rx="20" fill="#1E1930" stroke="#B79CFF" stroke-width="1.5"/>
+    <rect x="28" y="40" width="414" height="400" rx="18" fill="#221C36" stroke="#8C82A8" stroke-width="1.4"/>
+    <rect x="56" y="80" width="358" height="340" rx="16" fill="#261F3C" stroke="#60A5FA" stroke-width="1.4"/>
+    <rect x="84" y="120" width="302" height="280" rx="14" fill="#2A2440" stroke="#F59E0B" stroke-width="1.4"/>
+    <rect x="112" y="160" width="246" height="220" rx="12" fill="#2E2746" stroke="#4ADE80" stroke-width="1.4"/>
+    <rect x="140" y="200" width="190" height="160" rx="10" fill="#2a1a24" stroke="#F87171" stroke-width="1.6" stroke-dasharray="5 4"/>
+    <text x="20" y="26" class="h" fill="#B79CFF">1 · Safe Exam Browser</text>
+    <text x="48" y="66" class="h" fill="#B4AAC9">2 · Cloudflare edge</text>
+    <text x="76" y="106" class="h" fill="#60A5FA">3 · App policy + sessions</text>
+    <text x="104" y="146" class="h" fill="#F59E0B">4 · Ledger + tutor guard</text>
+    <text x="132" y="186" class="h" fill="#4ADE80">5 · DB roles</text>
+    <text x="235" y="270" class="h" fill="#F87171" text-anchor="middle">6 · Sandbox</text>
+    <text x="235" y="292" class="s" text-anchor="middle">untrusted code</text>
+    <text x="235" y="308" class="s" text-anchor="middle">lives only here</text>
+  </g>
+
+  <g transform="translate(540 78)">
+    <circle cx="12" cy="10" r="11" fill="#B79CFF"/><text x="12" y="14" class="n" text-anchor="middle">1</text>
+    <text x="34" y="8" class="h">Kiosk, Config-Key hash on every request</text>
+    <text x="34" y="26" class="s">no other apps, no paste/copy in the editor, quit password</text>
+
+    <circle cx="12" cy="80" r="11" fill="#8C82A8"/><text x="12" y="84" class="n" text-anchor="middle">2</text>
+    <text x="34" y="78" class="h">WAF rejects contest paths without SEB</text>
+    <text x="34" y="96" class="s">login + password change: 60 per 10 s per IP; TLS; no open ports</text>
+
+    <circle cx="12" cy="150" r="11" fill="#60A5FA"/><text x="12" y="154" class="n" text-anchor="middle">3</text>
+    <text x="34" y="148" class="h">Deny-by-default route table, role per prefix</text>
+    <text x="34" y="166" class="s">SEB hash re-checked in the app; one live session per participant;</text>
+    <text x="34" y="182" class="s">logins slowed, never refused; strong passwords enforced</text>
+
+    <circle cx="12" cy="236" r="11" fill="#F59E0B"/><text x="12" y="240" class="n" text-anchor="middle">4</text>
+    <text x="34" y="234" class="h">Tokens reserved before the model is called</text>
+    <text x="34" y="252" class="s">gateway refuses oversize prompts; the tutor never sees code;</text>
+    <text x="34" y="268" class="s">server filter removes code blocks over 3 lines</text>
+
+    <circle cx="12" cy="322" r="11" fill="#4ADE80"/><text x="12" y="326" class="n" text-anchor="middle">5</text>
+    <text x="34" y="320" class="h">Each service its own Postgres role</text>
+    <text x="34" y="338" class="s">audit_log + token_ledger reject UPDATE/DELETE by trigger;</text>
+    <text x="34" y="354" class="s">unclassified tables get no grants; only migrate owns the schema</text>
+
+    <circle cx="12" cy="408" r="11" fill="#F87171"/><text x="12" y="412" class="n" text-anchor="middle">6</text>
+    <text x="34" y="406" class="h">docker-proxy rebuilds every container</text>
+    <text x="34" y="424" class="s">--network=none, read-only, uid 65534, no capabilities, memory/pid/CPU caps;</text>
+    <text x="34" y="440" class="s">tampering with the runner yields IE, never Accepted</text>
+  </g>
+</svg>

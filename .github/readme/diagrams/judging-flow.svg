@@ -1,0 +1,65 @@
+<svg xmlns="http://www.w3.org/2000/svg" fill="#F7F5FB" viewBox="0 0 1200 520" width="1200" height="520" role="img" aria-labelledby="t d">
+  <title id="t">From Submit to the leaderboard</title>
+  <desc id="d">A submission is saved with an idempotency key, queued in a Postgres table, claimed by the worker, run through the docker-proxy in a locked-down sandbox against hidden tests, turned into a verdict and a score, and shown on the leaderboard. After the contest the batch judge scores process quality.</desc>
+  <defs>
+    <style>
+      text{font-family:'JetBrains Mono','SFMono-Regular',Menlo,Consolas,monospace}
+      .h{font-size:13px;font-weight:700}
+      .s{font-size:11.5px;fill:#B4AAC9}
+      .k{font-size:11px;font-weight:700;letter-spacing:.12em}
+      .box{fill:#2A2440;stroke:#8C82A8;stroke-width:1.2}
+      .hot{fill:#2A2440;stroke:#F59E0B;stroke-width:1.6}
+      .safe{fill:#2A2440;stroke:#4ADE80;stroke-width:1.4}
+      .danger{fill:#2a1a24;stroke:#F87171;stroke-width:1.4;stroke-dasharray:5 4}
+      .violet{fill:#2A2440;stroke:#B79CFF;stroke-width:1.4}
+      .l{stroke:#F59E0B;stroke-width:2;fill:none}
+      .lv{stroke:#B79CFF;stroke-width:1.8;fill:none;stroke-dasharray:6 4}
+    </style>
+    <marker id="a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0L10 5L0 10z" fill="#F59E0B"/></marker>
+    <marker id="v" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0L10 5L0 10z" fill="#B79CFF"/></marker>
+  </defs>
+  <rect width="1200" height="520" rx="18" fill="#14101F"/>
+  <text x="32" y="44" class="h" style="font-size:18px">JUDGING · <tspan fill="#F59E0B">correctness now, process after</tspan></text>
+
+  <text x="32" y="84" class="k" fill="#F59E0B">DURING THE CONTEST · DETERMINISTIC</text>
+  <rect class="hot" x="32" y="100" width="170" height="96" rx="8"/>
+  <text x="46" y="124" class="h">Submit</text><text x="46" y="144" class="s">code saved as a</text><text x="46" y="160" class="s">CodeVersion +</text><text x="46" y="176" class="s">idempotency key</text>
+  <rect class="box" x="232" y="100" width="170" height="96" rx="8"/>
+  <text x="246" y="124" class="h">submissions</text><text x="246" y="144" class="s">the table is the</text><text x="246" y="160" class="s">queue: QUEUED rows,</text><text x="246" y="176" class="s">SKIP LOCKED claim</text>
+  <rect class="box" x="432" y="100" width="170" height="96" rx="8"/>
+  <text x="446" y="124" class="h">worker</text><text x="446" y="144" class="s">CodeRunner is the</text><text x="446" y="160" class="s">only judge caller;</text><text x="446" y="176" class="s">no internet</text>
+  <rect class="safe" x="632" y="100" width="170" height="96" rx="8"/>
+  <text x="646" y="124" class="h">docker-proxy</text><text x="646" y="144" class="s">7 API calls allowed;</text><text x="646" y="160" class="s">≤ 32 live containers,</text><text x="646" y="176" class="s">template enforced</text>
+  <rect class="danger" x="832" y="100" width="170" height="96" rx="8"/>
+  <text x="846" y="124" class="h" fill="#F87171">sandbox</text><text x="846" y="144" class="s">hidden tests, no</text><text x="846" y="160" class="s">network, read-only,</text><text x="846" y="176" class="s">pinned cores</text>
+  <rect class="box" x="1032" y="100" width="136" height="96" rx="8"/>
+  <text x="1046" y="124" class="h">verdict</text><text x="1046" y="144" class="s">AC · WA · TLE</text><text x="1046" y="160" class="s">MLE · RE · CE</text><text x="1046" y="176" class="s">time, memory</text>
+  <path class="l" d="M202 148H232" marker-end="url(#a)"/><path class="l" d="M402 148H432" marker-end="url(#a)"/><path class="l" d="M602 148H632" marker-end="url(#a)"/><path class="l" d="M802 148H832" marker-end="url(#a)"/><path class="l" d="M1002 148H1032" marker-end="url(#a)"/>
+
+  <rect class="box" x="832" y="226" width="336" height="76" rx="8"/>
+  <text x="846" y="250" class="h">scoring (packages/core)</text>
+  <text x="846" y="270" class="s">decay per minute · −20% per wrong try</text>
+  <text x="846" y="287" class="s">IE re-judged once, then an incident</text>
+  <path class="l" d="M1100 196V226" marker-end="url(#a)"/>
+  <rect class="box" x="432" y="226" width="370" height="76" rx="8"/>
+  <text x="446" y="250" class="h">leaderboard</text>
+  <text x="446" y="270" class="s">admin board live · projector (frozen at</text>
+  <text x="446" y="287" class="s">the end) · provisional → appeals → final</text>
+  <path class="l" d="M832 264H802" marker-end="url(#a)"/>
+
+  <text x="32" y="350" class="k" fill="#B79CFF">AFTER THE CONTEST · LLM, BATCH, OVERRIDABLE</text>
+  <rect class="violet" x="32" y="366" width="250" height="110" rx="8"/>
+  <text x="46" y="390" class="h">judge input (per person)</text><text x="46" y="410" class="s">questions + filtered replies,</text><text x="46" y="426" class="s">code snapshots, run verdicts,</text><text x="46" y="442" class="s">integrity flags — never the</text><text x="46" y="458" class="s">hidden tests</text>
+  <rect class="violet" x="322" y="366" width="250" height="110" rx="8"/>
+  <text x="336" y="390" class="h">judge-review → relay</text><text x="336" y="410" class="s">GPT-OSS-120B, rubric</text><text x="336" y="426" class="s">judge-v2, JSON schema,</text><text x="336" y="442" class="s">≤ 3 attempts, then</text><text x="336" y="458" class="s">"needs manual"</text>
+  <rect class="violet" x="612" y="366" width="250" height="110" rx="8"/>
+  <text x="626" y="390" class="h">review screen</text><text x="626" y="410" class="s">score + rationale +</text><text x="626" y="426" class="s">injection flag; staff</text><text x="626" y="442" class="s">override with a reason</text><text x="626" y="458" class="s">(audit-logged)</text>
+  <rect class="box" x="902" y="366" width="266" height="110" rx="8"/>
+  <text x="916" y="390" class="h">final score</text>
+  <text x="916" y="412" class="s"><tspan fill="#F59E0B">55%</tspan> correctness</text>
+  <text x="916" y="428" class="s"><tspan fill="#60A5FA">15%</tspan> token efficiency</text>
+  <text x="916" y="444" class="s"><tspan fill="#4ADE80">10%</tspan> memory + runtime</text>
+  <text x="916" y="460" class="s"><tspan fill="#B79CFF">20%</tspan> process quality</text>
+  <path class="lv" d="M282 421H322" marker-end="url(#v)"/><path class="lv" d="M572 421H612" marker-end="url(#v)"/><path class="lv" d="M862 421H902" marker-end="url(#v)"/>
+  <path class="lv" d="M1035 366V302" marker-end="url(#v)"/>
+</svg>

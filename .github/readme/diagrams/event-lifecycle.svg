@@ -1,0 +1,39 @@
+<svg xmlns="http://www.w3.org/2000/svg" fill="#F7F5FB" viewBox="0 0 1200 300" width="1200" height="300" role="img" aria-labelledby="t d">
+  <title id="t">An event's life, from setup to final results</title>
+  <desc id="d">Setup, check-in at the door, the running contest with pause and extend, the end, the batch process judge, provisional results, the appeal window and final results.</desc>
+  <defs>
+    <style>
+      text{font-family:'JetBrains Mono','SFMono-Regular',Menlo,Consolas,monospace}
+      .h{font-size:13px;font-weight:700}
+      .s{font-size:11px;fill:#B4AAC9}
+      .st{fill:#2A2440;stroke:#8C82A8;stroke-width:1.2}
+      .live{fill:#2A2440;stroke:#F59E0B;stroke-width:1.8}
+      .post{fill:#2A2440;stroke:#B79CFF;stroke-width:1.4}
+      .l{stroke:#8C82A8;stroke-width:1.6;fill:none}
+    </style>
+    <marker id="a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0L10 5L0 10z" fill="#8C82A8"/></marker>
+  </defs>
+  <rect width="1200" height="300" rx="18" fill="#14101F"/>
+  <text x="32" y="42" class="h" style="font-size:18px">EVENT LIFECYCLE</text>
+  <g>
+    <rect class="st" x="32" y="80" width="130" height="92" rx="10"/>
+    <text x="46" y="104" class="h">Set up</text><text x="46" y="124" class="s">event, budget,</text><text x="46" y="140" class="s">problems, tests,</text><text x="46" y="156" class="s">calibrate, import</text>
+    <rect class="st" x="186" y="80" width="130" height="92" rx="10"/>
+    <text x="200" y="104" class="h">Check-in</text><text x="200" y="124" class="s">QR badge scanned</text><text x="200" y="140" class="s">→ account active,</text><text x="200" y="156" class="s">seat recorded</text>
+    <rect class="live" x="340" y="80" width="150" height="92" rx="10"/>
+    <text x="354" y="104" class="h" fill="#F59E0B">Running</text><text x="354" y="124" class="s">start locks config;</text><text x="354" y="140" class="s">clock = server time</text><text x="354" y="156" class="s">minus pauses</text>
+    <rect class="st" x="514" y="80" width="130" height="92" rx="10"/>
+    <text x="528" y="104" class="h">Ended</text><text x="528" y="124" class="s">submits closed;</text><text x="528" y="140" class="s">projector shows</text><text x="528" y="156" class="s">frozen board</text>
+    <rect class="post" x="668" y="80" width="150" height="92" rx="10"/>
+    <text x="682" y="104" class="h" fill="#B79CFF">Process judge</text><text x="682" y="124" class="s">GPT-OSS batch,</text><text x="682" y="140" class="s">staff review and</text><text x="682" y="156" class="s">override</text>
+    <rect class="post" x="842" y="80" width="150" height="92" rx="10"/>
+    <text x="856" y="104" class="h" fill="#B79CFF">Provisional</text><text x="856" y="124" class="s">results published,</text><text x="856" y="140" class="s">appeal window</text><text x="856" y="156" class="s">(30 min default)</text>
+    <rect class="st" x="1016" y="80" width="152" height="92" rx="10"/>
+    <text x="1030" y="104" class="h" fill="#4ADE80">Final</text><text x="1030" y="124" class="s">CSV export; logs</text><text x="1030" y="140" class="s">anonymised after</text><text x="1030" y="156" class="s">30 days</text>
+    <path class="l" d="M162 126H186" marker-end="url(#a)"/><path class="l" d="M316 126H340" marker-end="url(#a)"/><path class="l" d="M490 126H514" marker-end="url(#a)"/><path class="l" d="M644 126H668" marker-end="url(#a)"/><path class="l" d="M818 126H842" marker-end="url(#a)"/><path class="l" d="M992 126H1016" marker-end="url(#a)"/>
+  </g>
+  <path d="M380 172 C380 222 450 222 450 172" stroke="#FBBF24" stroke-width="1.6" fill="none" marker-end="url(#a)"/>
+  <text x="415" y="238" class="s" text-anchor="middle" style="fill:#FBBF24">pause · extend · extra minutes</text>
+  <text x="415" y="254" class="s" text-anchor="middle">(every action audit-logged with a reason)</text>
+  <text x="32" y="276" class="s">Practice problems and a public /system-check page are available before the event; nothing on them touches the contest data.</text>
+</svg>

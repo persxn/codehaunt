@@ -1,0 +1,80 @@
+<svg xmlns="http://www.w3.org/2000/svg" fill="#F7F5FB" viewBox="0 0 1200 640" width="1200" height="640" role="img" aria-labelledby="t d">
+  <title id="t">Asking the tutor: one request, end to end</title>
+  <desc id="d">Sequence diagram: the participant's question passes SEB and rate checks, tokens are reserved in the ledger, the gateway counts and caps tokens, the model answers without seeing code, a filter removes long code blocks, and the reservation is settled with exact usage.</desc>
+  <defs>
+    <style>
+      text{font-family:'JetBrains Mono','SFMono-Regular',Menlo,Consolas,monospace}
+      .h{font-size:13px;font-weight:700}
+      .s{font-size:11.5px;fill:#B4AAC9}
+      .n{font-size:11px;font-weight:700;fill:#14101F}
+      .life{stroke:#3A3352;stroke-width:2;stroke-dasharray:4 5}
+      .m{stroke:#F59E0B;stroke-width:1.8;fill:none}
+      .r{stroke:#4ADE80;stroke-width:1.8;fill:none;stroke-dasharray:6 4}
+      .head{fill:#2A2440;stroke:#8C82A8;stroke-width:1.2}
+      .act{fill:#3A3352}
+    </style>
+    <marker id="a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0L10 5L0 10z" fill="#F59E0B"/></marker>
+    <marker id="g" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0L10 5L0 10z" fill="#4ADE80"/></marker>
+  </defs>
+  <rect width="1200" height="640" rx="18" fill="#14101F"/>
+  <text x="32" y="44" class="h" style="font-size:18px">ASK THE TUTOR · <tspan fill="#F59E0B">one question, end to end</tspan></text>
+
+  <!-- lifelines -->
+  <g>
+    <rect class="head" x="40" y="70" width="170" height="48" rx="8"/><text x="125" y="99" class="h" text-anchor="middle">Contest screen</text>
+    <rect class="head" x="270" y="70" width="170" height="48" rx="8"/><text x="355" y="99" class="h" text-anchor="middle">Web API</text>
+    <rect class="head" x="500" y="70" width="170" height="48" rx="8"/><text x="585" y="99" class="h" text-anchor="middle">Token ledger</text>
+    <rect class="head" x="730" y="70" width="170" height="48" rx="8"/><text x="815" y="99" class="h" text-anchor="middle">Gateway</text>
+    <rect class="head" x="960" y="70" width="200" height="48" rx="8"/><text x="1060" y="99" class="h" text-anchor="middle">Tutor model</text>
+    <path class="life" d="M125 118V600M355 118V600M585 118V600M815 118V600M1060 118V600"/>
+  </g>
+
+  <path class="m" d="M125 160H345" marker-end="url(#a)"/>
+  <text x="135" y="152" class="s">typed question (≤ 1,000 chars)</text>
+
+  <rect class="act" x="347" y="168" width="16" height="70" rx="3"/>
+  <text x="372" y="186" class="s">session + SEB hash,</text>
+  <text x="372" y="202" class="s">rate limit, contest open?</text>
+
+  <path class="m" d="M363 250H575" marker-end="url(#a)"/>
+  <text x="372" y="242" class="s">reserve tokens (row lock)</text>
+  <text x="595" y="256" class="s">append-only rows,</text>
+  <text x="595" y="272" class="s">balance = sum</text>
+
+  <path class="m" d="M363 300H805" marker-end="url(#a)"/>
+  <text x="372" y="292" class="s">tutor-v1 + this session's turns only · no code, no statement</text>
+
+  <rect class="act" x="807" y="308" width="16" height="60" rx="3"/>
+  <text x="832" y="326" class="s">count with the model's</text>
+  <text x="832" y="342" class="s">tokenizer; refuse if over;</text>
+  <text x="832" y="358" class="s">cap reply; least-busy node</text>
+
+  <path class="m" d="M823 384H1050" marker-end="url(#a)"/>
+  <path class="r" d="M1050 418H833" marker-end="url(#g)"/>
+  <text x="840" y="410" class="s">streamed tokens + exact usage</text>
+
+  <path class="r" d="M807 450H365" marker-end="url(#g)"/>
+  <text x="380" y="442" class="s">stream, batched per 100 ms for the slow link</text>
+
+  <rect class="act" x="347" y="458" width="16" height="56" rx="3"/>
+  <text x="372" y="476" class="s">reply filter: code blocks</text>
+  <text x="372" y="492" class="s">over 3 lines replaced</text>
+
+  <path class="m" d="M363 528H575" marker-end="url(#a)"/>
+  <text x="372" y="520" class="s">settle: release unused part</text>
+
+  <path class="r" d="M347 566H135" marker-end="url(#g)"/>
+  <text x="150" y="558" class="s">filtered reply (not copyable)</text>
+  <text x="150" y="590" class="s">+ token and context meters</text>
+
+  <circle cx="1060" cy="160" r="12" fill="#F87171"/><text x="1060" y="164" class="n" text-anchor="middle">!</text>
+  <rect x="888" y="182" width="232" height="76" rx="8" fill="#1E1930" stroke="#F87171" stroke-width="1.2"/>
+  <text x="900" y="200" class="s">The model never receives</text>
+  <text x="900" y="216" class="s">the participant's code or the</text>
+  <text x="900" y="232" class="s">statement, so it cannot</text>
+  <text x="900" y="248" class="s">"solve" the problem for them.</text>
+  <rect x="888" y="482" width="232" height="60" rx="8" fill="#1E1930" stroke="#4ADE80" stroke-width="1.2"/>
+  <text x="900" y="500" class="s">On any failure the whole</text>
+  <text x="900" y="516" class="s">reservation is released:</text>
+  <text x="900" y="532" class="s">nobody pays for an outage.</text>
+</svg>
