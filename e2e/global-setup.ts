@@ -18,7 +18,7 @@ export default async function globalSetup() {
   const config = EventConfig.parse({
     branding: { title: 'E2E' },
     schedule: { checkInAt: new Date(Date.now() - 3_600_000).toISOString(), startsAt: new Date(Date.now() - 60_000).toISOString(), durationMinutes: 180 },
-    model: { baseUrl: process.env.GATEWAY_URL ?? 'http://gateway.invalid', name: 'junior', systemPromptVersion: 'v1' },
+    model: { baseUrl: process.env.GATEWAY_URL ?? 'http://gateway.invalid', name: 'junior', systemPromptVersion: 'tutor-v1' },
     judge: { rubricVersion: 'v1' },
     consent: { text: 'I agree that my prompts, replies and code are logged and judged.' },
   });

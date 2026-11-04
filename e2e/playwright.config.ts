@@ -4,7 +4,8 @@
  */
 import { defineConfig } from '@playwright/test';
 
-const PORT = Number(process.env.E2E_PORT ?? 3200);
+// Not 3200: the public preview (deploy/tunnel) listens there, and reuseExistingServer would test it instead.
+const PORT = Number(process.env.E2E_PORT ?? 3300);
 
 export default defineConfig({
   testDir: '.',

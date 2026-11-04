@@ -5,6 +5,7 @@ import { Button } from '@/components/button';
 import { Check, Alert } from '@/components/icons';
 import { postJSON } from '../api';
 import jsQR from 'jsqr';
+import { StateArt } from '@/components/state-art/state-art';
 import styles from './checkin.module.css';
 
 interface CheckInResult {
@@ -148,6 +149,7 @@ export default function Scanner() {
         <div className={styles.result}>
           {result.success ? (
             <>
+              <StateArt kind="checked-in" size={140} />
               <Check className={styles.successIcon} />
               <p className={styles.big}>
                 {result.data.name} ({result.data.enrolmentNo}), seat {result.data.seatLabel}

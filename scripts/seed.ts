@@ -45,11 +45,11 @@ try {
       durationMinutes: 180,
       freezeMinutes: 30,
     },
-    budget: { tokensPerParticipant: 60000, contextTokens: 8192, contextWarnPercent: 80, maxPromptChars: 4000 },
+    budget: { tokensPerParticipant: 60000, contextTokens: 8192, contextWarnPercent: 80, maxPromptChars: 1000 },
     model: {
       baseUrl: 'http://127.0.0.1:8000/v1',
       name: 'qwen2.5-coder',
-      systemPromptVersion: 'v1',
+      systemPromptVersion: 'tutor-v1',
       temperature: 0.2,
       hostedAllowed: false,
     },

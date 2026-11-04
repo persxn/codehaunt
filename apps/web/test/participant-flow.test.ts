@@ -1,7 +1,8 @@
 /**
- * The participant flow's services on PGlite (WP-03): prompt → code version with exact settlement, failures never
- * charged and never stored, budget exhaustion, sessions and revert, and no hidden test in any participant payload
- * or participant query.
+ * The participant flow's services on PGlite (WP-03, ADR-033): the participant saves their own code; a question to
+ * the tutor sends no code and no statement, streams a filtered reply, settles exactly and never changes the code;
+ * failures are never charged; budget exhaustion, sessions and revert; no hidden test in any participant payload or
+ * participant query.
  */
 import assert from 'node:assert/strict';
 import { randomUUID } from 'node:crypto';
@@ -12,7 +13,7 @@ import { tokenBalance } from '@codehaunt/db';
 import { createTestDatabase, type TestDatabase } from '@codehaunt/db/testing';
 
 import { startPrompt } from '../src/server/prompt-service.ts';
-import { contestState, listProblems, newSession, problemStatement, revert, workspace } from '../src/server/participant-service.ts';
+import { contestState, listProblems, newSession, problemStatement, revert, saveCode, workspace } from '../src/server/participant-service.ts';
 import { createRun, runView } from '../src/server/submission-service.ts';
 import { participantContext } from '../src/server/contest.ts';
 import { AppError } from '../src/server/errors.ts';
@@ -27,7 +28,13 @@ after(async () => {
   await db?.close();
 });
 
-async function prompt(f: Awaited<ReturnType<typeof setup>>, model: ReturnType<typeof fakeModel>['model'], text = 'Read two ints and print the sum.') {
+const F = '\x60\x60\x60';
+
+async function save(f: Awaited<ReturnType<typeof setup>>, source = 'print(sum(map(int, input().split())))\n') {
+  return saveCode(db.prisma, await f.ctx(), { problemId: f.problem.id, language: 'python', source });
+}
+
+async function prompt(f: Awaited<ReturnType<typeof setup>>, model: ReturnType<typeof fakeModel>['model'], text = 'Why could int overflow here?') {
   const ctx = await f.ctx();
   const started = await startPrompt({ prisma: db.prisma, model, now: () => new Date(), requestId: 'req-1' }, ctx, {
     problemId: f.problem.id,
@@ -40,26 +47,74 @@ async function prompt(f: Awaited<ReturnType<typeof setup>>, model: ReturnType<ty
   return events;
 }
 
-test('a prompt streams, stores the code and charges exactly the reported usage', async () => {
+test('a question streams, charges exactly the reported usage and never sends or changes the code', async () => {
   const f = await setup(db.prisma);
   await newSession(db.prisma, await f.ctx(), { problemId: f.problem.id, language: 'python' });
+  await save(f, 'SECRET_CODE = 1\n');
   const { model, calls } = fakeModel();
   const events = await prompt(f, model);
   const done = events.at(-1);
   assert.equal(done?.type, 'done');
-  assert.equal(events.filter((e) => e.type === 'delta').length, 2);
-  assert.match(done.type === 'done' ? done.response.code?.source ?? '' : '', /print\(sum/);
   assert.equal(await tokenBalance(db.prisma, f.participant.id), 20_000 - 340);
-  // The model got the persona with the language, the instruction, never the statement.
+  // The model got the tutor prompt with the language and the question: never the code or the statement (ADR-033).
   const sent = JSON.stringify(calls[0]!.messages);
-  assert.match(sent, /Language for this session: Python 3/);
-  assert.doesNotMatch(sent, /Add two numbers/);
+  assert.match(calls[0]!.messages[0]!.content, /programming tutor[\s\S]*at most 6 lines[\s\S]*writing Python 3/);
+  assert.doesNotMatch(sent, /Add two numbers|SECRET_CODE|current_code/);
   assert.equal(calls[0]!.codehaunt.budgetTokens, 4096 + 512);
-  // The second prompt carries the current code and the history.
-  await prompt(f, model, 'Now handle negative numbers.');
+  // The second question carries the history only.
+  await prompt(f, model, 'And for negative numbers?');
   const second = calls[1]!.messages;
-  assert.match(second.at(-1)!.content, /<current_code language="Python 3">[\s\S]*print\(sum/);
   assert.equal(second.length, 4);
+  assert.equal(second.at(-1)!.content, 'And for negative numbers?');
+  const ws = await workspace(db.prisma, await f.ctx(), f.problem.id);
+  assert.equal(ws.codeVersions.length, 1, 'replies never add code versions');
+  assert.equal(ws.codeVersions[0]!.source, 'SECRET_CODE = 1\n');
+});
+
+test('long code in a reply never reaches the participant, but the log keeps it', async () => {
+  const f = await setup(db.prisma);
+  await newSession(db.prisma, await f.ctx(), { problemId: f.problem.id, language: 'python' });
+  const long = Array.from({ length: 12 }, (_, i) => `x${i} = ${i}`).join('\n');
+  const reply = `Think about it.\n${F}python\n${long}\n${F}\nGood luck.`;
+  const { model, calls } = fakeModel({ text: reply });
+  const events = await prompt(f, model);
+  const streamed = events.flatMap((e) => (e.type === 'delta' ? [e.text] : [])).join('');
+  assert.doesNotMatch(streamed, /x11 = 11/);
+  assert.match(streamed, /example removed: too long/);
+  const done = events.at(-1);
+  assert.equal(done?.type === 'done' && done.response.reply, streamed);
+  const ws = await workspace(db.prisma, await f.ctx(), f.problem.id);
+  assert.doesNotMatch(JSON.stringify(ws), /x11 = 11/);
+  const stored = await db.prisma.promptTurn.findFirstOrThrow({ where: { chatSession: { participantId: f.participant.id } } });
+  assert.match(stored.reply ?? '', /x11 = 11/, 'staff and the judge see the full reply');
+  // The model gets back only what the participant saw, so it can't re-send the removed block in pieces.
+  await prompt(f, model, 'Show the rest.');
+  assert.doesNotMatch(JSON.stringify(calls[1]!.messages), /x11 = 11/);
+});
+
+test('the first question on a problem opens its chat in the saved code\'s language', async () => {
+  const f = await setup(db.prisma);
+  await saveCode(db.prisma, await f.ctx(), { problemId: f.problem.id, language: 'cpp', source: 'int main() {}\n' });
+  await db.prisma.chatSession.updateMany({ where: { participantId: f.participant.id }, data: { closedAt: new Date() } });
+  const { model, calls } = fakeModel();
+  assert.equal((await prompt(f, model)).at(-1)?.type, 'done');
+  assert.match(calls[0]!.messages[0]!.content, /writing C\+\+/);
+  const ws = await workspace(db.prisma, await f.ctx(), f.problem.id);
+  assert.equal(ws.session?.language, 'cpp');
+  assert.equal(ws.turns.length, 1);
+});
+
+test('saving code: unchanged saves add nothing; the first save opens a chat; languages must be enabled', async () => {
+  const f = await setup(db.prisma);
+  const a = await save(f, 'print(1)\n');
+  assert.equal((await save(f, 'print(1)\n')).id, a.id);
+  assert.notEqual((await save(f, 'print(2)\n')).id, a.id);
+  const ws = await workspace(db.prisma, await f.ctx(), f.problem.id);
+  assert.ok(ws.session, 'a session exists after the first save');
+  assert.equal(ws.codeVersions.length, 2);
+  assert.ok(ws.codeVersions.every((v) => v.turnId === null));
+  await db.prisma.event.update({ where: { id: f.event.id }, data: { config: { ...f.event.config as object, languages: ['cpp'] } } });
+  await assert.rejects(save(f, 'print(3)\n'), (e: unknown) => e instanceof AppError && e.status === 400);
 });
 
 test('a reply without usage is discarded and costs nothing', async () => {
@@ -68,7 +123,7 @@ test('a reply without usage is discarded and costs nothing', async () => {
   const events = await prompt(f, fakeModel({ usage: null }).model);
   assert.equal(events.at(-1)?.type, 'error');
   assert.equal(await tokenBalance(db.prisma, f.participant.id), 20_000);
-  assert.equal((await workspace(db.prisma, await f.ctx(), f.problem.id)).codeVersions.length, 0);
+  assert.equal((await workspace(db.prisma, await f.ctx(), f.problem.id)).turns[0]?.reply ?? null, null);
 });
 
 test('an exhausted budget is refused before the model is called', async () => {
@@ -84,7 +139,7 @@ test('an exhausted budget is refused before the model is called', async () => {
 test('a practice problem works only before the start and never touches the ledger', async () => {
   const f = await setup(db.prisma, { status: 'CHECK_IN', practice: true });
   await newSession(db.prisma, await f.ctx(), { problemId: f.problem.id, language: 'cpp' });
-  const events = await prompt(f, fakeModel({ text: '```cpp\nint main(){}\n```' }).model);
+  const events = await prompt(f, fakeModel({ text: 'Think of a 64-bit type.' }).model);
   assert.equal(events.at(-1)?.type, 'done');
   assert.equal(await db.prisma.tokenLedger.count({ where: { participantId: f.participant.id } }), 1, 'only the grant');
   await db.prisma.event.update({ where: { id: f.event.id }, data: { status: 'RUNNING' } });
@@ -98,15 +153,16 @@ test('work needs consent; the state says what to accept', async () => {
   await assert.rejects(participantContext(db.prisma, f.user.id, new Date()), (e: unknown) => e instanceof AppError && e.code === 'consent_required');
 });
 
-test('a new session carries the code; revert copies an old version', async () => {
+test('a new session starts an empty chat and leaves the code alone; revert copies an old version', async () => {
   const f = await setup(db.prisma);
   await newSession(db.prisma, await f.ctx(), { problemId: f.problem.id, language: 'python' });
-  await prompt(f, fakeModel({ text: '```python\nprint(1)\n```' }).model);
-  await prompt(f, fakeModel({ text: '```python\nprint(2)\n```' }).model);
+  await save(f, 'print(1)\n');
+  await prompt(f, fakeModel().model);
+  await save(f, 'print(2)\n');
   await newSession(db.prisma, await f.ctx(), { problemId: f.problem.id, language: 'python' });
   let ws = await workspace(db.prisma, await f.ctx(), f.problem.id);
   assert.equal(ws.turns.length, 0, 'fresh context');
-  assert.equal(ws.codeVersions.at(-1)?.source, 'print(2)\n', 'code carried');
+  assert.equal(ws.codeVersions.at(-1)?.source, 'print(2)\n', 'code unaffected');
   await revert(db.prisma, await f.ctx(), { problemId: f.problem.id, codeVersionId: ws.codeVersions[0]!.id });
   ws = await workspace(db.prisma, await f.ctx(), f.problem.id);
   assert.equal(ws.codeVersions.at(-1)?.source, 'print(1)\n');
@@ -117,7 +173,7 @@ test('a new session carries the code; revert copies an old version', async () =>
 test('runs are idempotent and capped per participant', async () => {
   const f = await setup(db.prisma);
   await newSession(db.prisma, await f.ctx(), { problemId: f.problem.id, language: 'python' });
-  await prompt(f, fakeModel().model);
+  await save(f);
   const ws = await workspace(db.prisma, await f.ctx(), f.problem.id);
   const key = randomUUID();
   const req = { problemId: f.problem.id, codeVersionId: ws.currentCodeVersionId!, kind: 'SAMPLE' as const, idempotencyKey: key };
@@ -130,7 +186,7 @@ test('runs are idempotent and capped per participant', async () => {
 test('no participant payload contains a hidden test, even a forged or failed verdict', async () => {
   const f = await setup(db.prisma);
   await newSession(db.prisma, await f.ctx(), { problemId: f.problem.id, language: 'python' });
-  await prompt(f, fakeModel().model);
+  await save(f);
   let ws = await workspace(db.prisma, await f.ctx(), f.problem.id);
   const hiddenId = (await db.prisma.testCase.findFirstOrThrow({ where: { problemId: f.problem.id, visibility: 'HIDDEN' } })).id;
   const visibleId = (await db.prisma.testCase.findFirstOrThrow({ where: { problemId: f.problem.id, visibility: 'VISIBLE' } })).id;
@@ -166,7 +222,7 @@ test('no participant payload contains a hidden test, even a forged or failed ver
 test('participant services never query hidden test rows (SQL level)', async () => {
   const f = await setup(db.prisma);
   await newSession(db.prisma, await f.ctx(), { problemId: f.problem.id, language: 'python' });
-  await prompt(f, fakeModel().model);
+  await save(f);
   const ws = await workspace(db.prisma, await f.ctx(), f.problem.id);
   await createRun(db.prisma, await f.ctx(), { problemId: f.problem.id, codeVersionId: ws.currentCodeVersionId!, kind: 'SAMPLE', idempotencyKey: randomUUID() });
   queries.length = 0;

@@ -17,6 +17,13 @@ a {
   color: var(--accent);
 }
 
+/* Page titles in the display face (ADR-032); components that style their own h1 override this. */
+h1 {
+  font-family: var(--font-display);
+  font-weight: 400;
+  letter-spacing: 0.02em;
+}
+
 pre,
 code {
   font-family: var(--font-mono);

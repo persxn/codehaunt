@@ -22,6 +22,8 @@ export const ContestState = z.object({
   tokens: z.object({ remaining: z.number().int(), total: z.number().int() }).strict(),
   languages: z.array(Language),
   contextWarnPercent: z.number().int(),
+  /** Longest question to the tutor (ADR-033). */
+  maxPromptChars: z.number().int().positive(),
   /** Set until the participant accepts the consent text (ADR-010); then null. */
   consent: z.object({ text: z.string(), guardianRequired: z.boolean() }).strict().nullable(),
 }).strict();
@@ -43,7 +45,7 @@ export const CodeVersionView = z.object({
   language: Language,
   source: z.string(),
   createdAt: z.string(),
-  /** null for a revert (a copy of an older version). */
+  /** Set only on versions from before ADR-033 (model-written); participant saves and restores are null. */
   turnId: z.string().nullable(),
 }).strict();
 export type CodeVersionView = z.infer<typeof CodeVersionView>;
@@ -78,9 +80,20 @@ export const Workspace = z.object({
 }).strict();
 export type Workspace = z.infer<typeof Workspace>;
 
-/** Start a session (first one, a new one carrying the code, or another language). */
+/** Start a tutor session: the first one, or a new empty one when the context is full (ADR-033). */
 export const NewSessionRequest = z.object({ problemId: z.string().min(1), language: Language }).strict();
 export type NewSessionRequest = z.infer<typeof NewSessionRequest>;
+
+/** Longest program a participant can save (the judge's own limit is far above any real solution). */
+export const MAX_SOURCE_CHARS = 65_536;
+
+/** The participant's own code, typed in the editor (ADR-033). Saved when it changed, every 20 s and on run/submit. */
+export const SaveCodeRequest = z.object({
+  problemId: z.string().min(1),
+  language: Language,
+  source: z.string().max(MAX_SOURCE_CHARS),
+}).strict();
+export type SaveCodeRequest = z.infer<typeof SaveCodeRequest>;
 
 export const RevertRequest = z.object({ problemId: z.string().min(1), codeVersionId: z.string().min(1) }).strict();
 export type RevertRequest = z.infer<typeof RevertRequest>;

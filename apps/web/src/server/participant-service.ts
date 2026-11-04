@@ -1,8 +1,9 @@
 /**
- * Participant reads and the free actions: problem list and statement, workspace, sessions, revert, contest state.
+ * Participant reads and the free actions: problem list and statement, workspace, code saves, sessions, revert,
+ * contest state.
  * Hidden tests: every test_cases query here filters `visibility: 'VISIBLE'` (WP-03; checked by a query-level test).
  */
-import { fromDbLanguage, toDbLanguage, toParticipantVerdict } from '@codehaunt/core';
+import { filterReply, fromDbLanguage, toDbLanguage, toParticipantVerdict } from '@codehaunt/core';
 import {
   ContestState,
   ParticipantProblem,
@@ -11,6 +12,7 @@ import {
   type ConsentRequest,
   type NewSessionRequest,
   type RevertRequest,
+  type SaveCodeRequest,
 } from '@codehaunt/contracts';
 import { tokenBalance, type PrismaClient } from '@codehaunt/db';
 
@@ -33,6 +35,7 @@ export async function contestState(prisma: PrismaClient, ctx: ParticipantContext
     tokens: { remaining: await tokenBalance(prisma, ctx.participantId), total: granted._sum.delta ?? 0 },
     languages: ctx.event.config.languages,
     contextWarnPercent: ctx.event.config.budget.contextWarnPercent,
+    maxPromptChars: ctx.event.config.budget.maxPromptChars,
     consent: ctx.consented ? null : { text: ctx.event.config.consent.text, guardianRequired: ctx.event.config.access.allowMinors },
   });
 }
@@ -125,7 +128,13 @@ export async function workspace(prisma: PrismaClient, ctx: ParticipantContext, p
       contextTokensUsed: lastAnswered ? lastAnswered.promptTokens + lastAnswered.completionTokens : 0,
       contextTokensLimit: ctx.event.config.budget.contextTokens,
     },
-    turns: turns.map((t) => ({ id: t.id, prompt: t.prompt, reply: t.reply, createdAt: t.createdAt.toISOString() })),
+    // Participants only ever see filtered replies (ADR-033); the stored reply is for staff and the judge.
+    turns: turns.map((t) => ({
+      id: t.id,
+      prompt: t.prompt,
+      reply: t.reply === null ? null : filterReply(t.reply, ctx.event.config.model.maxExampleLines),
+      createdAt: t.createdAt.toISOString(),
+    })),
     codeVersions: versions.map((v) => ({
       id: v.id,
       language: fromDbLanguage(v.language),
@@ -144,8 +153,8 @@ export async function workspace(prisma: PrismaClient, ctx: ParticipantContext, p
 }
 
 /**
- * Closes the open session (if any) and starts a new one in the chosen language. The code carries over because the
- * current code is the newest version across sessions. Free, but only while the problem is open for work.
+ * Closes the open session (if any) and starts a new, empty tutor chat in the chosen language (ADR-033: the tutor
+ * never sees the code, so nothing is carried in). The code is unaffected. Free, but only while the problem is open.
  */
 export async function newSession(prisma: PrismaClient, ctx: ParticipantContext, input: NewSessionRequest): Promise<{ id: string }> {
   if (!ctx.event.config.languages.includes(input.language)) throw badRequest('That language is not enabled for this event.');
@@ -162,6 +171,37 @@ export async function newSession(prisma: PrismaClient, ctx: ParticipantContext, 
       select: { id: true },
     });
     return created;
+  });
+}
+
+/**
+ * Saves the participant's own code (ADR-033): the editor calls this when the code changed, every 20 s and before a
+ * run or submit. Saving the newest version again returns it instead of adding a copy. A version needs a chat
+ * session, so the first save opens one. Serialised per participant, so two tabs can't interleave versions.
+ */
+export async function saveCode(prisma: PrismaClient, ctx: ParticipantContext, input: SaveCodeRequest): Promise<{ id: string }> {
+  if (!ctx.event.config.languages.includes(input.language)) throw badRequest('That language is not enabled for this event.');
+  const problem = await openProblem(prisma, ctx, input.problemId, true);
+  const language = toDbLanguage(input.language);
+  return prisma.$transaction(async (tx) => {
+    await tx.$queryRaw`SELECT id FROM participants WHERE id = ${ctx.participantId} FOR UPDATE`;
+    const latest = await tx.codeVersion.findFirst({
+      where: { chatSession: { participantId: ctx.participantId, problemId: problem.id } },
+      orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
+      select: { id: true, language: true, source: true },
+    });
+    if (latest && latest.source === input.source && latest.language === language) return { id: latest.id };
+    const session =
+      (await tx.chatSession.findFirst({
+        where: { participantId: ctx.participantId, problemId: problem.id, closedAt: null },
+        orderBy: { createdAt: 'desc' },
+        select: { id: true },
+      })) ??
+      (await tx.chatSession.create({ data: { participantId: ctx.participantId, problemId: problem.id, language }, select: { id: true } }));
+    return tx.codeVersion.create({
+      data: { chatSessionId: session.id, promptTurnId: null, language, source: input.source },
+      select: { id: true },
+    });
   });
 }
 

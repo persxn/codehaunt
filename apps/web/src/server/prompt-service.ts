@@ -1,26 +1,28 @@
 /**
- * One prompt turn (ADR-018, ADR-022). Security-critical: Claude-owned.
+ * One question to the tutor (ADR-033, ADR-022). Security-critical: Claude-owned.
  *
- * reserve tokens under the participant lock → stream the reply from the gateway → settle with the exact usage
- * (0 when the stream ended without usage) → store the reply and the extracted code. A reply without usage is
- * discarded. The call always runs to the end, even if the participant's browser goes away. Practice problems
+ * reserve tokens under the participant lock → stream the reply from the gateway through the reply filter → settle
+ * with the exact usage (0 when the stream ended without usage) → store the question and the unfiltered reply (staff
+ * and the judge read it; the participant only ever gets the filtered text). The model sees the tutor prompt and this
+ * session's questions and replies, never the participant's code or the statement. Replies never change the code.
+ * A reply without usage is discarded. The call always runs to the end, even if the participant's browser goes away. Practice problems
  * (open only before the start) use no ledger: their tokens don't count (ADR-007).
  */
-import { extractCode, fromDbLanguage } from '@codehaunt/core';
+import { createReplyFilter, filterReply, fromDbLanguage, toDbLanguage } from '@codehaunt/core';
 import type { PromptRequest, PromptResponse, PromptStreamEvent } from '@codehaunt/contracts';
 import { BudgetExhausted, reserveTokens, settleTokens, tokenBalance, type PrismaClient } from '@codehaunt/db';
 
 import { badRequest, conflict, notFound } from './errors.ts';
 import type { ModelClient } from './gateway-client.ts';
 import { openProblem, type ParticipantContext } from './contest.ts';
-import { systemPrompt, userMessage } from './system-prompt.ts';
+import { systemPrompt } from './system-prompt.ts';
 
 /** One prompt in flight per participant (the web runs as one process; ADR-003). */
 const inFlight = new Set<string>();
 
 const FAILURE_MESSAGES: Record<string, string> = {
-  context_exceeded: "This session's context is full. Start a new session: your code carries over.",
-  budget_exceeded: 'Not enough tokens left for this prompt. Try a shorter prompt or a new session.',
+  context_exceeded: "This chat's context is full. Start a new chat: your code is not affected.",
+  budget_exceeded: 'Not enough tokens left for this question. Try a shorter question or a new chat.',
 };
 const GENERIC_FAILURE = 'The model failed, try again. You were not charged for this prompt.';
 
@@ -43,7 +45,7 @@ export async function startPrompt(
   const { prisma } = deps;
   const config = ctx.event.config;
   if (request.prompt.length > config.budget.maxPromptChars) {
-    throw badRequest(`Prompts are limited to ${config.budget.maxPromptChars} characters.`);
+    throw badRequest(`Questions are limited to ${config.budget.maxPromptChars} characters.`);
   }
 
   const existing = await prisma.promptTurn.findUnique({
@@ -57,7 +59,7 @@ export async function startPrompt(
   }
 
   const problem = await openProblem(prisma, ctx, request.problemId, true);
-  const session = await prisma.chatSession.findFirst({
+  const open = await prisma.chatSession.findFirst({
     where: {
       participantId: ctx.participantId,
       problemId: problem.id,
@@ -66,7 +68,19 @@ export async function startPrompt(
     },
     orderBy: { createdAt: 'desc' },
   });
-  if (!session) throw notFound('That session');
+  if (!open && request.chatSessionId) throw notFound('That session');
+  // The first question on a problem opens its chat, in the language of the newest saved code (ADR-033).
+  const session = open ?? (await prisma.chatSession.create({
+    data: {
+      participantId: ctx.participantId,
+      problemId: problem.id,
+      language: (await prisma.codeVersion.findFirst({
+        where: { chatSession: { participantId: ctx.participantId, problemId: problem.id } },
+        orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
+        select: { language: true },
+      }))?.language ?? toDbLanguage(config.languages[0] ?? 'cpp'),
+    },
+  }));
 
   if (inFlight.has(ctx.participantId)) throw conflict('prompt_in_progress', 'Wait for the current reply to finish.');
   inFlight.add(ctx.participantId);
@@ -76,7 +90,6 @@ export async function startPrompt(
       orderBy: { ord: 'asc' },
       select: { ord: true, prompt: true, reply: true },
     });
-    const current = await currentCode(prisma, ctx.participantId, problem.id);
     const turn = await prisma.promptTurn.create({
       data: {
         chatSessionId: session.id,
@@ -107,17 +120,19 @@ export async function startPrompt(
 
     const language = fromDbLanguage(session.language);
     const messages = [
-      { role: 'system' as const, content: systemPrompt(config.model.systemPromptVersion, language) },
+      { role: 'system' as const, content: systemPrompt(config.model.systemPromptVersion, language, config.model.maxExampleLines) },
       ...history.filter((t) => t.reply !== null).flatMap((t) => [
         { role: 'user' as const, content: t.prompt },
-        { role: 'assistant' as const, content: t.reply! },
+        // The model gets back what the participant saw, so removed code can't be re-sent in pieces later.
+        { role: 'assistant' as const, content: filterReply(t.reply!, config.model.maxExampleLines) },
       ]),
-      { role: 'user' as const, content: userMessage(request.prompt, current) },
+      { role: 'user' as const, content: request.prompt },
     ];
 
     const run = async (emit: (event: PromptStreamEvent) => void) => {
       const started = Date.now();
       let used = 0;
+      const filter = createReplyFilter(config.model.maxExampleLines);
       try {
         const outcome = await deps.model.chat(
           {
@@ -127,7 +142,10 @@ export async function startPrompt(
             codehaunt: { budgetTokens: reserved, contextLimit: config.budget.contextTokens, sessionId: session.id },
           },
           deps.requestId,
-          (text) => emit({ type: 'delta', text }),
+          (text) => {
+            const shown = filter.push(text);
+            if (shown) emit({ type: 'delta', text: shown });
+          },
         );
         if (!outcome.ok) {
           emit({ type: 'error', code: 'model_failed', message: FAILURE_MESSAGES[outcome.code] ?? GENERIC_FAILURE });
@@ -135,25 +153,19 @@ export async function startPrompt(
         }
         // From here on the participant has seen the whole reply: it is charged even if storing it fails (audit M1).
         used = outcome.usage.prompt_tokens + outcome.usage.completion_tokens;
+        const rest = filter.end();
+        if (rest) emit({ type: 'delta', text: rest });
         const text = outcome.text.replaceAll('\u0000', '');
-        const extracted = extractCode(text, language);
-        await prisma.$transaction([
-          prisma.promptTurn.update({
-            where: { id: turn.id },
-            data: {
-              reply: text,
-              node: outcome.node,
-              promptTokens: outcome.usage.prompt_tokens,
-              completionTokens: outcome.usage.completion_tokens,
-              latencyMs: Date.now() - started,
-            },
-          }),
-          ...(extracted.ok
-            ? [prisma.codeVersion.create({
-                data: { chatSessionId: session.id, promptTurnId: turn.id, language: session.language, source: extracted.source },
-              })]
-            : []),
-        ]);
+        await prisma.promptTurn.update({
+          where: { id: turn.id },
+          data: {
+            reply: text,
+            node: outcome.node,
+            promptTokens: outcome.usage.prompt_tokens,
+            completionTokens: outcome.usage.completion_tokens,
+            latencyMs: Date.now() - started,
+          },
+        });
       } catch (error) {
         console.error(JSON.stringify({ level: 'error', msg: 'prompt failed', requestId: deps.requestId, error: String(error) }));
         emit({ type: 'error', code: 'model_failed', message: used ? 'The reply could not be saved. Send the prompt again.' : GENERIC_FAILURE });
@@ -180,27 +192,12 @@ export async function startPrompt(
   }
 }
 
-/** The newest code version of this participant on this problem, across sessions (new sessions carry it). */
-export async function currentCode(prisma: PrismaClient, participantId: string, problemId: string) {
-  const version = await prisma.codeVersion.findFirst({
-    where: { chatSession: { participantId, problemId } },
-    orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
-    select: { id: true, language: true, source: true },
-  });
-  return version ? { id: version.id, language: fromDbLanguage(version.language), source: version.source } : null;
-}
-
 async function responseFor(prisma: PrismaClient, ctx: ParticipantContext, turnId: string): Promise<PromptResponse> {
-  const turn = await prisma.promptTurn.findUniqueOrThrow({
-    where: { id: turnId },
-    include: { codeVersions: { take: 1, orderBy: { createdAt: 'desc' } } },
-  });
-  const code = turn.codeVersions[0];
+  const turn = await prisma.promptTurn.findUniqueOrThrow({ where: { id: turnId } });
   return {
     turnId: turn.id,
     chatSessionId: turn.chatSessionId,
-    reply: turn.reply ?? '',
-    code: code ? { language: fromDbLanguage(code.language), source: code.source } : null,
+    reply: filterReply(turn.reply ?? '', ctx.event.config.model.maxExampleLines),
     usage: {
       promptTokens: turn.promptTokens,
       completionTokens: turn.completionTokens,

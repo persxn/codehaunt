@@ -2,6 +2,7 @@ import type { ReactNode } from 'react';
 
 import { loadConfig } from '@/lib/config';
 
+import '@fontsource/creepster/400.css';
 import '@fontsource/ibm-plex-sans/400.css';
 import '@fontsource/ibm-plex-sans/500.css';
 import '@fontsource/ibm-plex-sans/600.css';

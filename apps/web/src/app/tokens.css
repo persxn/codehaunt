@@ -1,23 +1,27 @@
-/* Design system tokens */
+/* Design system tokens. Colours are the public theme's (ADR-032, values from `_public/public.module.css`). */
 :root {
-  /* Colors - dark theme (default) */
-  --bg: #14101F;
-  --surface: #1E1930;
-  --raised: #2A2440;
-  --text: #F7F5FB;
-  --text-muted: #B4AAC9;
-  --border: #3A3352;
-  --border-strong: #8C82A8;
-  --accent: #F59E0B;
-  --on-accent: #14101F;
-  --brand: #B79CFF;
-  --success: #4ADE80;
-  --warning: #FBBF24;
-  --danger: #F87171;
-  --info: #60A5FA;
+  /* Colors: the poster palette */
+  --bg: #0A0809;            /* ink */
+  --surface: #140E17;
+  --raised: #1E1523;
+  --text: #F0E2CC;          /* bone */
+  --text-muted: #C4B4C0;
+  --border: rgb(240 226 204 / 0.16);
+  --border-strong: rgb(240 226 204 / 0.42);
+  --accent: #EC5B1C;        /* pumpkin */
+  --accent-hi: #FF7A3D;
+  --on-accent: #0A0809;
+  --brand: #B98BE0;         /* violet-hi */
+  --violet: #4E1E61;
+  --success: #7BE29A;
+  --warning: #EC5B1C;
+  --danger: #FF8A7A;
+  --info: #B98BE0;
 
   /* Typography */
   --font-sans: 'IBM Plex Sans', system-ui, sans-serif;
+  /* Page titles and the wordmark only (ADR-032); dense UI stays in Plex and Mono. */
+  --font-display: 'Creepster', 'IBM Plex Sans', system-ui, sans-serif;
   --font-mono: 'JetBrains Mono', ui-monospace, monospace;
 
   /* Font sizes & line heights */
@@ -43,34 +47,16 @@
   --space-8: 2rem;    /* 32px */
 
   /* Radius */
-  --radius-sm: 0.25rem; /* 4px */
-  --radius-md: 0.5rem;  /* 8px */
+  --radius-sm: 4px;
+  --radius-md: 6px;     /* the public --r-sm */
 
   /* Shadow */
-  --shadow-menu: 0 8px 24px rgba(0, 0, 0, 0.4);
+  --shadow-menu: 0 18px 40px -20px rgb(0 0 0 / 0.8);
 
   /* Motion */
   --duration-fast: 120ms;
   --duration-base: 200ms;
-  --ease: cubic-bezier(0.2,0,0,1);
-}
-
-/* Light theme overrides */
-[data-theme="light"] {
-  --bg: #FFFFFF;
-  --surface: #F5F3FA;
-  --raised: #E9E5F2;
-  --text: #14101F;
-  --text-muted: #4B4563;
-  --border: #D6D0E4;
-  --border-strong: #6B6385;
-  --accent: #B45309;
-  --on-accent: #FFFFFF;
-  --brand: #6D28D9;
-  --success: #15803D;
-  --warning: #854D0E;
-  --danger: #B91C1C;
-  --info: #1D4ED8;
+  --ease: cubic-bezier(0.2, 0.7, 0.2, 1);
 }
 
 /* Reduced motion */

@@ -2,7 +2,6 @@
  * Zod schemas for prompt interactions.
  */
 import { z } from 'zod';
-import { Language } from './judge.ts';
 
 /** Prompt request from participant. */
 export const PromptRequest = z.object({
@@ -27,20 +26,15 @@ export type PromptUsage = z.infer<typeof PromptUsage>;
 export const PromptResponse = z.object({
   turnId: z.string().min(1),
   chatSessionId: z.string().min(1),
+  /** Through the reply filter (ADR-033): long code removed. */
   reply: z.string(),
-  code: z
-    .object({
-      language: Language,
-      source: z.string(),
-    })
-    .nullable(),
   usage: PromptUsage,
 });
 export type PromptResponse = z.infer<typeof PromptResponse>;
 
 /**
  * What `POST /api/contest/prompt` streams, one JSON object per line (NDJSON): reply deltas as they arrive, then
- * exactly one `done` or `error`. On `error` the streamed text is discarded (no code version; ADR-022).
+ * exactly one `done` or `error`. On `error` the streamed text is discarded (ADR-022). Deltas are already filtered.
  */
 export const PromptStreamEvent = z.discriminatedUnion('type', [
   z.object({ type: z.literal('delta'), text: z.string() }),

@@ -1,5 +1,5 @@
 # sessions
-POST `NewSessionRequest`: closes the open session and starts one in the chosen language (free).
+POST `NewSessionRequest`: closes the open tutor chat and starts an empty one (ADR-033: nothing carried in; the code is unaffected). Free.
 
 ## Contents
 | Path | What it does |

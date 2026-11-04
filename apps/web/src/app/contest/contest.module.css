@@ -44,14 +44,28 @@
 .mine { justify-self: end; max-width: 85%; background: var(--raised); padding: var(--space-2) var(--space-3); border-radius: var(--radius-md); white-space: pre-wrap; }
 .theirs { justify-self: start; max-width: 95%; background: var(--surface); border: 1px solid var(--border); padding: var(--space-2) var(--space-3); border-radius: var(--radius-md); }
 .prose { white-space: pre-wrap; margin: 0 0 var(--space-2); }
+/* Tutor replies can't be selected or copied (ADR-033). */
+.noCopy { -webkit-user-select: none; user-select: none; }
 .inlineCode, .output { font-family: var(--font-mono); font-size: var(--text-sm); background: var(--bg); border: 1px solid var(--border); border-radius: var(--radius-sm); padding: var(--space-2); margin: 0 0 var(--space-2); overflow-x: auto; white-space: pre; }
 .output { margin: 0; max-height: 8rem; }
 .promptBox { display: grid; gap: var(--space-2); position: sticky; bottom: 0; background: var(--surface); padding-top: var(--space-2); }
+.promptBox > button { justify-self: end; }
 .promptBox textarea { background: var(--raised); color: var(--text); border: 1px solid var(--border-strong); border-radius: var(--radius-sm); padding: var(--space-2) var(--space-3); font: inherit; resize: vertical; }
 
-.codeView { display: flex; background: var(--bg); border: 1px solid var(--border); border-radius: var(--radius-md); overflow: auto; max-height: 50vh; font-family: var(--font-mono); font-size: var(--text-sm); line-height: 1.6; user-select: text; }
+.codeView { display: flex; align-items: flex-start; background: var(--bg); border: 1px solid var(--border); border-radius: var(--radius-md); overflow: auto; min-height: 16rem; max-height: 60vh; font-family: var(--font-mono); font-size: var(--text-sm); line-height: 1.6; -webkit-user-select: none; user-select: none; }
+.codeView:focus-within { border-color: var(--accent); }
+.codeView[data-readonly] { opacity: 0.85; }
 .gutter { margin: 0; padding: var(--space-2); color: var(--text-muted); text-align: right; border-right: 1px solid var(--border); user-select: none; }
-.code { margin: 0; padding: var(--space-2) var(--space-3); white-space: pre; }
+/* The editor: highlighted code and a transparent textarea in one grid cell, same font and padding (ADR-033). */
+.editorStack { display: grid; flex: 1; min-width: max-content; }
+.editorStack > * { grid-area: 1 / 1; }
+.code { margin: 0; padding: var(--space-2) var(--space-3); white-space: pre; font: inherit; }
+.editorInput {
+  margin: 0; padding: var(--space-2) var(--space-3); border: 0; outline: none; resize: none; overflow: hidden;
+  background: transparent; color: transparent; caret-color: var(--text); white-space: pre; font: inherit;
+  -webkit-user-select: text; user-select: text; min-height: 15rem;
+}
+.editorInput::selection { background: color-mix(in srgb, var(--accent) 35%, transparent); color: transparent; }
 .code :global(.hljs-keyword), .code :global(.hljs-built_in), .code :global(.hljs-type) { color: var(--accent); }
 .code :global(.hljs-string) { color: var(--success); }
 .code :global(.hljs-number), .code :global(.hljs-literal) { color: var(--info); }
@@ -66,6 +80,24 @@
 
 .runs { list-style: none; margin: 0; padding: 0; display: grid; gap: var(--space-3); }
 .run { border: 1px solid var(--border); border-radius: var(--radius-md); padding: var(--space-2) var(--space-3); display: grid; gap: var(--space-2); }
+/* The newest run carries its state illustration on the left (ADR-032). */
+.run[data-newest] { grid-template-columns: auto minmax(0, 1fr); align-items: start; column-gap: var(--space-4); }
+.run[data-newest] > img { grid-row: 1 / span 1; }
+.run[data-newest] > :not(img) { grid-column: 2; }
+.run[data-newest] > table, .run[data-newest] > pre { grid-column: 1 / -1; }
+/* Phones (the contest itself runs in SEB on laptops; this keeps the screen usable for checks and staff). */
+@media (max-width: 720px) {
+  .app { height: auto; min-height: 100dvh; overflow: visible; }
+  .topBar { flex-wrap: wrap; gap: var(--space-2) var(--space-4); }
+  .tokenMeter { width: 100%; }
+  .columns { grid-template-columns: 1fr; grid-template-rows: auto; }
+  .columns > .pane:first-child, .columns > .tabActive, .columns > .tabInactive,
+  .columns > section:last-child { grid-column: 1; grid-row: auto; }
+  .pane { height: auto; overflow: visible; border-right: none; border-bottom: 1px solid var(--border); }
+  .tabs { grid-row: auto; order: -1; }
+  .promptBox { position: static; }
+}
+@media (max-width: 480px) { .run[data-newest] { grid-template-columns: 1fr; } .run[data-newest] > img { grid-row: auto; } .run[data-newest] > :not(img) { grid-column: 1; } }
 .runHead { display: flex; flex-wrap: wrap; gap: var(--space-3); align-items: center; font-size: var(--text-sm); font-family: var(--font-mono); }
 .tests { width: 100%; border-collapse: collapse; font-size: var(--text-sm); }
 .tests th, .tests td { text-align: left; padding: var(--space-1) var(--space-2); border-top: 1px solid var(--border); vertical-align: top; }

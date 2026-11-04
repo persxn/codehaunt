@@ -3,7 +3,7 @@
 ## Contents
 | File | Description |
 |---|---|
-| `extract-code.test.ts` | Unit tests for `extractCode`. |
+| `reply-filter.test.ts` | Tutor reply filter (ADR-033): 6-line examples shown, 7+ removed (fenced and unfenced), per-reply limit, long one-liners by characters, stream = whole reply in any chunking, no early leak, code detection. |
 | `contest-clock.test.ts` | Unit tests for `contestClock` (actual start, pauses, elapsed time). |
 | `verdict-projection.test.ts` | Verdict projection tests. |
 | `scoring.test.ts` | Decay, penalties (IE counts, CE/pending/reversed don't), token median, resource vs reference, weights, overrides, tie-breaks, disqualified. |

@@ -15,7 +15,7 @@ export function eventConfig(overrides: Partial<Record<string, unknown>> = {}) {
   return EventConfig.parse({
     branding: { title: 'Test' },
     schedule: { checkInAt: '2026-11-07T09:00:00+05:30', startsAt: new Date(Date.now() - 60_000).toISOString(), durationMinutes: 180 },
-    model: { baseUrl: 'http://gateway.test', name: 'junior', systemPromptVersion: 'v1' },
+    model: { baseUrl: 'http://gateway.test', name: 'junior', systemPromptVersion: 'tutor-v1' },
     judge: { rubricVersion: 'r1' },
     consent: { text: 'I agree.' },
     budget: { tokensPerParticipant: 20_000, contextTokens: 4096, replyTokens: 512 },
@@ -59,7 +59,7 @@ export function fakeModel(behaviour: { text?: string; usage?: { prompt_tokens: n
     async chat(request, _requestId, onDelta) {
       calls.push(request);
       if (behaviour.fail) return behaviour.fail;
-      const text = behaviour.text ?? 'Here:\n```python\nprint(sum(map(int, input().split())))\n```\nDone.';
+      const text = behaviour.text ?? 'An int holds up to about 2.1 x 10^9.\nA 64-bit type holds far more.';
       onDelta(text.slice(0, 5));
       onDelta(text.slice(5));
       if (behaviour.usage === null) return { ok: false, code: 'stream_failed', partial: text };

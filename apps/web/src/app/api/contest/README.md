@@ -7,9 +7,10 @@ Participant contest API (WP-03). Every route: PARTICIPANT only, through `lib/rou
 | `state/` | contest phase, time left, tokens, languages, consent text until accepted |
 | `consent/` | POST: accept the consent text (ADR-010) |
 | `problems/` | problem list; `[id]/` statement (visible tests only) and workspace |
-| `sessions/` | POST: new model session (first, fresh context, or another language); code carries over |
+| `sessions/` | POST: new tutor chat (first, or a fresh empty one when the context is full; ADR-033) |
+| `code/` | POST: save the participant's own code (ADR-033; no-op when unchanged) |
 | `revert/` | POST: copy an older code version as the newest |
-| `prompt/` | POST: one prompt turn, streamed as NDJSON (`PromptStreamEvent`) |
+| `prompt/` | POST: one question to the tutor, the filtered reply streamed as NDJSON (`PromptStreamEvent`) |
 | `runs/` | POST: queue a sample run or submission (idempotent); `[id]/` GET: its projected verdict |
 
 ## Affects / depends on

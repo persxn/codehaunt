@@ -13,6 +13,13 @@
   border: 1px solid transparent;
 }
 
+/* Icons inside a button are text-sized wherever the button sits. */
+.button svg {
+  width: 1rem;
+  height: 1rem;
+  flex: none;
+}
+
 .primary {
   background: var(--accent);
   color: var(--on-accent);

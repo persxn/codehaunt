@@ -1,17 +1,20 @@
 'use client';
-/** The conversation with the model: turns, the live reply, context meter, session controls and the prompt box. */
+/**
+ * The conversation with the tutor (ADR-033): turns, the live reply, context meter, new chat and the question box.
+ * Questions are typed only (paste and drop blocked); replies can't be copied. The tutor never sees the code, and its
+ * replies never change it. Replies arrive already filtered (long code removed on the server).
+ */
 import { useState } from 'react';
 
-import type { ContestState, Language, Workspace } from '@codehaunt/contracts';
+import type { ContestState, Workspace } from '@codehaunt/contracts';
 
 import { Button } from '@/components/button';
 import { Send } from '@/components/icons';
 import { Meter } from '@/components/meter';
 
 import { postJSON, streamPrompt } from './api';
+import { noClipboard } from './code-editor';
 import styles from './contest.module.css';
-
-const LABELS: Record<Language, string> = { c: 'C', cpp: 'C++', java: 'Java', python: 'Python 3' };
 
 /** Model text as plain text, with fenced blocks shown as code. Never HTML. */
 export function ModelText({ text }: { text: string }) {
@@ -33,16 +36,16 @@ export function ChatPanel({ problemId, state, workspace, canWork, reload }: {
   reload: () => Promise<void>;
 }) {
   const session = workspace.session;
-  const turnsWithCode = new Set(workspace.codeVersions.map((v) => v.turnId));
-  const [language, setLanguage] = useState<Language>(session?.language ?? state.languages[0] ?? 'cpp');
+  // The tutor is told the language the participant is writing (the newest saved code's, else the first enabled).
+  const language = workspace.codeVersions.at(-1)?.language ?? session?.language ?? state.languages[0] ?? 'cpp';
   const [prompt, setPrompt] = useState('');
   const [live, setLive] = useState<string | null>(null);
   const [sent, setSent] = useState('');
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
 
-  const startSession = async (confirmFirst: boolean) => {
-    if (confirmFirst && !window.confirm('Start a new session? The model forgets this conversation; your code carries over.')) return;
+  const newChat = async () => {
+    if (!window.confirm('Start a new chat? The tutor forgets this conversation. Your code is not affected.')) return;
     setError('');
     try {
       await postJSON('/api/contest/sessions', { problemId, language });
@@ -54,12 +57,12 @@ export function ChatPanel({ problemId, state, workspace, canWork, reload }: {
 
   const sendPrompt = async () => {
     const text = prompt.trim();
-    if (!text || busy || !session) return;
+    if (!text || busy) return;
     setBusy(true);
     setError('');
     setLive('');
     setSent(text);
-    await streamPrompt({ problemId, chatSessionId: session.id, prompt: text, idempotencyKey: crypto.randomUUID() }, (event) => {
+    await streamPrompt({ problemId, ...(session ? { chatSessionId: session.id } : {}), prompt: text, idempotencyKey: crypto.randomUUID() }, (event) => {
       if (event.type === 'delta') setLive((s) => (s ?? '') + event.text);
       else if (event.type === 'error') setError(event.message);
       else setPrompt('');
@@ -70,18 +73,11 @@ export function ChatPanel({ problemId, state, workspace, canWork, reload }: {
   };
 
   return (
-    <section className={styles.pane} aria-label="Chat with the model">
+    <section className={styles.pane} aria-label="Ask the tutor">
       <div className={styles.sessionBar}>
-        <label className={styles.inline}>
-          Language
-          <select value={language} onChange={(e) => setLanguage(e.target.value as Language)} disabled={!canWork || busy}>
-            {state.languages.map((l) => <option key={l} value={l}>{LABELS[l]}</option>)}
-          </select>
-        </label>
-        {session ? (
-          <Button variant="secondary" onClick={() => startSession(true)} disabled={!canWork || busy}>New session</Button>
-        ) : (
-          <Button onClick={() => startSession(false)} disabled={!canWork}>Start</Button>
+        <p className={styles.muted}>Ask about concepts and how to improve. The tutor never sees your code and won&apos;t write your solution.</p>
+        {session && workspace.turns.length > 0 && (
+          <Button variant="secondary" onClick={newChat} disabled={!canWork || busy}>New chat</Button>
         )}
       </div>
       {session && (
@@ -90,18 +86,15 @@ export function ChatPanel({ problemId, state, workspace, canWork, reload }: {
           used={session.contextTokensUsed}
           total={session.contextTokensLimit}
           warnAtPercent={state.contextWarnPercent}
-          warning="Context almost full: start a new session to carry your code over."
+          warning="Context almost full: start a new chat (your code is not affected)."
         />
       )}
-      <ol className={styles.turns}>
+      <ol className={`${styles.turns} ${styles.noCopy}`} {...noClipboard}>
         {workspace.turns.map((t) => (
           <li key={t.id}>
             <div className={styles.mine}>{t.prompt}</div>
             <div className={styles.theirs}>
               {t.reply === null ? <em>No reply (not charged).</em> : <ModelText text={t.reply} />}
-              {t.reply !== null && session && !turnsWithCode.has(t.id) && (
-                <p className={styles.muted}>No {LABELS[session.language]} code block in this reply: the code is unchanged.</p>
-              )}
             </div>
           </li>
         ))}
@@ -113,23 +106,23 @@ export function ChatPanel({ problemId, state, workspace, canWork, reload }: {
         )}
       </ol>
       {error && <p role="alert" className={styles.error}>{error}</p>}
-      {session && (
-        <form className={styles.promptBox} onSubmit={(e) => { e.preventDefault(); void sendPrompt(); }}>
-          <label htmlFor="prompt">Instruction to the model</label>
-          <textarea
-            id="prompt"
-            value={prompt}
-            maxLength={4000}
-            rows={4}
-            disabled={!canWork}
-            onChange={(e) => setPrompt(e.target.value)}
-            onKeyDown={(e) => { if (e.key === 'Enter' && e.ctrlKey) { e.preventDefault(); void sendPrompt(); } }}
-          />
-          <Button type="submit" busy={busy} disabled={!canWork || !prompt.trim()}>
-            <Send aria-hidden="true" /> Send
-          </Button>
-        </form>
-      )}
+      <form className={styles.promptBox} onSubmit={(e) => { e.preventDefault(); void sendPrompt(); }}>
+        <label htmlFor="prompt">Question for the tutor</label>
+        <textarea
+          id="prompt"
+          value={prompt}
+          maxLength={state.maxPromptChars}
+          rows={4}
+          disabled={!canWork}
+          onChange={(e) => setPrompt(e.target.value)}
+          onKeyDown={(e) => { if (e.key === 'Enter' && e.ctrlKey) { e.preventDefault(); void sendPrompt(); } }}
+          {...noClipboard}
+        />
+        <p className={styles.muted}>{prompt.length} / {state.maxPromptChars} characters · typing only, paste is off</p>
+        <Button type="submit" busy={busy} disabled={!canWork || !prompt.trim()}>
+          <Send aria-hidden="true" /> Send
+        </Button>
+      </form>
     </section>
   );
 }

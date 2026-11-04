@@ -7,10 +7,10 @@ authorise and call one function here; nothing here imports Next.
 |---|---|
 | `errors.ts` | `AppError` and helpers (`notFound`, `forbidden`, `badRequest`, `conflict`, `contestNotRunning`); mapped to `ApiError` in `lib/route.ts` |
 | `contest.ts` | `participantContext` (live event, contest clock incl. pauses and the participant's extra minutes, consent gate), `eventClock`, `openProblem` (practice before the start, others while running), `visible` |
-| `system-prompt.ts` | `[claude]` junior-developer persona v1 (ADR-018) + session language; `userMessage` wraps the current code |
+| `system-prompt.ts` | `[claude]` tutor persona `tutor-v1` (ADR-033; unknown versions, incl. the retired junior `v1`, fall back to it) + the language the participant writes + the example-line limit |
 | `gateway-client.ts` | `[claude]` `ModelClient` / `GatewayClient`: gateway-a, fallback to gateway-b only before any byte; compact SSE parse; no usage = failure |
-| `prompt-service.ts` | `[claude]` `startPrompt`: reserve → stream → settle (0 without usage) → store reply + extracted code; one prompt in flight per participant; `currentCode` |
-| `participant-service.ts` | contest state (tokens, phase, consent), problem list/statement (visible tests only), workspace, new session, revert, `recordConsent`, `visibleTestIds` |
+| `prompt-service.ts` | `[claude]` `startPrompt` (ADR-033): reserve → stream through the reply filter → settle (0 without usage) → store the unfiltered reply; the model gets the tutor prompt + this session's questions and *filtered* replies, never the code or statement; replies never create code versions; one question in flight per participant |
+| `participant-service.ts` | contest state (tokens, phase, consent, question limit), problem list/statement (visible tests only), workspace (replies filtered), `saveCode` (ADR-033: the participant's own code; unchanged saves add nothing; first save opens a chat), new (empty) chat, revert, `recordConsent`, `visibleTestIds` |
 | `submission-service.ts` | `createRun` (idempotent, ≤ 2 active per participant; stamps `contestMs`) and `runView` (verdict projection only) |
 | `checkin-service.ts` | `[claude]` badges (password + single-use `CH1:` code, only its SHA-256 stored; all-or-nothing with the audit row), `checkInOpen`, `deskVisible` (one rule for the scanner and the desk), `checkIn` (cap, activation, token grant, audit), `promoteFromWaitlist` |
 | `event-service.ts` | Event editor: list/get/create/update; `isLocked` (lockedAt, status past check-in, or start time passed); then only budget and schedule change; a budget change adjusts every checked-in balance in the same transaction |
@@ -43,3 +43,4 @@ authorise and call one function here; nothing here imports Next.
 - Organizers may not see hidden tests: `participant-log-service.ts` strips hidden-test output; incident `internalError` is staff-only plain text (ADR-021).
 - `projectorView` is public: it returns `ProjectorView` (strict) only.
 - `inFlight` in `prompt-service.ts` is per process: the web runs as one process (ADR-003).
+- Participants only ever get tutor replies through `filterReply` (stream, `responseFor`, `workspace`); staff views (`participant-log-service.ts`) and the judge read the stored, unfiltered reply.

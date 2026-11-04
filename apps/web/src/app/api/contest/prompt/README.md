@@ -1,5 +1,5 @@
 # prompt
-POST `PromptRequest`: streams `PromptStreamEvent` lines; reserve/settle around the gateway call (ADR-022). The call runs to the end if the browser leaves.
+POST `PromptRequest`: one question to the tutor (ADR-033); streams `PromptStreamEvent` lines of the filtered reply; reserve/settle around the gateway call (ADR-022). The call runs to the end if the browser leaves.
 
 ## Contents
 | Path | What it does |

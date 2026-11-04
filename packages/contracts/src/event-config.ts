@@ -54,12 +54,16 @@ export const EventConfig = z.object({
     contextWarnPercent: z.number().int().min(50).max(99).default(80),
     /** Reply cap per prompt (the gateway also caps it to what is left of the context). */
     replyTokens: z.number().int().min(64).max(4096).default(1024),
-    maxPromptChars: z.number().int().min(100).max(20000).default(4000),
+    /** Longest question to the tutor (ADR-033: 1,000). */
+    maxPromptChars: z.number().int().min(100).max(20000).default(1000),
   }).prefault({}),
   model: z.object({
     baseUrl: z.url(),
     name: z.string().min(1),
+    /** `tutor-v1` (ADR-033); unknown versions fall back to it. */
     systemPromptVersion: z.string().min(1),
+    /** Most code lines a tutor reply may show (ADR-033 reply filter). */
+    maxExampleLines: z.number().int().min(0).max(40).default(6),
     temperature: z.number().min(0).max(2).default(0.2),
     hostedAllowed: z.boolean().default(false),
   }),

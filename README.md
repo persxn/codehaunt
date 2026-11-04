@@ -1,6 +1,6 @@
 # CodeHaunt
 
-AI‑assisted coding‑contest harness: participants solve problems by prompting a tiny code model under a strict token budget. Solutions run in a sandboxed Docker judge; process quality is evaluated by an LLM judge.
+AI‑assisted coding‑contest harness: participants write their own code and may ask a small AI tutor about concepts, under a strict token budget (ADR-033). Solutions run in a sandboxed Docker judge; process quality is evaluated by an LLM judge.
 
 ## Quick start (development)
 - Prereqs: Node 22, Docker.

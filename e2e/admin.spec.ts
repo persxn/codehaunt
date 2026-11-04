@@ -123,10 +123,8 @@ test.describe.serial('admin console', () => {
     await page.getByRole('button', { name: 'Accept' }).click();
     await page.getByRole('button', { name: /Sum/ }).click();
     await page.getByLabel('Language').selectOption('python');
-    await page.getByRole('button', { name: 'Start' }).click();
-    await page.getByLabel('Instruction to the model').fill('Write a program that reads two integers given on ONE line separated by a space and prints their sum.');
-    await page.getByRole('button', { name: 'Send' }).click();
-    await expect(page.getByRole('region', { name: 'Current code (read-only)' })).toBeVisible({ timeout: 90_000 });
+    await page.getByLabel('Your Python 3 code').click();
+    await page.keyboard.type('a, b = map(int, input().split())\nprint(a + b)\n');
     page.once('dialog', (d) => d.accept());
     await page.getByRole('button', { name: 'Submit' }).click();
     await expect(page.locator('li', { hasText: 'Submission' }).first().getByText('Accepted').first()).toBeVisible({ timeout: 120_000 });

@@ -98,8 +98,11 @@ export function ContestApp() {
         </Banner>
       )}
       {phase === 'paused' && <Banner tone="warning">Paused by the organizers.</Banner>}
-      {phase === 'ended' && <Banner tone="muted">The contest has ended. Your work is saved.</Banner>}
-      {error && <Banner tone="danger">{error}</Banner>}
+      {phase === 'ended' && <Banner tone="muted" art="times-up">Time&apos;s up: the contest has ended. Your work is saved.</Banner>}
+      {phase === 'running' && state.tokens.remaining <= 0 && (
+        <Banner tone="warning" art="budget-out">Your token budget is used up. You can still write code, run samples and submit.</Banner>
+      )}
+      {error && <Banner tone="danger" art="connection-lost">{error}</Banner>}
 
       <div className={styles.columns}>
         <section className={`${styles.pane} ${tab === 'statement' ? styles.tabActive : styles.tabInactive}`} aria-label="Problems">
@@ -142,7 +145,7 @@ export function ContestApp() {
             <div className={tab === 'chat' ? styles.tabActive : styles.tabInactive}>
               <ChatPanel key={selected} problemId={selected} state={state} workspace={workspace} canWork={canWork} reload={reload} />
             </div>
-            <CodePanel problemId={selected} workspace={workspace} canWork={canWork} reload={reload} />
+            <CodePanel key={selected} problemId={selected} state={state} workspace={workspace} canWork={canWork} reload={reload} />
           </>
         ) : (
           <p className={styles.placeholder}>{problems.length ? 'Pick a problem to start.' : 'No problems are open right now.'}</p>

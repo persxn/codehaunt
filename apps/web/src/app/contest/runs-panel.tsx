@@ -2,18 +2,26 @@
 /** Sample runs and submissions, newest first, with the projected verdict (never hidden-test detail). */
 import type { RunView } from '@codehaunt/contracts';
 
+import { StateArt, type StateArtKind } from '@/components/state-art/state-art';
 import { VerdictBadge } from '@/components/verdict-badge';
 
 import styles from './contest.module.css';
 
 const mb = (kb: number) => `${(kb / 1024).toFixed(1)} MB`;
 
+/** The illustration for the newest run only (ADR-032), beside its verdict badge. */
+function artFor(run: RunView): StateArtKind {
+  if (!run.verdict) return 'judging';
+  return run.verdict === 'AC' ? 'accepted' : 'wrong-answer';
+}
+
 export function RunsPanel({ runs }: { runs: RunView[] }) {
   if (!runs.length) return <p className={styles.muted}>No runs yet. Run the samples to check the current code.</p>;
   return (
     <ol className={styles.runs} aria-live="polite">
-      {runs.map((r) => (
-        <li key={r.submissionId} className={styles.run}>
+      {runs.map((r, i) => (
+        <li key={r.submissionId} className={styles.run} data-newest={i === 0 || undefined}>
+          {i === 0 && <StateArt kind={artFor(r)} size={120} />}
           <div className={styles.runHead}>
             <VerdictBadge verdict={r.verdict} status={r.verdict ? undefined : r.status} />
             <span>{r.kind === 'SAMPLE' ? 'Sample run' : 'Submission'}</span>

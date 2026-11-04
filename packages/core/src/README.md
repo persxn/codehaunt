@@ -7,7 +7,7 @@ Framework-free business logic of `@codehaunt/core`: pure functions, no I/O, no c
 | `index.ts` | barrel |
 | `language.ts` | the four languages: contract name ↔ DB enum, display label, code-fence tags (`LANGUAGES`, `toDbLanguage`, `fromDbLanguage`) |
 | `verdict-projection.ts` | `[claude]` `toParticipantVerdict`: what a participant may see of a run (counts; time/memory only for samples and Accepted submissions, ADR-027; visible-test detail; CE log) |
-| `extract-code.ts` | `extractCode(reply, language)`: last fenced block tagged with the language, else the last untagged one; size-capped |
+| `reply-filter.ts` | `[claude]` ADR-033: `createReplyFilter(maxLines)` (streaming) and `filterReply` replace code in tutor replies beyond `maxLines` lines / `maxLines × 80` chars per reply (fenced blocks and unfenced code-like runs) with `REMOVED_EXAMPLE`; a block is held until it ends or passes the limit; `looksLikeCode` |
 | `contest-clock.ts` | `contestClock(input, now)`: phase, start/end/freeze times, time left, frozen, elapsed; actual start, pauses and extra minutes (ADR-028) |
 | `scoring.ts` | `[claude]` `computeStandings`: ADR-009 components (constants ADR-028: problem values, decay, token median, resource vs reference), overrides, ranking with tie-breaks; `decayedPoints` ported from JojoCode |
 | `process-metrics.ts` | `computeProcessMetrics`: deterministic per-problem metrics for the batch judge (WP-07): prompts, tokens, attempts, rejections before AC, time to AC, tokens after AC, time/memory ratio vs reference |
@@ -27,4 +27,4 @@ Framework-free business logic of `@codehaunt/core`: pure functions, no I/O, no c
 - Never edit `judge-prompt-v1.ts` in place once reviews exist: add `judge-prompt-v2.ts` with a new version (stored per review).
 - `verdict-projection.ts` is security-critical: never return `internalError`, hidden-test output, or time/memory of a
   failed submission (a side channel on hidden inputs, audit run-9 M2).
-- `extract-code.ts` must stay linear on long input (model replies are untrusted); use `trimEnd()`, not trailing-space regexes.
+- `reply-filter.ts` must stay linear on long input (model replies are untrusted): line regexes only, anchored, no nested quantifiers. Streamed and whole-reply output must stay identical (a test feeds every chunk size).

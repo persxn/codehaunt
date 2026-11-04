@@ -1,0 +1,2 @@
+.art { flex: none; display: block; object-fit: contain; }
+@media (max-width: 480px) { .art { width: 88px; height: 88px; } }

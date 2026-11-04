@@ -10,7 +10,7 @@
 .nav a[aria-current='page'] { background: var(--raised); color: var(--accent); font-weight: 600; }
 .content { padding: var(--space-6); max-width: 1200px; width: 100%; box-sizing: border-box; }
 @media (max-width: 720px) {
-  .shell { grid-template-columns: 1fr; }
+  .shell { grid-template-columns: 1fr; grid-template-rows: auto auto 1fr; }
   .nav ul { display: flex; flex-wrap: wrap; }
   .nav { border-right: none; border-bottom: 1px solid var(--border); }
   .content { padding: var(--space-4); }

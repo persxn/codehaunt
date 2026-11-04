@@ -5,7 +5,7 @@ Framework‑free business‑logic library for the CodeHaunt platform. It contain
 ## Contents
 | Path | What it does |
 |---|---|
-| `src/` | Pure source files (`extract-code.ts`, `contest-clock.ts`, `language.ts`, `verdict-projection.ts`, `scoring.ts`, `index.ts`). |
+| `src/` | Pure source files (`reply-filter.ts`, `contest-clock.ts`, `language.ts`, `verdict-projection.ts`, `scoring.ts`, `index.ts`). |
 | `test/` | Unit tests for the pure functions. |
 | `package.json` | NPM package metadata. |
 | `tsconfig.json` | TypeScript configuration (extends the workspace base). |

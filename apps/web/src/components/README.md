@@ -17,6 +17,7 @@
 | `meter.module.css` | Meter styles |
 | `banner.tsx` | Contest banner component |
 | `banner.module.css` | Banner styles |
+| `state-art/` | state illustrations beside state text (ADR-032; `state-art/README.md`) |
 
 ## Affects / depends on
 - Used by: contest and admin pages
