@@ -17,6 +17,7 @@ interface Row {
   participantId: string; name: string; enrolmentNo: string;
   job: { id: string; status: string; attempts: number; error: string | null; durationMs: number | null } | null;
   overall: { score: number; rationale: string; model: string; createdAt: string } | null;
+  runs: number;
   problems: Array<{ problemId: string; score: number; rationale: string; criteria: Record<string, number> | null; complexityAchieved: string | null; complexityOptimal: string | null }>;
   injection: { flagged: boolean; evidence: string; hints: string[] };
   flags: Array<{ problemId: string; saveBursts: number; aiCopiedLines: number; codeHeavyQuestions: number }>;
@@ -88,8 +89,9 @@ export function Review({ admin }: { admin: boolean }) {
                   await refresh();
                 }} />
                 <p className={styles.muted}>
-                  Then run the judge on the DGX: <code>docker compose --profile judge run --rm judge-review</code>. It works
-                  one participant at a time and stops when the queue is empty.
+                  Then, on the DGX: <code>docker compose --profile judge up -d judge-relay</code>,{' '}
+                  <code>docker compose --profile judge run --rm judge-review</code> (one participant at a time; it stops when
+                  the queue is empty), then <code>docker compose --profile judge stop judge-relay</code>.
                 </p>
               </>
             ) : (
@@ -112,6 +114,7 @@ export function Review({ admin }: { admin: boolean }) {
                       </td>
                       <td>
                         {r.job ? STATUS[r.job.status] ?? r.job.status : 'not queued'}
+                        {r.runs > 1 && <div className={styles.muted}>judged {r.runs} times (newest counts)</div>}
                         {r.job?.error && <div className={styles.error}>{r.job.error}</div>}
                       </td>
                       <td>

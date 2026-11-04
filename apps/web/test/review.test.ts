@@ -74,3 +74,19 @@ test('the board shows the newest overall score, flags and the override; the lead
   await overrideScore(db.prisma, f.participant.id, { component: 'processQuality', value: 60, reason: 'manual review' }, { id: f.admin.id, requestId: 'r' });
   assert.equal((await reviewBoard(db.prisma, f.event.id)).rows.find((r) => r.participantId === f.participant.id)!.processOverride, 60);
 });
+
+test('audit R14-6: two re-queues at once move the job once; the board counts judge runs', async () => {
+  const f = await setup(db.prisma);
+  await db.prisma.event.update({ where: { id: f.event.id }, data: { status: 'ENDED' } });
+  const actor = { id: f.admin.id, requestId: 'r' };
+  const job = await db.prisma.judgeJob.create({ data: { eventId: f.event.id, participantId: f.participant.id, rubricVersion: 'judge-v2', status: 'DONE' } });
+  const results = await Promise.allSettled([requeueJudgeJob(db.prisma, job.id, 'a', actor), requeueJudgeJob(db.prisma, job.id, 'b', actor)]);
+  assert.equal(results.filter((r) => r.status === 'fulfilled').length, 1);
+  assert.equal(await db.prisma.auditLog.count({ where: { action: 'judge.requeued', targetId: f.participant.id } }), 1);
+  const common = { participantId: f.participant.id, rubricVersion: 'judge-v2', model: 'm', problemId: null, rationale: 'r', raw: {} };
+  await db.prisma.judgeReview.create({ data: { ...common, score: 40 } });
+  await db.prisma.judgeReview.create({ data: { ...common, score: 70 } });
+  const row = (await reviewBoard(db.prisma, f.event.id)).rows.find((r) => r.participantId === f.participant.id)!;
+  assert.equal(row.runs, 2);
+  assert.equal(row.overall?.score, 70);
+});

@@ -26,6 +26,8 @@ COPY --from=docker:27-cli@sha256:851f91d241214e7c6db86513b270d58776379aacc5eb9c4
 COPY --from=build /app/node_modules ./node_modules
 COPY --from=build /app/packages ./packages
 COPY --from=build /app/apps/worker ./apps/worker
+# The batch judge's relay socket (ADR-035): a named volume copies this owner on first mount, so `node` can bind there.
+RUN mkdir -p /run/judge && chown node:node /run/judge
 USER node
 ENV WORKER_HEALTH_HOST=0.0.0.0
 HEALTHCHECK CMD node -e "fetch('http://127.0.0.1:3101/healthz').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"

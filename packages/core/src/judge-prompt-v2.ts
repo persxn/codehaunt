@@ -57,12 +57,16 @@ Reply with ONE JSON object and nothing else, exactly this shape:
 {"problems":[{"problemId":"<id from input>","score":0,"criteria":{"questionQuality":0,"independence":0,
 "debugging":0,"improvement":0,"complexity":0,"tokenEconomy":0},"complexityAchieved":"O(...)",
 "complexityOptimal":"O(...)","rationale":"..."}],"overall":{"score":0,"rationale":"..."},
-"injectionFlag":false,"injectionEvidence":""}
+"injectionFlag":false,"injectionEvidence":"","rubricCheck":"<the session check code below>"}
 Include every problemId from the input exactly once. Use "n/a" for complexityAchieved when there is no final code.`;
 
-export function buildJudgeMessagesV2(input: JudgeInputV2): ChatMessage[] {
+/**
+ * `check` is a fresh random code per judging call, placed last in the rubric: the reply must echo it in `rubricCheck`
+ * (audit R14-NV1). Participant data never contains it, so only a model that read the rubric can.
+ */
+export function buildJudgeMessagesV2(input: JudgeInputV2, check: string): ChatMessage[] {
   return [
-    { role: 'system', content: JUDGE_SYSTEM_PROMPT_V2 },
+    { role: 'system', content: `${JUDGE_SYSTEM_PROMPT_V2}\nSession check code: ${check}` },
     { role: 'user', content: `<participant_data>${untrustedJson(input)}</participant_data>` },
   ];
 }
@@ -82,19 +86,39 @@ const INJECTION_PATTERNS: readonly RegExp[] = [
   /"injectionFlag"/i,
 ];
 
-const suspicious = (text: string) => INJECTION_PATTERNS.some((p) => p.test(text));
+/** Look-alike letters (Cyrillic, Greek) folded to ASCII, so "јudge" or "ignоre" still match (audit R14-1). */
+const CONFUSABLES: Readonly<Record<string, string>> = {
+  а: 'a', е: 'e', о: 'o', р: 'p', с: 'c', у: 'y', х: 'x', і: 'i', ј: 'j', ѕ: 's', ԁ: 'd', ɡ: 'g', ӏ: 'l', һ: 'h', ո: 'n',
+  А: 'A', В: 'B', Е: 'E', К: 'K', М: 'M', Н: 'H', О: 'O', Р: 'P', С: 'C', Т: 'T', Х: 'X', І: 'I', Ј: 'J', Ѕ: 'S',
+  α: 'a', ο: 'o', ρ: 'p', ν: 'v', ε: 'e', ι: 'i', κ: 'k', τ: 't', υ: 'u', Α: 'A', Β: 'B', Ε: 'E', Ι: 'I', Κ: 'K', Μ: 'M', Ν: 'N', Ο: 'O', Ρ: 'P', Τ: 'T', Χ: 'X',
+};
+
+/** NFKC (full-width forms), invisible format characters removed (zero-width spaces, joiners), look-alikes folded. */
+export function normalizeForHints(text: string): string {
+  return text
+    .normalize('NFKC')
+    .replace(/\p{Cf}/gu, '')
+    .replace(/[^\x00-\x7F]/g, (ch) => CONFUSABLES[ch] ?? ch);
+}
+
+const suspicious = (text: string) => {
+  const normal = normalizeForHints(text);
+  return INJECTION_PATTERNS.some((p) => p.test(normal));
+};
 
 /**
- * Questions that match a pattern, as `problemId@atMs`, and the final code (a comment can carry text for the judge),
- * as `problemId@code`. Tutor replies are not scanned: they quote the questions.
+ * Every participant-influenced string that matches a pattern: questions and tutor replies as `problemId@atMs`, code
+ * snapshots as `problemId@snap<atMs>`, the final code as `problemId@code`. Replies are scanned too (a participant
+ * can make the tutor spell an injection out); quoting a question only over-flags, which never changes a score.
  */
 export function injectionHintsV2(input: JudgeInputV2): string[] {
-  const hits: string[] = [];
+  const hits = new Set<string>();
   for (const problem of input.problems) {
     for (const entry of problem.transcript) {
-      if (entry.kind === 'question' && suspicious(entry.text)) hits.push(`${problem.problemId}@${entry.atMs}`);
+      if ((entry.kind === 'question' || entry.kind === 'reply') && suspicious(entry.text)) hits.add(`${problem.problemId}@${entry.atMs}`);
     }
-    if (problem.finalCode && suspicious(problem.finalCode)) hits.push(`${problem.problemId}@code`);
+    for (const snap of problem.codeSnapshots) if (suspicious(snap.code)) hits.add(`${problem.problemId}@snap${snap.atMs}`);
+    if (problem.finalCode && suspicious(problem.finalCode)) hits.add(`${problem.problemId}@code`);
   }
-  return hits;
+  return [...hits];
 }

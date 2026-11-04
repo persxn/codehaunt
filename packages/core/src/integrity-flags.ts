@@ -6,6 +6,10 @@
 import { looksLikeCode } from './reply-filter.ts';
 
 export const SAVE_BURST_CHARS = 400;
+/** Sustained typing ceiling (audit R14-2): about 120 wpm of code is already fast. */
+export const MAX_TYPING_CHARS_PER_S = 10;
+/** The editor autosaves at most this often (code-panel AUTOSAVE_MS), so a shorter gap counts as this long. */
+export const MIN_SAVE_INTERVAL_MS = 20_000;
 
 export interface SavedVersion {
   /** Milliseconds timestamp */
@@ -15,18 +19,17 @@ export interface SavedVersion {
 }
 
 /**
- * Detects burst saves where a participant quickly types a large amount of code.
- * Returns the timestamps of flagged saves.
- *
- * @param versions – array of saved versions (must not be mutated)
- * @param opts – optional maxGrowth (default SAVE_BURST_CHARS) and windowMs (default 30_000)
+ * Saves that grew faster than anyone types: more than `maxGrowth` chars, at a rate above `maxCharsPerSecond` over the
+ * time since the previous save (never shorter than one autosave interval). A rate, not a window: idling before a
+ * paste doesn't hide it (audit R14-2). The first save counts as growth from '' and is flagged above `maxGrowth`;
+ * a save equal to an earlier version (a restore) never is. Returns the timestamps of flagged saves.
  */
 export function saveBursts(
   versions: readonly SavedVersion[],
-  opts?: { maxGrowth?: number; windowMs?: number },
+  opts?: { maxGrowth?: number; maxCharsPerSecond?: number },
 ): number[] {
   const maxGrowth = opts?.maxGrowth ?? SAVE_BURST_CHARS;
-  const windowMs = opts?.windowMs ?? 30_000;
+  const rate = opts?.maxCharsPerSecond ?? MAX_TYPING_CHARS_PER_S;
 
   // copy and sort by atMs ascending (stable sort)
   const sorted = [...versions].sort((a, b) => a.atMs - b.atMs);
@@ -44,7 +47,8 @@ export function saveBursts(
         if (cur.source.length > maxGrowth) flagged.push(cur.atMs);
       } else if (prev) {
         const growth = cur.source.length - prev.source.length;
-        if (growth > maxGrowth && cur.atMs - prev.atMs <= windowMs) {
+        const seconds = Math.max(cur.atMs - prev.atMs, MIN_SAVE_INTERVAL_MS) / 1000;
+        if (growth > maxGrowth && growth > rate * seconds) {
           flagged.push(cur.atMs);
         }
       }

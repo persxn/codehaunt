@@ -32,22 +32,30 @@ test('approve, reject, decide once, refused after the start', async () => {
   const naive = await db.prisma.problemDraft.create({ data: { problemId: f.problem.id, kind: 'NAIVE', language: 'PYTHON', source: 'print(0)', note: 'brute', model: 'gpt-oss:120b' } });
 
   const hiddenBefore = await db.prisma.testCase.count({ where: { problemId: f.problem.id, visibility: 'HIDDEN' } });
-  await decideDraft(db.prisma, f.problem.id, test1.id, { decision: 'approve' }, actor);
+  await decideDraft(db.prisma, f.problem.id, test1.id, { decision: 'approve', reason: 'checked' }, actor);
   const hidden = await db.prisma.testCase.findMany({ where: { problemId: f.problem.id, visibility: 'HIDDEN' }, orderBy: { ord: 'asc' } });
   assert.equal(hidden.length, hiddenBefore + 1);
   assert.equal(hidden.at(-1)!.input, '0 0');
-  await assert.rejects(decideDraft(db.prisma, f.problem.id, test1.id, { decision: 'reject' }, actor), code('draft_decided'));
+  await assert.rejects(decideDraft(db.prisma, f.problem.id, test1.id, { decision: 'reject', reason: 'wrong output' }, actor), code('draft_decided'));
 
-  await decideDraft(db.prisma, f.problem.id, naive.id, { decision: 'approve' }, actor);
+  await decideDraft(db.prisma, f.problem.id, naive.id, { decision: 'approve', reason: 'checked' }, actor);
   const solution = await db.prisma.referenceSolution.findUniqueOrThrow({ where: { problemId_language_kind: { problemId: f.problem.id, language: 'PYTHON', kind: 'NAIVE' } } });
   assert.equal(solution.source, 'print(0)');
 
-  await decideDraft(db.prisma, f.problem.id, test2.id, { decision: 'reject' }, actor);
+  await decideDraft(db.prisma, f.problem.id, test2.id, { decision: 'reject', reason: 'wrong output' }, actor);
   assert.equal(await db.prisma.testCase.count({ where: { problemId: f.problem.id, visibility: 'HIDDEN' } }), hiddenBefore + 1);
   assert.deepEqual((await listDrafts(db.prisma, f.problem.id)).map((d) => d.status), ['APPROVED', 'REJECTED', 'APPROVED']);
-  assert.equal(await db.prisma.auditLog.count({ where: { targetId: f.problem.id, action: { startsWith: 'problem.draft_' } } }), 3);
+  const audits = await db.prisma.auditLog.findMany({ where: { targetId: f.problem.id, action: { startsWith: 'problem.draft_' } } });
+  assert.equal(audits.length, 3);
+  assert.ok(audits.every((a) => a.reason), 'every decision carries its reason (audit R14-7)');
+
+  // The 200-hidden-test cap holds for approvals too.
+  const count = await db.prisma.testCase.count({ where: { problemId: f.problem.id, visibility: 'HIDDEN' } });
+  await db.prisma.testCase.createMany({ data: Array.from({ length: 200 - count }, (_, i) => ({ problemId: f.problem.id, visibility: 'HIDDEN' as const, ord: 1000 + i, input: 'x', expectedOutput: 'x' })) });
+  const over = await db.prisma.problemDraft.create({ data: { problemId: f.problem.id, kind: 'TEST', input: '9 9', expectedOutput: '18', note: 'x', model: 'm' } });
+  await assert.rejects(decideDraft(db.prisma, f.problem.id, over.id, { decision: 'approve', reason: 'x' }, actor), code('too_many_tests'));
 
   const late = await db.prisma.problemDraft.create({ data: { problemId: f.problem.id, kind: 'TEST', input: '1 1', expectedOutput: '2', note: 'x', model: 'm' } });
   await db.prisma.event.update({ where: { id: f.event.id }, data: { lockedAt: new Date(), status: 'RUNNING' } });
-  await assert.rejects(decideDraft(db.prisma, f.problem.id, late.id, { decision: 'approve' }, actor), code('event_locked'));
+  await assert.rejects(decideDraft(db.prisma, f.problem.id, late.id, { decision: 'approve', reason: 'checked' }, actor), code('event_locked'));
 });

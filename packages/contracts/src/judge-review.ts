@@ -171,6 +171,13 @@ export type JudgeCriteriaV2 = z.infer<typeof JudgeCriteriaV2>;
 export const JudgeProblemReviewV2 = JudgeProblemReview.extend({ criteria: JudgeCriteriaV2 }).strict();
 export type JudgeProblemReviewV2 = z.infer<typeof JudgeProblemReviewV2>;
 
-export const JudgeOutputV2 = JudgeOutput.extend({ problems: z.array(JudgeProblemReviewV2).min(1).max(20) }).strict();
+export const JudgeOutputV2 = JudgeOutput.extend({
+  problems: z.array(JudgeProblemReviewV2).min(1).max(20),
+  /**
+   * Echo of the per-call code at the end of the rubric (audit R14-NV1). Ollama drops the system message when a prompt
+   * overflows the context; a model that never saw the rubric can't know the code, so its reply is refused.
+   */
+  rubricCheck: z.string().max(40),
+}).strict();
 export type JudgeOutputV2 = z.infer<typeof JudgeOutputV2>;
 

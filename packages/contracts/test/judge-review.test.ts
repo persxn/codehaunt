@@ -89,8 +89,10 @@ test('judge-v2 input: tutor transcript, snapshots, flags; v1 kinds and extra fie
 test('judge-v2 output: tutor-mode criteria only, strict', () => {
   const criteria = { questionQuality: 4, independence: 5, debugging: 3, improvement: 4, complexity: 5, tokenEconomy: 4 };
   const review = { problemId: 'A', score: 82, criteria, complexityAchieved: 'O(n)', complexityOptimal: 'O(n)', rationale: 'Asked about overflow at 1000.' };
-  const output = { problems: [review], overall: { score: 82, rationale: 'Good.' }, injectionFlag: false, injectionEvidence: '' };
+  const output = { problems: [review], overall: { score: 82, rationale: 'Good.' }, injectionFlag: false, injectionEvidence: '', rubricCheck: 'c0de' };
   assert.equal(JudgeOutputV2.safeParse(output).success, true);
+  const { rubricCheck: _check, ...withoutCheck } = output;
+  assert.equal(JudgeOutputV2.safeParse(withoutCheck).success, false, 'rubricCheck is required (R14-NV1)');
   assert.equal(judgeOutputMismatch(JudgeInputV2.parse({ participantRef: 'p', problems: [problemV2('A')] }), JudgeOutputV2.parse(output)), null);
   const v1Criteria = { specificity: 4, memoryAwareness: 4, mistakeCorrection: 4, debugging: 4, complexity: 4, tokenEconomy: 4 };
   assert.equal(JudgeOutputV2.safeParse({ ...output, problems: [{ ...review, criteria: v1Criteria }] }).success, false);

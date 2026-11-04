@@ -154,3 +154,11 @@ test('codeHeavyQuestions identifies heavy code question', () => {
   const res = codeHeavyQuestions(questions);
   assert.deepEqual(res, [1]);
 });
+
+test('audit R14-2: idling before a paste does not hide it; slow honest growth is not flagged', () => {
+  const base = 'x'.repeat(100);
+  assert.deepEqual(saveBursts([{ atMs: 0, source: base }, { atMs: 40_000, source: base + 'y'.repeat(2400) }]), [40_000], '2400 chars after a 40 s idle');
+  assert.deepEqual(saveBursts([{ atMs: 0, source: base }, { atMs: 10 * 60_000, source: base + 'y'.repeat(2400) }]), [], '2400 chars over 10 minutes (offline typing) is 4 chars/s');
+  assert.deepEqual(saveBursts([{ atMs: 0, source: base }, { atMs: 5_000, source: base + 'y'.repeat(450) }]), [5_000], 'a gap under one autosave counts as 20 s');
+});
+

@@ -106,18 +106,37 @@ services:
         condition: service_healthy
     restart: unless-stopped
 
-  # One-shot batch judge (WP-07, ADR-035): `docker compose --profile judge run --rm judge-review` after the contest.
-  # Host network only to reach Postgres and Ollama on 127.0.0.1; the long-running worker stays on internal networks.
+  # Batch judge (WP-07, ADR-035; audit R14-4). After the contest:
+  #   docker compose --profile judge up -d judge-relay
+  #   docker compose --profile judge run --rm judge-review
+  #   docker compose --profile judge stop judge-relay
+  # The judge sits on the internal `db` network only; its one way out is the relay's unix socket, which forwards
+  # POST /api/chat to Ollama on 127.0.0.1 and nothing else.
+  judge-relay:
+    <<: *hardened
+    profiles: [judge]
+    image: codehaunt-worker:dev
+    command: ["node", "--experimental-strip-types", "apps/worker/src/judge-review/relay.ts"]
+    network_mode: host
+    environment:
+      JUDGE_OLLAMA_URL: ${JUDGE_OLLAMA_URL:-http://127.0.0.1:11434}
+      JUDGE_RELAY_SOCKET: /run/judge/ollama.sock
+    volumes: ["judge-socket:/run/judge"]
+    mem_limit: 128m
+    restart: "no"
+
   judge-review:
     <<: *hardened
     profiles: [judge]
     image: codehaunt-worker:dev
     command: ["node", "--experimental-strip-types", "apps/worker/src/judge-review/main.ts"]
-    network_mode: host
     environment:
-      DATABASE_URL: postgresql://codehaunt_worker:${WORKER_DB_PASSWORD}@127.0.0.1:${POSTGRES_PORT:-5434}/${POSTGRES_DB:-codehaunt}
-      JUDGE_OLLAMA_URL: ${JUDGE_OLLAMA_URL:-http://127.0.0.1:11434}
+      DATABASE_URL: postgresql://codehaunt_worker:${WORKER_DB_PASSWORD}@postgres:5432/${POSTGRES_DB:-codehaunt}
+      JUDGE_RELAY_SOCKET: /run/judge/ollama.sock
       JUDGE_MODEL: ${JUDGE_MODEL:-gpt-oss:120b}
+      JUDGE_THINK: ${JUDGE_THINK:-low}
+    volumes: ["judge-socket:/run/judge"]
+    networks: [db]
     mem_limit: 512m
     restart: "no"
 
@@ -149,3 +168,5 @@ networks:
 
 volumes:
   pgdata:
+  # The relay's unix socket, shared by judge-relay and judge-review only.
+  judge-socket:

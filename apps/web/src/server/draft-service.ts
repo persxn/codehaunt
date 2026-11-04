@@ -13,6 +13,9 @@ import { isLocked } from './event-service.ts';
 
 type Actor = { id: string; requestId: string };
 
+/** Same bound as `ProblemInput.hiddenTests` in @codehaunt/contracts. */
+export const MAX_HIDDEN_TESTS = 200;
+
 export async function listDrafts(prisma: PrismaClient, problemId: string) {
   const drafts = await prisma.problemDraft.findMany({ where: { problemId }, orderBy: { createdAt: 'asc' } });
   return drafts.map((d) => ({
@@ -34,6 +37,10 @@ export async function decideDraft(prisma: PrismaClient, problemId: string, draft
     if (input.decision === 'approve') {
       if (draft.kind === 'TEST') {
         if (draft.input === null || draft.expectedOutput === null) throw conflict('draft_incomplete', 'That draft has no input or output.');
+        // ProblemInput allows at most 200 hidden tests; an approval must not push past it (audit R14-7).
+        if ((await tx.testCase.count({ where: { problemId, visibility: 'HIDDEN' } })) >= MAX_HIDDEN_TESTS) {
+          throw conflict('too_many_tests', `A problem has at most ${MAX_HIDDEN_TESTS} hidden tests.`);
+        }
         const last = await tx.testCase.findFirst({ where: { problemId, visibility: 'HIDDEN' }, orderBy: { ord: 'desc' }, select: { ord: true } });
         await tx.testCase.create({ data: { problemId, visibility: 'HIDDEN', ord: (last?.ord ?? -1) + 1, input: draft.input, expectedOutput: draft.expectedOutput } });
       } else {
@@ -50,7 +57,7 @@ export async function decideDraft(prisma: PrismaClient, problemId: string, draft
       data: { status: input.decision === 'approve' ? 'APPROVED' : 'REJECTED', decidedAt: new Date(), decidedById: actor.id },
     });
     await tx.auditLog.create({
-      data: { actorId: actor.id, action: `problem.draft_${input.decision === 'approve' ? 'approved' : 'rejected'}`, targetType: 'problem', targetId: problemId, after: { draftId, kind: draft.kind }, requestId: actor.requestId },
+      data: { actorId: actor.id, action: `problem.draft_${input.decision === 'approve' ? 'approved' : 'rejected'}`, targetType: 'problem', targetId: problemId, after: { draftId, kind: draft.kind }, reason: input.reason, requestId: actor.requestId },
     });
     return { ok: true };
   });

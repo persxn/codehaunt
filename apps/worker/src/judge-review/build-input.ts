@@ -26,6 +26,51 @@ import type { PrismaClient } from '@codehaunt/db';
 
 const TRUNCATED = '\n[truncated]';
 
+/**
+ * The whole judge input must fit the model's context with room for the rubric, a repair turn, reasoning and the reply
+ * (audit R14-3, R14-NV1): 70,000 characters of JSON is at most ~23k tokens even at 3 chars per token, inside
+ * OllamaJudgeModel's 32k context. Over the context Ollama drops the system message (measured), so this is a hard limit.
+ */
+export const MAX_INPUT_CHARS = 70_000;
+
+export class InputTooLarge extends Error {
+  readonly chars: number;
+  constructor(chars: number) {
+    super(`judge input is ${chars} characters after trimming (limit ${MAX_INPUT_CHARS})`);
+    this.chars = chars;
+  }
+}
+
+const size = (input: JudgeInputV2) => JSON.stringify(input).length;
+const cut = (text: string, max: number) => (text.length <= max ? text : text.slice(0, max - TRUNCATED.length) + TRUNCATED);
+
+/**
+ * Shrinks an over-budget input in a fixed order, least informative first, and returns the steps taken (stored with
+ * the review): tutor replies, middle snapshots, long questions, the middle of each transcript, then code.
+ */
+export function fitToBudget(input: JudgeInputV2, max = MAX_INPUT_CHARS): { input: JudgeInputV2; trimmed: string[] } {
+  const trimmed: string[] = [];
+  let current = input;
+  const steps: Array<[string, (p: JudgeInputV2['problems'][number]) => JudgeInputV2['problems'][number]]> = [
+    ['replies', (p) => ({ ...p, transcript: p.transcript.map((e) => (e.kind === 'reply' ? { ...e, text: cut(e.text, 400) } : e)) })],
+    ['snapshots', (p) => ({ ...p, codeSnapshots: p.codeSnapshots.length > 2 ? [p.codeSnapshots[0]!, p.codeSnapshots.at(-1)!] : p.codeSnapshots })],
+    ['questions', (p) => ({ ...p, transcript: p.transcript.map((e) => (e.kind === 'question' ? { ...e, text: cut(e.text, 800) } : e)) })],
+    ['transcript', (p) => ({ ...p, transcript: p.transcript.length > 60 ? [...p.transcript.slice(0, 30), ...p.transcript.slice(-30)] : p.transcript })],
+    ['code', (p) => ({ ...p, finalCode: p.finalCode && cut(p.finalCode, 3000), codeSnapshots: p.codeSnapshots.map((s) => ({ ...s, code: cut(s.code, 1500) })) })],
+    // Second round, harder: still every turn and the final code, each shorter.
+    ['replies-hard', (p) => ({ ...p, transcript: p.transcript.map((e) => (e.kind === 'reply' ? { ...e, text: cut(e.text, 120) } : e)) })],
+    ['questions-hard', (p) => ({ ...p, transcript: p.transcript.map((e) => (e.kind === 'question' ? { ...e, text: cut(e.text, 300) } : e)) })],
+    ['code-hard', (p) => ({ ...p, finalCode: p.finalCode && cut(p.finalCode, 2000), codeSnapshots: p.codeSnapshots.slice(-1).map((s) => ({ ...s, code: cut(s.code, 800) })) })],
+  ];
+  for (const [name, shrink] of steps) {
+    if (size(current) <= max) break;
+    current = { ...current, problems: current.problems.map(shrink) };
+    trimmed.push(name);
+  }
+  if (size(current) > max) throw new InputTooLarge(size(current));
+  return { input: current, trimmed };
+}
+
 export function clip(text: string): string {
   return text.length <= JUDGE_TEXT_MAX ? text : text.slice(0, JUDGE_TEXT_MAX - TRUNCATED.length) + TRUNCATED;
 }
@@ -46,6 +91,8 @@ function pickSnapshots<T>(items: readonly T[]): T[] {
 
 export interface BuiltInput {
   input: JudgeInputV2;
+  /** Shrinking steps applied to fit the budget (`fitToBudget`); empty when the input fit as built. */
+  trimmed: string[];
   /** For the review screen: which problems carry which deterministic flags. */
   flags: Array<{ problemId: string; saveBursts: number[]; aiCopiedLines: number; codeHeavyQuestions: number }>;
 }
@@ -166,5 +213,5 @@ export async function buildJudgeInput(prisma: PrismaClient, participantId: strin
       };
     }),
   });
-  return { input, flags };
+  return { ...fitToBudget(input), flags };
 }

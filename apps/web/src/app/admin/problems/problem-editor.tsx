@@ -49,9 +49,15 @@ export function ProblemEditor({ eventId, problemId, nextOrd, onSaved, onDeleted 
   const [busy, setBusy] = useState(false);
   // Bumped when a draft is approved on the server: the form reloads, so saving it can't drop the new hidden test.
   const [version, setVersion] = useState(0);
+  // The form as last loaded or saved; drafts can't be approved while the form differs from it (audit R14-7).
+  const [loaded, setLoaded] = useState('');
 
   useEffect(() => {
-    if (problemId) getJSON<ProblemInput>(`/api/admin/problems/${problemId}`).then((p) => setForm(toForm(p))).catch((e: Error) => setMessage({ ok: false, text: e.message }));
+    if (problemId) getJSON<ProblemInput>(`/api/admin/problems/${problemId}`).then((p) => {
+      const next = toForm(p);
+      setForm(next);
+      setLoaded(JSON.stringify(next));
+    }).catch((e: Error) => setMessage({ ok: false, text: e.message }));
   }, [problemId, version]);
 
   if (!form) return <p className={styles.muted}>{message?.text ?? 'Loading…'}</p>;
@@ -66,6 +72,7 @@ export function ProblemEditor({ eventId, problemId, nextOrd, onSaved, onDeleted 
       const { id } = problemId
         ? await putJSON<{ id: string }>(`/api/admin/problems/${problemId}`, body)
         : await postJSON<{ id: string }>(`/api/admin/events/${encodeURIComponent(eventId)}/problems`, body);
+      setLoaded(JSON.stringify(form));
       await onSaved(id);
     } catch (err) {
       setMessage({ ok: false, text: (err as Error).message });
@@ -132,7 +139,7 @@ export function ProblemEditor({ eventId, problemId, nextOrd, onSaved, onDeleted 
         {problemId && <Button type="button" variant="danger" onClick={remove}>Delete</Button>}
         {message && <p role={message.ok ? 'status' : 'alert'} className={message.ok ? styles.success : styles.error}>{message.text}</p>}
       </div>
-      {problemId && <Drafts problemId={problemId} onApproved={() => setVersion((v) => v + 1)} />}
+      {problemId && <Drafts problemId={problemId} dirty={JSON.stringify(form) !== loaded} onApproved={() => setVersion((v) => v + 1)} />}
       {problemId && <Calibration problemId={problemId} />}
     </form>
   );

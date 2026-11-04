@@ -37,12 +37,16 @@ export async function requeueJudgeJob(prisma: PrismaClient, jobId: string, reaso
   const job = await prisma.judgeJob.findUnique({ where: { id: jobId }, select: { id: true, status: true, participantId: true, event: { select: { resultsState: true } } } });
   if (!job) throw notFound('That judge job');
   if (job.event.resultsState === 'FINAL') throw conflict('results_final', 'The results are final.');
-  if (job.status === 'RUNNING' || job.status === 'QUEUED') throw conflict('judge_busy', 'That participant is already queued or being judged.');
-  await prisma.$transaction([
-    prisma.judgeJob.update({ where: { id: jobId }, data: { status: 'QUEUED', error: null, startedAt: null, finishedAt: null } }),
-    prisma.auditLog.create({ data: { actorId: actor.id, action: 'judge.requeued', targetType: 'participant', targetId: job.participantId, reason, requestId: actor.requestId } }),
-  ]);
-  return { ok: true };
+  // One atomic status check (audit R14-6): two staff clicking at once requeue it once, never a RUNNING job.
+  return prisma.$transaction(async (tx) => {
+    const moved = await tx.judgeJob.updateMany({
+      where: { id: jobId, status: { in: ['DONE', 'NEEDS_MANUAL'] } },
+      data: { status: 'QUEUED', error: null, startedAt: null, finishedAt: null },
+    });
+    if (moved.count === 0) throw conflict('judge_busy', 'That participant is already queued or being judged.');
+    await tx.auditLog.create({ data: { actorId: actor.id, action: 'judge.requeued', targetType: 'participant', targetId: job.participantId, reason, requestId: actor.requestId } });
+    return { ok: true as const };
+  });
 }
 
 export interface ReviewRow {
@@ -51,6 +55,8 @@ export interface ReviewRow {
   enrolmentNo: string;
   job: { id: string; status: string; attempts: number; error: string | null; durationMs: number | null } | null;
   overall: { score: number; rationale: string; model: string; createdAt: string } | null;
+  /** How many times this participant was judged (each run writes one overall row): re-judging shows (R14-6). */
+  runs: number;
   problems: Array<{ problemId: string; score: number; rationale: string; criteria: Record<string, number> | null; complexityAchieved: string | null; complexityOptimal: string | null }>;
   injection: { flagged: boolean; evidence: string; hints: string[] };
   flags: Array<{ problemId: string; saveBursts: number; aiCopiedLines: number; codeHeavyQuestions: number }>;
@@ -93,8 +99,16 @@ export async function reviewBoard(prisma: PrismaClient, eventId: string): Promis
     orderBy: [{ createdAt: 'asc' }, { id: 'asc' }],
     select: { source: true, chatSession: { select: { participantId: true, problemId: true } } },
   });
+  // The code the judge scores (audit R14-8): the first accepted submission's version, else the newest save.
   const finalCode = new Map<string, string>();
   for (const v of versions) finalCode.set(`${v.chatSession.participantId}\u0000${v.chatSession.problemId}`, v.source);
+  const accepted = await prisma.submission.findMany({
+    where: { participantId: { in: ids }, kind: 'SUBMIT', verdict: { verdict: 'AC' }, problem: { eventId, practice: false } },
+    orderBy: { createdAt: 'desc' },
+    select: { participantId: true, problemId: true, codeVersion: { select: { source: true } } },
+  });
+  // Newest first, so the earliest AC is written last and wins.
+  for (const s of accepted) finalCode.set(`${s.participantId}\u0000${s.problemId}`, s.codeVersion.source);
   const similar: SimilarityFlag[] = similarityFlags([
     ...turns.map((t) => ({ participantId: t.chatSession.participantId, problemId: t.chatSession.problemId, kind: 'prompt' as const, text: t.prompt })),
     ...[...finalCode].map(([key, text]) => {
@@ -120,6 +134,7 @@ export async function reviewBoard(prisma: PrismaClient, eventId: string): Promis
       enrolmentNo: p.enrolmentNo,
       job: job && { id: job.id, status: job.status, attempts: job.attempts, error: job.error, durationMs: job.durationMs },
       overall: overall && { score: overall.score, rationale: overall.rationale, model: overall.model, createdAt: overall.createdAt.toISOString() },
+      runs: mine.filter((r) => r.problemId === null).length,
       problems: [...perProblem.values()].map((r) => {
         const review = obj(r.raw);
         return {

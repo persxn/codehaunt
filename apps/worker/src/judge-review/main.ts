@@ -14,6 +14,8 @@ import { drainJudgeQueue } from './review.ts';
 const Config = z.object({
   DATABASE_URL: z.string().startsWith('postgresql://', 'must be a postgresql:// URL'),
   JUDGE_OLLAMA_URL: z.url().default('http://127.0.0.1:11434'),
+  /** Set in the container: the relay's socket (ADR-035). Unset in development: JUDGE_OLLAMA_URL is used directly. */
+  JUDGE_RELAY_SOCKET: z.string().startsWith('/').optional(),
   JUDGE_MODEL: z.string().min(1).default('gpt-oss:120b'),
   JUDGE_THINK: z.enum(['low', 'medium', 'high']).default('low'),
 });
@@ -26,7 +28,12 @@ if (!parsed.success) {
 const config = parsed.data;
 const prisma = createPrismaClient({ url: config.DATABASE_URL, maxConnections: 2 });
 const log = (entry: Record<string, unknown>) => console.log(JSON.stringify(entry));
-const model = new OllamaJudgeModel({ url: config.JUDGE_OLLAMA_URL, model: config.JUDGE_MODEL, think: config.JUDGE_THINK });
+const model = new OllamaJudgeModel({
+  url: config.JUDGE_OLLAMA_URL,
+  ...(config.JUDGE_RELAY_SOCKET ? { socketPath: config.JUDGE_RELAY_SOCKET } : {}),
+  model: config.JUDGE_MODEL,
+  think: config.JUDGE_THINK,
+});
 
 const started = Date.now();
 const [command, eventId] = process.argv.slice(2);

@@ -16,10 +16,11 @@ type Draft = {
   input: string | null; expectedOutput: string | null; language: string | null; source: string | null; note: string; model: string;
 };
 
-export function Drafts({ problemId, onApproved }: { problemId: string; onApproved: () => void }) {
+export function Drafts({ problemId, dirty, onApproved }: { problemId: string; dirty: boolean; onApproved: () => void }) {
   const [drafts, setDrafts] = useState<Draft[]>([]);
   const [error, setError] = useState('');
   const [busy, setBusy] = useState<string | null>(null);
+  const [reason, setReason] = useState('');
 
   const load = useCallback(async () => setDrafts((await getJSON<{ drafts: Draft[] }>(`/api/admin/problems/${problemId}/drafts`)).drafts), [problemId]);
   useEffect(() => { load().catch((e: Error) => setError(e.message)); }, [load]);
@@ -28,7 +29,7 @@ export function Drafts({ problemId, onApproved }: { problemId: string; onApprove
     setBusy(id);
     setError('');
     try {
-      await postJSON(`/api/admin/problems/${problemId}/drafts/${id}`, { decision });
+      await postJSON(`/api/admin/problems/${problemId}/drafts/${id}`, { decision, reason });
       await load();
       if (decision === 'approve') onApproved();
     } catch (e) {
@@ -47,6 +48,12 @@ export function Drafts({ problemId, onApproved }: { problemId: string; onApprove
         Approved tests become hidden tests with the model&apos;s proposed output. Calibrate afterwards: if the reference
         solution fails a new test, the proposed output was wrong.
       </p>
+      <label className={styles.stack}>
+        Reason (audit log)
+        <input value={reason} onChange={(e) => setReason(e.target.value)} maxLength={500} />
+      </label>
+      {/* Approving reloads the editor form from the server: unsaved edits there would be lost (audit R14-7). */}
+      {dirty && <p className={styles.muted}>Save or discard your edits to this problem before approving a draft.</p>}
       {error && <p className={styles.error} role="alert">{error}</p>}
       <ul className={styles.stack}>
         {drafts.map((d) => (
@@ -62,8 +69,8 @@ export function Drafts({ problemId, onApproved }: { problemId: string; onApprove
             )}
             {d.status === 'DRAFT' && (
               <div className={styles.row}>
-                <Button busy={busy === d.id} onClick={() => decide(d.id, 'approve')}>Approve</Button>
-                <Button variant="secondary" disabled={busy === d.id} onClick={() => decide(d.id, 'reject')}>Reject</Button>
+                <Button busy={busy === d.id} disabled={dirty || !reason.trim()} onClick={() => decide(d.id, 'approve')}>Approve</Button>
+                <Button variant="secondary" disabled={busy === d.id || !reason.trim()} onClick={() => decide(d.id, 'reject')}>Reject</Button>
               </div>
             )}
           </li>
