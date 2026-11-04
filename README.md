@@ -20,7 +20,7 @@ AI‑assisted coding‑contest harness: participants write their own code and ma
 | `LICENSE` | MIT |
 | `Makefile` | common development commands |
 | `VENDORED.md` | list of vendored upstream code |
-| `docker-compose.yml` | canonical install: profile `db` (Postgres) and `core` (+ migrate, web, worker, docker-proxy); internal networks, hardened containers; web gets `GATEWAY_*`, worker `JUDGE_CONCURRENCY` from `.env` |
+| `docker-compose.yml` | canonical install: profile `db` (Postgres) and `core` (+ migrate, web, worker, docker-proxy); profile `judge`: the one-shot batch judge (ADR-035); internal networks, hardened containers; web gets `GATEWAY_*`, worker `JUDGE_CONCURRENCY` from `.env` |
 | `package.json` | root npm workspace definition; `overrides` pins patched `postcss` |
 | `package-lock.json` | lockfile |
 | `tsconfig.base.json` | shared compiler options every workspace extends |

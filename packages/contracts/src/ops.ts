@@ -79,3 +79,7 @@ export const ProjectorView = z.object({
   }).strict()),
 }).strict();
 export type ProjectorView = z.infer<typeof ProjectorView>;
+
+/** Queue batch judging for an ended event, or put one participant's judge job back (WP-07, ADR-035). */
+export const JudgeQueueRequest = z.object({ reason: Reason }).strict();
+export type JudgeQueueRequest = z.infer<typeof JudgeQueueRequest>;

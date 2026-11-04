@@ -59,3 +59,40 @@ test('input strings are capped', () => {
   const long = { ...input, problems: [{ ...input.problems[0], finalCode: 'x'.repeat(8001) }] };
   assert.equal(JudgeInput.safeParse(long).success, false);
 });
+
+// judge-v2 (ADR-033)
+import { JudgeInputV2, JudgeOutputV2 } from '../src/index.ts';
+
+const metricsV2 = { accepted: true, prompts: 1, tokens: 300, attempts: 1, rejectedBeforeAccept: 0, timeToAcceptMs: 60_000, tokensAfterAccept: 0, timeRatio: 1, memoryRatio: 1 };
+const problemV2 = (problemId: string) => ({
+  problemId, title: 'Sum', statement: 'Add.', language: 'cpp', metrics: metricsV2,
+  transcript: [
+    { kind: 'question', atMs: 1000, tokens: 40, text: 'Why can int overflow?' },
+    { kind: 'reply', atMs: 2000, text: 'An int holds about 2.1e9.' },
+    { kind: 'save', atMs: 20_000, chars: 120, burst: false },
+    { kind: 'submit', atMs: 60_000, verdict: 'AC', testsPassed: 5, testsTotal: 5 },
+  ],
+  codeSnapshots: [{ atMs: 20_000, code: 'int main(){}' }],
+  finalCode: 'int main(){}',
+  flags: { saveBursts: 0, aiCopiedLines: 0, codeHeavyQuestions: 0 },
+});
+
+test('judge-v2 input: tutor transcript, snapshots, flags; v1 kinds and extra fields refused', () => {
+  const ok = JudgeInputV2.parse({ participantRef: 'p1', problems: [problemV2('A')] });
+  assert.equal(ok.problems[0]!.transcript.length, 4);
+  const withPrompt = { participantRef: 'p1', problems: [{ ...problemV2('A'), transcript: [{ kind: 'prompt', atMs: 0, tokens: 1, text: 'x' }] }] };
+  assert.equal(JudgeInputV2.safeParse(withPrompt).success, false, 'v1 "prompt" entries are not v2');
+  const tooMany = { participantRef: 'p1', problems: [{ ...problemV2('A'), codeSnapshots: Array.from({ length: 5 }, () => ({ atMs: 0, code: '' })) }] };
+  assert.equal(JudgeInputV2.safeParse(tooMany).success, false, 'at most 4 snapshots');
+});
+
+test('judge-v2 output: tutor-mode criteria only, strict', () => {
+  const criteria = { questionQuality: 4, independence: 5, debugging: 3, improvement: 4, complexity: 5, tokenEconomy: 4 };
+  const review = { problemId: 'A', score: 82, criteria, complexityAchieved: 'O(n)', complexityOptimal: 'O(n)', rationale: 'Asked about overflow at 1000.' };
+  const output = { problems: [review], overall: { score: 82, rationale: 'Good.' }, injectionFlag: false, injectionEvidence: '' };
+  assert.equal(JudgeOutputV2.safeParse(output).success, true);
+  assert.equal(judgeOutputMismatch(JudgeInputV2.parse({ participantRef: 'p', problems: [problemV2('A')] }), JudgeOutputV2.parse(output)), null);
+  const v1Criteria = { specificity: 4, memoryAwareness: 4, mistakeCorrection: 4, debugging: 4, complexity: 4, tokenEconomy: 4 };
+  assert.equal(JudgeOutputV2.safeParse({ ...output, problems: [{ ...review, criteria: v1Criteria }] }).success, false);
+  assert.equal(JudgeOutputV2.safeParse({ ...output, extra: 1 }).success, false);
+});

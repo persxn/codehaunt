@@ -61,8 +61,11 @@ export async function standingsFor(prisma: PrismaClient, event: LoadedEvent, opt
     orderBy: { finishedAt: 'asc' },
     select: { problemId: true, language: true, result: true },
   });
-  const reviews = await prisma.judgeReview.groupBy({
-    by: ['participantId'], where: { participant: { eventId: event.id }, ...(cutoff ? { createdAt: { lt: cutoff } } : {}) }, _avg: { score: true },
+  // The judge writes one row per problem plus an overall row (problemId null, WP-07); the newest overall row counts.
+  const reviews = await prisma.judgeReview.findMany({
+    where: { participant: { eventId: event.id }, problemId: null, ...(cutoff ? { createdAt: { lt: cutoff } } : {}) },
+    orderBy: { createdAt: 'asc' },
+    select: { participantId: true, score: true },
   });
   const overrides = await prisma.scoreOverride.findMany({
     where: { participant: { eventId: event.id }, problemId: null, ...(cutoff ? { createdAt: { lt: cutoff } } : {}) },
@@ -79,7 +82,7 @@ export async function standingsFor(prisma: PrismaClient, event: LoadedEvent, opt
       references.set(`${c.problemId}:${c.language.toLowerCase()}`, { maxTimeMs: result.data.maxTimeMs, maxMemoryKb: result.data.maxMemoryKb });
     }
   }
-  const judge = new Map(reviews.map((r) => [r.participantId, r._avg.score]));
+  const judge = new Map(reviews.map((r) => [r.participantId, r.score]));
   const overrideMap = new Map<string, Partial<Record<ScoreComponentName, number>>>();
   for (const o of overrides) {
     const component = ScoreComponent.safeParse(o.component);

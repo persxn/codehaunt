@@ -14,6 +14,8 @@ Tests for the web app: access control (policy, middleware, CSP) without a server
 | `budget-concurrency.test.ts` | real Postgres (`TEST_POSTGRES_URL`): live budget changes during reserve/settle loops: no deadlock, exact final balances |
 | `gateway-client.test.ts` | `GatewayClient` with a fake fetch: split SSE chunks, usage required, b only on connection failure or Traefik text 502/503/504, no retry after a timeout or a JSON error |
 | `contest-ops.test.ts` | WP-05: start sets `lockedAt`; pause blocks prompts/submits and stops the clock; resume/extend; `contestMs`; extra time; top-up idempotency; disqualify/deactivate/reinstate; counted IE + reversal; re-judge; projector freeze, strict view, link rotation; results states; CSV injection; no hidden output in the log; audit run-13 regressions R13-1…5 and the admin-only incident text |
+| `review.test.ts` | WP-07 review: queue only after the contest, once per participant, audited; re-queue rules; board shows the newest overall score, flags, override; leaderboard uses the overall row |
+| `drafts.test.ts` | WP-07 task 8: approve → hidden test / NAIVE solution, reject, decided once, refused after the start, audited |
 | `role-writes.test.ts` | static: only `changeRole` in `server/staff-service.ts` updates `users.role` |
 
 ## Affects / depends on

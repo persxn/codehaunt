@@ -66,8 +66,7 @@ export function shownCodeLines(replies: readonly string[]): string[] {
   for (const reply of replies) {
     const lines = reply.split(/\r?\n/);
     let inFence = false;
-    for (let raw of lines) {
-      const line = raw; // keep original spacing for looksLikeCode
+    for (const line of lines) {
       if (fenceRegex.test(line)) {
         inFence = !inFence;
         continue; // fence line itself not returned

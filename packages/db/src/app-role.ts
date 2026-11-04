@@ -38,6 +38,10 @@ export const TABLE_ACCESS: Readonly<Record<string, { web: Access; worker: Access
   verdicts: { web: 'write', worker: 'update' },
   judge_reviews: { web: 'write', worker: 'update' },
   score_overrides: { web: 'write', worker: 'read' },
+  // WP-07 (ADR-035): staff queue judging in the web; the one-shot judge-review container (worker role) works the queue.
+  judge_jobs: { web: 'write', worker: 'update' },
+  // GPT-OSS drafts (R8-Q6): written by the judge container, approved or rejected by staff in the web.
+  problem_drafts: { web: 'write', worker: 'append' },
   // The worker opens judge incidents (ADR-021); staff resolve them in the web (never delete).
   incidents: { web: 'update', worker: 'append' },
   // Ledgers: append-only for everyone; the triggers are the second wall, these grants the first.

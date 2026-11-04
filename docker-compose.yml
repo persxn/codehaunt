@@ -106,6 +106,21 @@ services:
         condition: service_healthy
     restart: unless-stopped
 
+  # One-shot batch judge (WP-07, ADR-035): `docker compose --profile judge run --rm judge-review` after the contest.
+  # Host network only to reach Postgres and Ollama on 127.0.0.1; the long-running worker stays on internal networks.
+  judge-review:
+    <<: *hardened
+    profiles: [judge]
+    image: codehaunt-worker:dev
+    command: ["node", "--experimental-strip-types", "apps/worker/src/judge-review/main.ts"]
+    network_mode: host
+    environment:
+      DATABASE_URL: postgresql://codehaunt_worker:${WORKER_DB_PASSWORD}@127.0.0.1:${POSTGRES_PORT:-5434}/${POSTGRES_DB:-codehaunt}
+      JUDGE_OLLAMA_URL: ${JUDGE_OLLAMA_URL:-http://127.0.0.1:11434}
+      JUDGE_MODEL: ${JUDGE_MODEL:-gpt-oss:120b}
+    mem_limit: 512m
+    restart: "no"
+
   docker-proxy:
     <<: *hardened
     profiles: [core]

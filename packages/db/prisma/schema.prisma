@@ -82,32 +82,33 @@ enum ResultsState {
 }
 
 model Event {
-  id        String      @id @default(cuid())
-  slug      String      @unique
-  name      String
-  status    EventStatus @default(DRAFT)
+  id                 String       @id @default(cuid())
+  slug               String       @unique
+  name               String
+  status             EventStatus  @default(DRAFT)
   /// EventConfig (zod, @codehaunt/contracts): schedule, budgets, languages, weights, model, rubric.
-  config    Json
+  config             Json
   /// Set when the contest starts; problems and scoring weights are frozen from then on (ADR-006). Also the actual
   /// start of the contest clock (ADR-028).
-  lockedAt  DateTime?
+  lockedAt           DateTime?
   /// Set while paused; on resume the pause is added to `pausedMs` (ADR-028).
-  pausedAt  DateTime?
-  pausedMs  Int         @default(0)
+  pausedAt           DateTime?
+  pausedMs           Int          @default(0)
   /// The projector's freeze cut, stored once when first seen frozen; pauses and extends never move it (audit R13-1).
-  frozenAt  DateTime?
+  frozenAt           DateTime?
   /// SHA-256 of the projector link's token (ADR-028); the token itself is shown once.
-  projectorTokenHash String? @unique
-  resultsState  ResultsState @default(NONE)
+  projectorTokenHash String?      @unique
+  resultsState       ResultsState @default(NONE)
   /// When provisional results were published: the appeal window runs from here.
-  provisionalAt DateTime?
-  createdAt DateTime    @default(now())
-  updatedAt DateTime    @updatedAt
+  provisionalAt      DateTime?
+  createdAt          DateTime     @default(now())
+  updatedAt          DateTime     @updatedAt
 
   problems     Problem[]
   participants Participant[]
   tokenLedger  TokenLedger[]
   incidents    Incident[]
+  judgeJobs    JudgeJob[]
 
   @@map("events")
 }
@@ -125,30 +126,64 @@ enum Language {
   PYTHON
 }
 
-model Problem {
-  id                String     @id @default(cuid())
-  eventId           String
-  event             Event      @relation(fields: [eventId], references: [id], onDelete: Cascade)
-  slug              String
-  title             String
-  /// Markdown statement shown to participants.
-  statement         String
-  difficulty        Difficulty
-  ord               Int
-  timeLimitMs       Int
-  memoryLimitMb     Int
-  /// Checker (zod, @codehaunt/contracts).
-  checker           Json
-  /// Warm-up problem (ADR-007): open only before the contest starts; its tokens and score don't count.
-  practice          Boolean    @default(false)
-  createdAt         DateTime   @default(now())
-  updatedAt         DateTime   @updatedAt
+enum DraftKind {
+  TEST
+  NAIVE
+}
 
-  testCases          TestCase[]
-  chatSessions       ChatSession[]
-  submissions        Submission[]
-  solutions          ReferenceSolution[]
-  calibrationRuns    CalibrationRun[]
+enum DraftStatus {
+  DRAFT
+  APPROVED
+  REJECTED
+}
+
+/// GPT-OSS drafts for a problem (WP-07 task 8, R8-Q6): an edge/stress test input with its proposed output, or a naive
+/// solution. Never shown to participants or judged; an admin approves one into a HIDDEN test or a NAIVE solution.
+model ProblemDraft {
+  id             String      @id @default(cuid())
+  problemId      String
+  problem        Problem     @relation(fields: [problemId], references: [id], onDelete: Cascade)
+  kind           DraftKind
+  status         DraftStatus @default(DRAFT)
+  input          String?
+  expectedOutput String?
+  language       Language?
+  source         String?
+  note           String      @default("")
+  model          String
+  decidedAt      DateTime?
+  decidedById    String?
+  createdAt      DateTime    @default(now())
+
+  @@index([problemId, status])
+  @@map("problem_drafts")
+}
+
+model Problem {
+  id            String     @id @default(cuid())
+  eventId       String
+  event         Event      @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  slug          String
+  title         String
+  /// Markdown statement shown to participants.
+  statement     String
+  difficulty    Difficulty
+  ord           Int
+  timeLimitMs   Int
+  memoryLimitMb Int
+  /// Checker (zod, @codehaunt/contracts).
+  checker       Json
+  /// Warm-up problem (ADR-007): open only before the contest starts; its tokens and score don't count.
+  practice      Boolean    @default(false)
+  createdAt     DateTime   @default(now())
+  updatedAt     DateTime   @updatedAt
+
+  testCases       TestCase[]
+  chatSessions    ChatSession[]
+  submissions     Submission[]
+  solutions       ReferenceSolution[]
+  calibrationRuns CalibrationRun[]
+  drafts          ProblemDraft[]
 
   @@unique([eventId, slug])
   @@index([eventId, ord])
@@ -257,6 +292,7 @@ model Participant {
   judgeReviews   JudgeReview[]
   scoreOverrides ScoreOverride[]
   incidents      Incident[]
+  judgeJobs      JudgeJob[]
 
   @@unique([eventId, userId])
   @@unique([eventId, enrolmentNo])
@@ -343,25 +379,25 @@ enum SubmissionStatus {
 }
 
 model Submission {
-  id             String           @id @default(cuid())
-  participantId  String
-  participant    Participant      @relation(fields: [participantId], references: [id], onDelete: Cascade)
-  problemId      String
-  problem        Problem          @relation(fields: [problemId], references: [id], onDelete: Cascade)
-  codeVersionId  String
-  codeVersion    CodeVersion      @relation(fields: [codeVersionId], references: [id], onDelete: Restrict)
-  kind           SubmissionKind
-  status         SubmissionStatus @default(QUEUED)
-  idempotencyKey String           @unique
+  id                 String           @id @default(cuid())
+  participantId      String
+  participant        Participant      @relation(fields: [participantId], references: [id], onDelete: Cascade)
+  problemId          String
+  problem            Problem          @relation(fields: [problemId], references: [id], onDelete: Cascade)
+  codeVersionId      String
+  codeVersion        CodeVersion      @relation(fields: [codeVersionId], references: [id], onDelete: Restrict)
+  kind               SubmissionKind
+  status             SubmissionStatus @default(QUEUED)
+  idempotencyKey     String           @unique
   /// Claims by the worker (ADR-025): a row left RUNNING is requeued; after 2 attempts it is FAILED.
-  attempts       Int              @default(0)
+  attempts           Int              @default(0)
   /// Contest time elapsed when it was made, pauses excluded (ADR-028); scoring's decay uses it. Null for practice.
-  contestMs      Int?
+  contestMs          Int?
   /// The first IE's internalError: set means the run is (or was) the automatic re-check (ADR-021).
   firstInternalError String?
-  createdAt      DateTime         @default(now())
-  startedAt      DateTime?
-  finishedAt     DateTime?
+  createdAt          DateTime         @default(now())
+  startedAt          DateTime?
+  finishedAt         DateTime?
 
   verdict   Verdict?
   incidents Incident[]
@@ -391,21 +427,50 @@ model Verdict {
 
 /// LLM process review (batch after the contest). Rationale and flags are organizer-facing.
 model JudgeReview {
-  id             String      @id @default(cuid())
-  participantId  String
-  participant    Participant @relation(fields: [participantId], references: [id], onDelete: Cascade)
-  problemId      String?
-  rubricVersion  String
-  model          String
-  score          Float
-  rationale      String
-  injectionFlag  Boolean     @default(false)
+  id            String      @id @default(cuid())
+  participantId String
+  participant   Participant @relation(fields: [participantId], references: [id], onDelete: Cascade)
+  problemId     String?
+  rubricVersion String
+  model         String
+  score         Float
+  rationale     String
+  injectionFlag Boolean     @default(false)
   /// Schema-validated raw judge output.
-  raw            Json
-  createdAt      DateTime    @default(now())
+  raw           Json
+  createdAt     DateTime    @default(now())
 
   @@index([participantId])
   @@map("judge_reviews")
+}
+
+enum JudgeJobStatus {
+  QUEUED
+  RUNNING
+  DONE
+  NEEDS_MANUAL
+}
+
+/// One batch-judging run per participant and rubric version (WP-07, ADR-035): queued by staff after the contest,
+/// worked by the one-shot `judge-review` container. NEEDS_MANUAL after the retries fail; staff score by override.
+model JudgeJob {
+  id            String         @id @default(cuid())
+  eventId       String
+  event         Event          @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  participantId String
+  participant   Participant    @relation(fields: [participantId], references: [id], onDelete: Cascade)
+  rubricVersion String
+  status        JudgeJobStatus @default(QUEUED)
+  attempts      Int            @default(0)
+  error         String?
+  durationMs    Int?
+  startedAt     DateTime?
+  finishedAt    DateTime?
+  createdAt     DateTime       @default(now())
+
+  @@unique([participantId, rubricVersion])
+  @@index([eventId, status])
+  @@map("judge_jobs")
 }
 
 model ScoreOverride {
@@ -437,22 +502,22 @@ enum IncidentStatus {
 
 /// Staff-facing (ADR-021, ADR-028). `detail` may hold participant-controlled text: render as plain text only.
 model Incident {
-  id            String         @id @default(cuid())
-  eventId       String
-  event         Event          @relation(fields: [eventId], references: [id], onDelete: Cascade)
-  participantId String?
-  participant   Participant?   @relation(fields: [participantId], references: [id], onDelete: Cascade)
-  submissionId  String?
-  submission    Submission?    @relation(fields: [submissionId], references: [id], onDelete: Cascade)
-  kind          IncidentKind
-  status        IncidentStatus @default(OPEN)
-  detail        Json
+  id              String         @id @default(cuid())
+  eventId         String
+  event           Event          @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  participantId   String?
+  participant     Participant?   @relation(fields: [participantId], references: [id], onDelete: Cascade)
+  submissionId    String?
+  submission      Submission?    @relation(fields: [submissionId], references: [id], onDelete: Cascade)
+  kind            IncidentKind
+  status          IncidentStatus @default(OPEN)
+  detail          Json
   /// Set by "reverse penalty": the submission no longer counts as a wrong attempt.
-  penaltyReversed Boolean      @default(false)
-  resolution    String?
-  resolvedBy    String?
-  resolvedAt    DateTime?
-  createdAt     DateTime       @default(now())
+  penaltyReversed Boolean        @default(false)
+  resolution      String?
+  resolvedBy      String?
+  resolvedAt      DateTime?
+  createdAt       DateTime       @default(now())
 
   @@index([submissionId])
   @@index([eventId, createdAt])

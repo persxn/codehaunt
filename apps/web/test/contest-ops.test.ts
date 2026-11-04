@@ -154,7 +154,7 @@ test('leaderboard scores a counted IE as WA; reversing the incident restores the
   const incident = await db.prisma.incident.create({ data: { eventId: f.event.id, participantId: f.participant.id, submissionId: ie.id, kind: 'JUDGE_IE', detail: { internalError: '<b>forged</b>' } } });
   let board = await adminLeaderboard(db.prisma, f.event.id);
   const row = () => board.standings.find((s) => s.participantId === f.participant.id)!;
-  assert.equal(row().problems[0]!.points, 500 - 20 - 50);
+  assert.equal(row().problems[0]!.points, 500 - 20 - 100, 'ADR-034: one counted rejection costs 20% of 500');
   const list = await listIncidents(db.prisma, f.event.id, { role: 'ADMIN' });
   assert.equal(list.incidents[0]!.internalError, '<b>forged</b>', 'plain string; the UI renders it as text');
   const forOrganizer = await listIncidents(db.prisma, f.event.id, { role: 'ORGANIZER' });

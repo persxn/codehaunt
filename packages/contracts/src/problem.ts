@@ -60,3 +60,19 @@ export const ParticipantProblem = z.object({
   visibleTests: z.array(TestCase).min(1).max(20),
 }).strict();
 export type ParticipantProblem = z.infer<typeof ParticipantProblem>;
+
+/** Approve or reject one GPT-OSS draft (WP-07 task 8). */
+export const DraftDecision = z.object({ decision: z.enum(['approve', 'reject']) }).strict();
+export type DraftDecision = z.infer<typeof DraftDecision>;
+
+/** What GPT-OSS must return when drafting for one problem (validated before anything is stored). */
+export const DraftReply = z.object({
+  tests: z.array(z.object({
+    input: z.string().min(1).max(2000),
+    expectedOutput: z.string().max(2000),
+    why: z.string().min(1).max(300),
+  }).strict()).min(1).max(8),
+  naive: z.object({ language: Language, source: z.string().min(1).max(8000), why: z.string().min(1).max(300) }).strict(),
+}).strict();
+export type DraftReply = z.infer<typeof DraftReply>;
+

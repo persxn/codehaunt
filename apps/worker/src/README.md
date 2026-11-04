@@ -8,6 +8,7 @@ Source code for the worker service.
 | `config.ts` | validates `DATABASE_URL`, `RUNNER_IMAGE`, `WORKER_HEALTH_HOST/PORT`, `JUDGE_CONCURRENCY` (1–16, default 8) at startup (Docker endpoint comes from `DOCKER_HOST`) |
 | `main.ts` | entry point: health endpoints and the judge loop; on SIGTERM finishes runs in progress |
 | `sandbox/` | Contains the `CodeRunner` implementation that wraps the vendored judge |
+| `judge-review/` | the batch process-quality judge and GPT-OSS drafting, run only by the one-shot `judge-review` container (ADR-035; `judge-review/README.md`) |
 | `queue.ts` | judge queue (ADR-025): `claim` (SKIP LOCKED), `judgeSubmission` (SAMPLE visible / SUBMIT all tests), `runCalibration`, `requeueStuck` (45 min), retry after a failure only after `RETRY_DELAY_MS`, `judgeLoop` (≤ `JUDGE_CONCURRENCY`); a submit's first IE is re-checked once (`firstInternalError`), the second is the verdict + a `JUDGE_IE` incident; an IE carrying `PROXY_REFUSAL_MARKER` opens a `PROXY_REFUSAL` incident (ADR-021/028) |
 
 ## Affects / depends on

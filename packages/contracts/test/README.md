@@ -4,7 +4,7 @@ Contract tests for `@codehaunt/contracts`.
 ## Contents
 | Path | What it does |
 |---|---|
-| `judge-review.test.ts` | judge output strict/bounded, exact problem coverage, no hidden-test fields in the input |
+| `judge-review.test.ts` | judge output strict/bounded, exact problem coverage, no hidden-test fields in the input; `judge-v2` (ADR-033) input kinds, snapshot cap, tutor-mode criteria |
 | `contracts.test.ts` | defaults, strictness, hidden-test exclusion, size and format limits for every schema |
 
 ## Affects / depends on

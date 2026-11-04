@@ -24,6 +24,7 @@ Who may open what is decided per path in `packages/auth/src/policy.ts` (voluntee
 | `contest/` | contest clock controls, extend, projector link, results, participant actions (ADMIN, ORGANIZER) |
 | `leaderboard/` | live leaderboard with all components and overrides (ADMIN, ORGANIZER) |
 | `incidents/` | incident dashboard (ADMIN, ORGANIZER; ADR-021) |
+| `review/` | batch-judge review: queue judging, scores, integrity flags, override (ADMIN, ORGANIZER; WP-07) |
 | `log/` | one participant's log (`?participant=`) |
 
 ## Affects / depends on

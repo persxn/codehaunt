@@ -1,5 +1,6 @@
 /**
- * Batch process-quality judge (WP-07, ADR-009/018): what the worker sends GPT-OSS and what must come back.
+ * Batch process-quality judge (WP-07, ADR-009): what the worker sends GPT-OSS and what must come back.
+ * `judge-v1` (ADR-018, junior-developer game) is kept for history; `judge-v2` (ADR-033, tutor mode) is what runs.
  *
  * `JudgeInput` is built by the worker from the DB; every participant-written string in it is untrusted and
  * travels as data, never as instructions. `JudgeOutput` is the only shape accepted from the model: strict, bounded,
@@ -100,7 +101,10 @@ export const JudgeOutput = z
 export type JudgeOutput = z.infer<typeof JudgeOutput>;
 
 /** Output must review exactly the input's problems, once each; returns the problem of the first mismatch, or null. */
-export function judgeOutputMismatch(input: JudgeInput, output: JudgeOutput): string | null {
+export function judgeOutputMismatch(
+  input: { problems: ReadonlyArray<{ problemId: string }> },
+  output: { problems: ReadonlyArray<{ problemId: string }> },
+): string | null {
   const expected = new Set(input.problems.map((p) => p.problemId));
   const seen = new Set<string>();
   for (const review of output.problems) {
@@ -110,3 +114,63 @@ export function judgeOutputMismatch(input: JudgeInput, output: JudgeOutput): str
   for (const id of expected) if (!seen.has(id)) return id;
   return null;
 }
+
+// ---------------------------------------------------------------------------------------------------------------
+// judge-v2 (ADR-033): the participant wrote the code; the AI was a tutor that never saw it.
+
+/** Most code snapshots per problem in the input (first, evenly spaced, final), each capped at JUDGE_TEXT_MAX. */
+export const JUDGE_SNAPSHOTS_MAX = 4;
+
+export const JudgeTranscriptEntryV2 = z.discriminatedUnion('kind', [
+  z.object({ kind: z.literal('question'), atMs: z.number().int().min(0), tokens: z.number().int().min(0), text: z.string().max(JUDGE_TEXT_MAX) }),
+  /** What the participant saw: the reply after the reply filter (long code removed). */
+  z.object({ kind: z.literal('reply'), atMs: z.number().int().min(0), text: z.string().max(JUDGE_TEXT_MAX) }),
+  /** A code save: size only (snapshots carry the code). `burst`: grew faster than typing (ADR-033 flag). */
+  z.object({ kind: z.literal('save'), atMs: z.number().int().min(0), chars: z.number().int().min(0), burst: z.boolean() }),
+  z.object({
+    kind: z.enum(['run', 'submit']),
+    atMs: z.number().int().min(0),
+    verdict: Verdict.nullable(),
+    testsPassed: z.number().int().min(0),
+    testsTotal: z.number().int().min(0),
+  }),
+]);
+export type JudgeTranscriptEntryV2 = z.infer<typeof JudgeTranscriptEntryV2>;
+
+export const JudgeProblemInputV2 = JudgeProblemInput.omit({ transcript: true }).extend({
+  transcript: z.array(JudgeTranscriptEntryV2).max(JUDGE_TRANSCRIPT_MAX),
+  codeSnapshots: z.array(z.object({ atMs: z.number().int().min(0), code: z.string().max(JUDGE_TEXT_MAX) })).max(JUDGE_SNAPSHOTS_MAX),
+  /** Deterministic integrity signals (`@codehaunt/core` integrity-flags); context for the rubric, never a verdict. */
+  flags: z.object({
+    saveBursts: z.number().int().min(0),
+    aiCopiedLines: z.number().int().min(0),
+    codeHeavyQuestions: z.number().int().min(0),
+  }),
+});
+export type JudgeProblemInputV2 = z.infer<typeof JudgeProblemInputV2>;
+
+export const JudgeInputV2 = z.object({
+  participantRef: z.string().min(1).max(64),
+  problems: z.array(JudgeProblemInputV2).min(1).max(20),
+});
+export type JudgeInputV2 = z.infer<typeof JudgeInputV2>;
+
+/** ADR-033 rubric criteria, each 0–5. */
+export const JudgeCriteriaV2 = z
+  .object({
+    questionQuality: Criterion,
+    independence: Criterion,
+    debugging: Criterion,
+    improvement: Criterion,
+    complexity: Criterion,
+    tokenEconomy: Criterion,
+  })
+  .strict();
+export type JudgeCriteriaV2 = z.infer<typeof JudgeCriteriaV2>;
+
+export const JudgeProblemReviewV2 = JudgeProblemReview.extend({ criteria: JudgeCriteriaV2 }).strict();
+export type JudgeProblemReviewV2 = z.infer<typeof JudgeProblemReviewV2>;
+
+export const JudgeOutputV2 = JudgeOutput.extend({ problems: z.array(JudgeProblemReviewV2).min(1).max(20) }).strict();
+export type JudgeOutputV2 = z.infer<typeof JudgeOutputV2>;
+

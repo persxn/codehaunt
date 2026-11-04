@@ -13,6 +13,7 @@ ADMIN only (policy rows in `packages/auth/src/policy.ts`, and the role list in e
 | `roles/` | `[id]/` the one audited role change |
 | `users/` | `[id]/password/` staff password reset |
 | `ops/` | contest operations (WP-05): controls, extend, leaderboard, results + CSV, projector link, participant log/actions, overrides, incidents |
+| `review/` | batch-judge review (WP-07): board per event, queue judging, re-queue a job |
 
 ## Affects / depends on
 - Depends on: `src/lib/route.ts`, services in `src/server/` (`event-service`, `problem-admin-service`,

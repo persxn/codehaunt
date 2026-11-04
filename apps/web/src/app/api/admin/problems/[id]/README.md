@@ -6,6 +6,7 @@ GET the full problem incl. hidden tests and solutions; PUT replaces it; DELETE (
 |---|---|
 | `route.ts` | handler |
 | `calibrate/` | calibration runs |
+| `drafts/` | GPT-OSS drafts (WP-07 task 8): list, approve, reject |
 
 ## Affects / depends on
 - Depends on: `src/lib/route.ts` (session, roles, error envelope), services in `src/server/`.

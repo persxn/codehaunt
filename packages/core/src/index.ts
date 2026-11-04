@@ -6,4 +6,5 @@ export * from './scoring.ts';
 export * from './process-metrics.ts';
 export * from './similarity.ts';
 export * from './judge-prompt-v1.ts';
+export * from './judge-prompt-v2.ts';
 export * from './integrity-flags.ts';

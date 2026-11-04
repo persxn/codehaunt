@@ -15,9 +15,11 @@ authorise and call one function here; nothing here imports Next.
 | `checkin-service.ts` | `[claude]` badges (password + single-use `CH1:` code, only its SHA-256 stored; all-or-nothing with the audit row), `checkInOpen`, `deskVisible` (one rule for the scanner and the desk), `checkIn` (cap, activation, token grant, audit), `promoteFromWaitlist` |
 | `event-service.ts` | Event editor: list/get/create/update; `isLocked` (lockedAt, status past check-in, or start time passed); then only budget and schedule change; a budget change adjusts every checked-in balance in the same transaction |
 | `problem-admin-service.ts` | problems with visible/hidden tests and reference/naive solutions; frozen once locked; calibration runs (audit-logged, refused once locked) |
+| `draft-service.ts` | WP-07 task 8: `listDrafts`, `decideDraft` (approve → HIDDEN test or the NAIVE solution for that language; reject; under the editor's event lock; audited). ADMIN routes only: drafts are hidden tests |
+| `review-service.ts` | WP-07 task 6: `queueJudging` (contest ended, one job per checked-in participant, audited), `requeueJudgeJob`, `reviewBoard` (newest overall + per-problem judge reviews, injection evidence and hints, ADR-033 flags, cross-participant similarity, process-quality override) |
 | `participant-admin-service.ts` | CSV/form import (waitlist beyond the cap; re-imported people inactive again), desk list, export (incl. ledger, sign-ins, audit trail), anonymise every derived text (ADR-010) |
 | `contest-ops-service.ts` | WP-05 (ADR-028): `controlContest` (open check-in, start sets `lockedAt`, pause/resume fold `pausedMs`, end), `extendContest`, `contestStatus`, `topUp` (idempotent, audited in one tx), `setExtraTime`, `participantAction(In)` (disqualify, reinstate, end session, deactivate), `publishResults` (appeal window), `newProjectorLink` (hash only, reason), `freezeCut` (stored `frozenAt`, never moves); extend idempotent per key; participant actions take the participant row lock |
-| `leaderboard-service.ts` | `[claude]` loads one event for `computeStandings` (core): SUBMITs on contest problems, reversed penalties, tokens on contest problems, REFERENCE calibrations, judge reviews, overrides; `adminLeaderboard`, `projectorView` (stores `frozenAt` once; the cut filters verdicts, prompts, overrides, reversals, judge reviews; disqualification applies at once), `resultsCsv` (formula-safe), `overrideScore` |
+| `leaderboard-service.ts` | `[claude]` loads one event for `computeStandings` (core): SUBMITs on contest problems, reversed penalties, tokens on contest problems, REFERENCE calibrations, judge reviews (the newest overall row per participant, WP-07), overrides; `adminLeaderboard`, `projectorView` (stores `frozenAt` once; the cut filters verdicts, prompts, overrides, reversals, judge reviews; disqualification applies at once), `resultsCsv` (formula-safe), `overrideScore` |
 | `incident-service.ts` | ADR-021: `listIncidents` (incidents table, `auth.session_replaced`, `slowedUsernames()`, FAILED runs), `actOnIncident` (reverse penalty, re-judge — clears reversals —, dismiss, end session, deactivate); `internalError` text for ADMIN only |
 | `participant-log-service.ts` | `participantLog` (prompts, replies, code, runs with per-test results — output only for visible tests —, ledger, actions), `opsParticipants` |
 | `staff-service.ts` | staff create/remove (organizers: volunteers only), the one `changeRole`, password resets; `AccessGroupSync` (no-op until WP-06) |
@@ -33,7 +35,7 @@ authorise and call one function here; nothing here imports Next.
 
 ## Gotchas
 - Hidden tests: every participant `test_cases` query filters `visibility: 'VISIBLE'`; `participant-flow.test.ts` checks
-  the payloads and the SQL. Admin services (`problem-admin-service.ts`) return hidden tests: admin routes only.
+  the payloads and the SQL. Admin services (`problem-admin-service.ts`, `draft-service.ts`) return hidden tests: ADMIN routes only.
 - Imports between these files are relative with `.ts` so the tests can load them with plain Node.
 - Token ledger invariant: negative deltas only via `reserveTokens`/`adjustTokens` (participant row lock).
 - Check-in, budget changes, imports and problem edits lock the event row with `FOR NO KEY UPDATE` (never `FOR UPDATE`:

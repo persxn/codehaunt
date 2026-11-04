@@ -13,6 +13,7 @@ import { Field, inputClass } from '@/components/field';
 import styles from '../admin.module.css';
 import { deleteJSON, getJSON, postJSON, putJSON } from '../api';
 import { Calibration } from './calibration';
+import { Drafts } from './drafts';
 import { TestList } from './test-list';
 
 type Form = Omit<ProblemInput, 'solutions'> & { solutions: Record<string, string> };
@@ -46,10 +47,12 @@ export function ProblemEditor({ eventId, problemId, nextOrd, onSaved, onDeleted 
   const [form, setForm] = useState<Form | null>(problemId ? null : empty(nextOrd));
   const [message, setMessage] = useState<{ ok: boolean; text: string } | null>(null);
   const [busy, setBusy] = useState(false);
+  // Bumped when a draft is approved on the server: the form reloads, so saving it can't drop the new hidden test.
+  const [version, setVersion] = useState(0);
 
   useEffect(() => {
     if (problemId) getJSON<ProblemInput>(`/api/admin/problems/${problemId}`).then((p) => setForm(toForm(p))).catch((e: Error) => setMessage({ ok: false, text: e.message }));
-  }, [problemId]);
+  }, [problemId, version]);
 
   if (!form) return <p className={styles.muted}>{message?.text ?? 'Loading…'}</p>;
   const patch = (p: Partial<Form>) => setForm({ ...form, ...p });
@@ -129,6 +132,7 @@ export function ProblemEditor({ eventId, problemId, nextOrd, onSaved, onDeleted 
         {problemId && <Button type="button" variant="danger" onClick={remove}>Delete</Button>}
         {message && <p role={message.ok ? 'status' : 'alert'} className={message.ok ? styles.success : styles.error}>{message.text}</p>}
       </div>
+      {problemId && <Drafts problemId={problemId} onApproved={() => setVersion((v) => v + 1)} />}
       {problemId && <Calibration problemId={problemId} />}
     </form>
   );
