@@ -68,7 +68,7 @@ test('a question streams, charges exactly the reported usage and never sends or 
   assert.equal(await tokenBalance(db.prisma, f.participant.id), 20_000 - 340);
   // The model got the tutor prompt with the language and the question: never the code or the statement (ADR-033).
   const sent = JSON.stringify(calls[0]!.messages);
-  assert.match(calls[0]!.messages[0]!.content, /programming tutor[\s\S]*at most 6 lines[\s\S]*writing Python 3/);
+  assert.match(calls[0]!.messages[0]!.content, /programming tutor[\s\S]*at most 3 lines[\s\S]*writing Python 3/);
   assert.doesNotMatch(sent, /Add two numbers|SECRET_CODE|current_code/);
   assert.equal(calls[0]!.codehaunt.budgetTokens, 4096 + 512);
   // The second question carries the history only.

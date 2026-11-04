@@ -8,7 +8,7 @@ Schema modules of `@codehaunt/contracts`, re-exported from `index.ts`.
 | `judge.ts` | `Language`, `Verdict`, `Checker`, `RunRequest`/`RunResult` (CodeRunner I/O), `MAX_SOURCE_BYTES` |
 | `auth.ts` | `LoginRequest`, `Role`, `Me`, `ApiError` (error envelope with request ID) |
 | `judge-review.ts` | batch judge I/O (WP-07): `JudgeInput` (per problem: statement, metrics, transcript of prompts/replies/run counts, final code; capped), `JudgeOutput` (strict: per-problem score 0–100, six ADR-018 criteria 0–5, complexity achieved/optimal, rationale; overall; injection flag + evidence), `judgeOutputMismatch` |
-| `event-config.ts` | `EventConfig` (ADR-006: schedule, budgets incl. `replyTokens`, model, scoring weights, leaderboard incl. `appealMinutes`, access, consent), `EventStatus`, `LIVE_EDITABLE_KEYS` |
+| `event-config.ts` | `EventConfig` (ADR-006: schedule, budgets incl. `replyTokens`, model (`maxExampleLines` default 3, ADR-038), scoring weights, leaderboard incl. `appealMinutes`, access, consent), `EventStatus`, `LIVE_EDITABLE_KEYS` |
 | `problem.ts` | `ProblemInput` (organizer authoring, with per-language `solutions`), `SolutionInput`, `SolutionKind`, `ParticipantProblem` (participant view, strict), `Difficulty` |
 | `prompt.ts` | `PromptRequest`, `PromptResponse`, `PromptUsage`, `PromptStreamEvent` (NDJSON lines of the prompt stream) |
 | `gateway.ts` | `GatewayChatRequest` (OpenAI chat + `codehaunt` caps: budgetTokens, contextLimit, sessionId), `GatewayError`, `GatewayUsage` (ADR-022) |

@@ -105,7 +105,7 @@ export function defaultConfig(name: string): EventConfig {
     languages: ['c', 'cpp', 'java', 'python'],
     timeMultiplier: { c: 1, cpp: 1, java: 2, python: 3 },
     budget: { tokensPerParticipant: 60000, contextTokens: 8192, contextWarnPercent: 80, maxPromptChars: 1000, replyTokens: 1024 },
-    model: { baseUrl: 'http://gateway.invalid', name: 'junior', systemPromptVersion: 'tutor-v1', maxExampleLines: 6, temperature: 0.2, hostedAllowed: false },
+    model: { baseUrl: 'http://gateway.invalid', name: 'junior', systemPromptVersion: 'tutor-v1', maxExampleLines: 3, temperature: 0.2, hostedAllowed: false },
     judge: { rubricVersion: 'v1', model: 'gpt-oss:120b' },
     scoring: { weights: { correctness: 0.55, tokenEfficiency: 0.15, resourceEfficiency: 0.1, processQuality: 0.2 }, wrongSubmissionPenaltyPct: 20, decayPerMinute: 2 },
     leaderboard: { projectorEnabled: true, appealMinutes: 30 },
