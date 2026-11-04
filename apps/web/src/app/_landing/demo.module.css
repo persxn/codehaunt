@@ -65,6 +65,16 @@
 }
 .bubble figcaption { font-size: var(--fs-small); color: var(--violet-hi); font-weight: 600; filter: brightness(1.25); }
 .bubble blockquote { margin: var(--s1) 0 0; font-size: 19px; line-height: 1.45; color: var(--bone); }
+/* The tutor answers from the other side, on the editor's surface. */
+.reply {
+  margin-top: var(--s3);
+  border-radius: var(--r-sm) var(--r-sm) 2px var(--r-sm);
+  background: var(--surface-2);
+  border: 2px solid var(--line-soft);
+}
+.reply figcaption { color: var(--pumpkin-hi); filter: none; }
+.reply blockquote { font-size: 17px; }
+.reply code { white-space: normal; overflow-wrap: anywhere; }
 
 /* The editor: the right half, as tall as the left. */
 .editor {

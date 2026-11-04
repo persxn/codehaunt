@@ -10,15 +10,15 @@ import { calendarHref } from './_public/event';
 import ui from './_public/public.module.css';
 import { Faq, FinalCta, Footer } from './_landing/closing';
 import { Hero } from './_landing/hero';
-import { JuniorDemo } from './_landing/junior-demo';
 import { Nav } from './_landing/nav';
 import { Reveal } from './_landing/reveal';
 import { Halves, HowItWorks, TheDay } from './_landing/sections';
+import { TutorDemo } from './_landing/tutor-demo';
 
 export const metadata = {
   title: 'CodeHaunt · AI coding competition · 7 Nov 2026',
   description:
-    'Solve problems by directing an AI junior developer under a token budget. Plus a tech talk. 7 November 2026, 10 AM, IEM Newtown Campus.',
+    'Write the code yourself and ask an AI tutor when you are stuck, under a token budget. Plus a tech talk. 7 November 2026, 10 AM, IEM Newtown Campus.',
   openGraph: { title: 'CodeHaunt', description: 'AI coding competition and tech talk · 7 Nov 2026, 10 AM · IEM Newtown Campus' },
 };
 
@@ -48,7 +48,7 @@ export default async function Home() {
       <main id="main">
         <Hero calendar={calendar} />
         <HowItWorks />
-        <JuniorDemo />
+        <TutorDemo />
         <Halves />
         <TheDay />
         <Faq />

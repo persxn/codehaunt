@@ -12,8 +12,8 @@ export function HowItWorks() {
         <header className={styles.head} data-reveal>
           <h2 id="how-title" className={ui.title}>How it works</h2>
           <p className={ui.lead}>
-            The junior writes all the code. You decide what it writes, and every word you send comes out of a fixed
-            token budget.
+            You write all the code. An AI tutor explains concepts and how to do better, and every question you ask
+            comes out of a fixed token budget.
           </p>
         </header>
         <ol className={styles.steps}>
@@ -36,7 +36,7 @@ export function Halves() {
   const halves = [
     {
       title: 'AI Coding Competition',
-      text: 'Data-structure problems in Python, C, C++ or Java, solved only by instructing the junior. Correct answers, lean prompts and sound reasoning all score.',
+      text: 'Data-structure problems in Python, C, C++ or Java. You write the solutions; an AI tutor helps with the concepts. Correct answers, careful submissions and sound reasoning all score.',
       art: archCompetition,
       alt: 'A candlelit contest hall: rows of hooded coders and ghosts at laptops facing a glowing leaderboard',
     },

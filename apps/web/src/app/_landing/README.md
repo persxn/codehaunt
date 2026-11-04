@@ -9,7 +9,7 @@ module, all on the tokens in `../_public/`.
 | `hero.tsx` / `hero.module.css` | full-bleed haunted-lab art (phone crop via `<picture>`), wordmark, poster info rows, countdown, actions, flying bats, vertical tagline rail |
 | `countdown.tsx` | client: four tiles to 7 Nov 10:00 IST; dashes on the server (no hydration mismatch); per-minute without seconds under reduced motion |
 | `sections.tsx` / `sections.module.css` | How it works (three arches), One day two halves (the poster's own arch panels), The day (five-stop track) |
-| `junior-demo.tsx` / `demo.module.css` | client: "Say what you mean": vague vs precise instruction → the junior's code, verdict and token meter (worked example of ADR-018; no model call) |
+| `tutor-demo.tsx` / `demo.module.css` | client: "Ask the right question": asking for the answer vs asking about the idea → the tutor's reply, the code you typed, verdict, 20% penalty note and token meter (worked example of ADR-033/034; no model call) |
 | `closing.tsx` / `closing.module.css` | FAQ accordion (`details name`, one open), ghosts' banner call to action, footer |
 | `content.ts` | copy for steps, the day and FAQ |
 | `reveal.tsx` | client: entrances for `[data-reveal]`; anything at or above the fold line shows, so fast scrolls never hide content |
@@ -31,5 +31,7 @@ Open `/` signed out. Checked with Playwright at 1920/1440/820/390 and the `desig
 
 ## Gotchas
 - Copy not confirmed by the client: FAQ answers, the order of "The day", the tech-talk line, the demo's token numbers.
+- The copy states the game rules (ADR-033: you write the code, the AI tutors, no paste; ADR-034: 20% per wrong
+  submission). Change them here and in `content.ts` when the rules change.
 - No `next/image`: the optimizer route would need opening in the tunnel and `sharp` in the image; images are
   pre-sized WebP with explicit width/height.

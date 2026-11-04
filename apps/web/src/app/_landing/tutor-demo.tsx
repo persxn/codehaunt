@@ -7,14 +7,15 @@ import ui from '../_public/public.module.css';
 import styles from './demo.module.css';
 
 /**
- * The live thing (ADR-030/031): choose how you instruct the junior and see what it writes, what the judge says and
- * what it cost. A worked example of ADR-018's persona (plain defaults unless told), not a call to any model.
+ * The live thing (ADR-030/031, game per ADR-033/034): you write the code, the AI tutor explains. Choose how you ask
+ * and see what the tutor says, what your code becomes and what it cost. A worked example, not a call to any model.
  * Code lines are [text, highlighted type] pairs so the deciding type stands out.
  */
 const TAKES = {
-  vague: {
-    label: 'Vague',
-    prompt: 'Add up all the numbers.',
+  answer: {
+    label: 'Ask for the answer',
+    question: 'Just write the code that sums the numbers for me.',
+    reply: 'That part is yours to write. Tell me what you tried and where it breaks, and I can explain the idea behind it.',
     code: [
       ['int n; cin >> n;', null],
       ['int sum = 0;', 'int'],
@@ -25,13 +26,15 @@ const TAKES = {
       ['cout << sum;', null],
     ],
     verdict: 'Wrong answer on hidden test 7',
-    note: 'The values reach 10^18. An int overflows long before that, and fixing it costs another prompt.',
-    tokens: 214,
+    note: 'No help, and the wrong submission cost 20% of the problem’s value. Every further wrong try costs another 20%.',
+    tokens: 120,
     ok: false,
   },
-  precise: {
-    label: 'Precise',
-    prompt: 'Read n, then n integers up to 10^18. Sum them in a long long and print it.',
+  idea: {
+    label: 'Ask about the idea',
+    question: 'My sum works on the samples but fails when the values get huge. Why could int be wrong here?',
+    reply: 'An int holds up to about 2.1 × 10^9. A total of values up to 10^18 needs a 64-bit type, e.g.',
+    example: 'long long total = 0;',
     code: [
       ['int n; cin >> n;', null],
       ['long long sum = 0;', 'long long'],
@@ -42,7 +45,7 @@ const TAKES = {
       ['cout << sum;', null],
     ],
     verdict: 'Accepted on every hidden test',
-    note: 'One clear instruction, one run. The tokens you saved go to the next problem.',
+    note: 'One clear question, and you fixed it yourself. The tokens you saved go to the next problem.',
     tokens: 96,
     ok: true,
   },
@@ -63,8 +66,8 @@ function Line({ text, mark }: { text: string; mark: string | null }) {
   );
 }
 
-export function JuniorDemo() {
-  const [take, setTake] = useState<Take>('vague');
+export function TutorDemo() {
+  const [take, setTake] = useState<Take>('answer');
   const t = TAKES[take];
 
   return (
@@ -72,31 +75,43 @@ export function JuniorDemo() {
       <div className={`${ui.container} ${styles.frame}`}>
         <div className={styles.panel}>
           <div className={styles.copy}>
-            <h2 id="demo-title" className={ui.title} data-reveal>Say what you mean</h2>
+            <h2 id="demo-title" className={ui.title} data-reveal>Ask the right question</h2>
             <p className={ui.lead} data-reveal>
-              Leave a choice open and the junior takes the plain default. Here the default is an <code>int</code>, and
-              the answer needed a <code>long long</code>. Try both instructions.
+              You write every line. The tutor explains ideas and never writes your solution. Here the code used an{' '}
+              <code>int</code>, and the answer needed a <code>long long</code>. Try both questions.
             </p>
 
-            <div className={styles.toggle} role="radiogroup" aria-label="How you instruct the junior" data-reveal>
+            <div className={styles.toggle} role="radiogroup" aria-label="How you ask the tutor" data-reveal>
               {(Object.keys(TAKES) as Take[]).map((key) => (
                 <label key={key} className={styles.option} data-active={key === take || undefined}>
-                  <input type="radio" name="junior-take" value={key} checked={key === take} onChange={() => setTake(key)} />
+                  <input type="radio" name="tutor-take" value={key} checked={key === take} onChange={() => setTake(key)} />
                   {TAKES[key].label}
                 </label>
               ))}
             </div>
 
-            <figure className={styles.bubble} key={take}>
-              <figcaption>You, to the junior</figcaption>
-              <blockquote>&ldquo;{t.prompt}&rdquo;</blockquote>
+            <figure className={styles.bubble} key={`q-${take}`}>
+              <figcaption>You, to the tutor</figcaption>
+              <blockquote>&ldquo;{t.question}&rdquo;</blockquote>
+            </figure>
+            <figure className={`${styles.bubble} ${styles.reply}`} key={`a-${take}`}>
+              <figcaption>The tutor</figcaption>
+              <blockquote>
+                {t.reply}
+                {'example' in t && (
+                  <>
+                    {' '}
+                    <code>{t.example}</code>
+                  </>
+                )}
+              </blockquote>
             </figure>
           </div>
 
           <div className={styles.editor} aria-live="polite">
             <div className={styles.tabs}>
               <span className={styles.tab}>sum.cpp</span>
-              <span className={styles.by}>written by the junior</span>
+              <span className={styles.by}>typed by you</span>
             </div>
             <pre className={styles.code} key={take}>
               <code>
@@ -115,7 +130,7 @@ export function JuniorDemo() {
               <p className={styles.note}>{t.note}</p>
               <div className={styles.meter}>
                 <div className={styles.meterHead}>
-                  <span>Tokens spent</span>
+                  <span>Tutor tokens spent</span>
                   <span>
                     <strong>{t.tokens}</strong> of {BUDGET} (example budget)
                   </span>
@@ -126,7 +141,7 @@ export function JuniorDemo() {
                   aria-valuemin={0}
                   aria-valuemax={BUDGET}
                   aria-valuenow={t.tokens}
-                  aria-label="Tokens spent"
+                  aria-label="Tutor tokens spent"
                 >
                   <span style={{ transform: `scaleX(${t.tokens / BUDGET})` }} data-ok={t.ok || undefined} />
                 </div>

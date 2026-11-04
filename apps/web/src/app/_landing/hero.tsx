@@ -26,8 +26,8 @@ export function Hero({ calendar }: { calendar: string }) {
           <span className={styles.line2} data-text="Haunt">Haunt</span>
         </h1>
         <p className={styles.lede}>
-          An AI coding competition and a tech talk. Solve problems by directing an AI junior developer, one prompt at a
-          time.
+          An AI coding competition and a tech talk. You write the code; an AI tutor explains the ideas when you get
+          stuck.
         </p>
 
         <p className={styles.powered}>
