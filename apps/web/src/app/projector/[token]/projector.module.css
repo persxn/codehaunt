@@ -7,7 +7,7 @@
   min-height: 100dvh; box-sizing: border-box; display: grid; gap: var(--space-6); align-content: start;
   padding: clamp(24px, 3vw, 56px);
   color: var(--text);
-  background: radial-gradient(1400px 600px at 50% -260px, rgb(78 30 97 / 0.45), transparent 70%), var(--bg);
+  background: var(--bg);
   position: relative; isolation: isolate;
 }
 .screen::before {
@@ -16,8 +16,10 @@
 }
 .header {
   position: relative; display: flex; align-items: center; gap: var(--space-6); flex-wrap: wrap;
-  padding-bottom: var(--space-4); border-bottom: 1px solid var(--border); box-shadow: 0 4px 0 -2px rgb(236 91 28 / 0.45);
+  padding-bottom: var(--space-4); border-bottom: 1px solid var(--border);
 }
+.header::after { content: ''; position: absolute; left: 0; right: 0; bottom: -4px; height: 1px; background: rgb(236 91 28 / 0.45); pointer-events: none; }
+
 .title { font-size: clamp(2.5rem, 4.2vw, 4.5rem); line-height: 1; margin: 0; letter-spacing: 0.03em; }
 .clock {
   margin-left: auto; display: grid; justify-items: end; gap: var(--space-1);

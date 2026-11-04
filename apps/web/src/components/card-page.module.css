@@ -5,7 +5,7 @@
 .page {
   min-height: 100dvh; box-sizing: border-box; display: grid; place-items: center;
   padding-block: var(--space-8); padding-inline: var(--space-4);
-  background: radial-gradient(900px 420px at 50% -120px, rgb(78 30 97 / 0.4), transparent 70%), var(--bg);
+  background: var(--bg);
 }
 @media (min-width: 900px) {
   .page { position: relative; isolation: isolate; }

@@ -6,7 +6,7 @@
 .app {
   /* A column, not a 3-row grid: banners come and go, and the panes always take the rest of the height. */
   display: flex; flex-direction: column; height: 100dvh; overflow: hidden;
-  background: radial-gradient(1200px 500px at 50% -200px, rgb(78 30 97 / 0.35), transparent 70%), var(--bg);
+  background: var(--bg);
 }
 /* The poster's grunge ground, faint and fixed (static: no cost while typing). Desktop only, like the public site. */
 @media (min-width: 900px) {
@@ -23,8 +23,10 @@
   display: flex; align-items: center; gap: var(--space-6); padding: var(--space-2) var(--space-4);
   background: var(--surface);
   /* the poster's double rule */
-  border-bottom: 1px solid var(--border); box-shadow: 0 3px 0 -2px rgb(236 91 28 / 0.35);
+  border-bottom: 1px solid var(--border); position: relative; z-index: 1;
 }
+.topBar::after { content: ''; position: absolute; left: 0; right: 0; bottom: -4px; height: 1px; background: rgb(236 91 28 / 0.35); pointer-events: none; }
+
 .eventName {
   font-size: var(--text-sm); font-weight: 600; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.1em;
   padding-left: var(--space-4); border-left: 1px solid var(--border);

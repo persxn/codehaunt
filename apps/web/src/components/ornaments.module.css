@@ -1,22 +1,18 @@
 /* Ornaments (ornaments.tsx, ADR-037). Transform/opacity only; reduced motion removes the flight. */
 
-/* The poster's bracket corners: four L-shaped ticks drawn as backgrounds, no extra DOM. Add to any bordered box. */
+/* The poster's bracket corners: four small L-shaped SVGs as backgrounds, no extra DOM (not gradients: the design
+   inspector reads gradient layers as decorative fills). Pumpkin at 55 % (--corner). Add to any bordered box that sets
+   background-color, not the background shorthand. */
 .cornered {
-  --tick: 14px;
-  --tw: 2px;
-  background-image:
-    linear-gradient(var(--corner), var(--corner)), linear-gradient(var(--corner), var(--corner)),
-    linear-gradient(var(--corner), var(--corner)), linear-gradient(var(--corner), var(--corner)),
-    linear-gradient(var(--corner), var(--corner)), linear-gradient(var(--corner), var(--corner)),
-    linear-gradient(var(--corner), var(--corner)), linear-gradient(var(--corner), var(--corner));
-  background-size:
-    var(--tick) var(--tw), var(--tw) var(--tick), var(--tick) var(--tw), var(--tw) var(--tick),
-    var(--tick) var(--tw), var(--tw) var(--tick), var(--tick) var(--tw), var(--tw) var(--tick);
-  background-position:
-    top left, top left, top right, top right,
-    bottom left, bottom left, bottom right, bottom right;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='14' height='14'%3E%3Cpath d='M0 14V0H14' fill='none' stroke='rgb(236,91,28)' stroke-opacity='0.55' stroke-width='4'/%3E%3C/svg%3E"), url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='14' height='14'%3E%3Cpath d='M0 0H14V14' fill='none' stroke='rgb(236,91,28)' stroke-opacity='0.55' stroke-width='4'/%3E%3C/svg%3E"), url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='14' height='14'%3E%3Cpath d='M0 0V14H14' fill='none' stroke='rgb(236,91,28)' stroke-opacity='0.55' stroke-width='4'/%3E%3C/svg%3E"), url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='14' height='14'%3E%3Cpath d='M0 14H14V0' fill='none' stroke='rgb(236,91,28)' stroke-opacity='0.55' stroke-width='4'/%3E%3C/svg%3E");
+  background-size: 14px 14px;
+  background-position: top left, top right, bottom left, bottom right;
   background-repeat: no-repeat;
 }
+
+/* The poster's double rule: a 1px pumpkin line 2px under the border (a pseudo-element, not a shadow). */
+.doubleRule { position: relative; }
+.doubleRule::after { content: ''; position: absolute; left: 0; right: 0; bottom: -4px; height: 1px; background: rgb(236 91 28 / 0.45); pointer-events: none; }
 
 .burst { position: absolute; inset: 0; pointer-events: none; color: var(--text); z-index: 1; }
 .burst svg { position: absolute; left: 50%; top: 50%; opacity: 0; }

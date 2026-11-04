@@ -17,3 +17,5 @@ apps/web/.next-design/
 .taste-skill/
 deploy/release/.current
 deploy/release/.previous
+apps/web/.next-branch/
+apps/web/.next-main/
