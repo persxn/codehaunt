@@ -13,9 +13,10 @@ Framework-free business logic of `@codehaunt/core`: pure functions, no I/O, no c
 | `process-metrics.ts` | `computeProcessMetrics`: deterministic per-problem metrics for the batch judge (WP-07): prompts, tokens, attempts, rejections before AC, time to AC, tokens after AC, time/memory ratio vs reference |
 | `judge-prompt-v1.ts` | `[claude]` judge prompt v1 (`JUDGE_RUBRIC_VERSION` `judge-v1`): ADR-018 rubric in the system message only; participant data as tag-safe JSON (`untrustedJson`); `buildJudgeMessages`; `injectionHints` (patterns on prompts + final code, OR-ed with the model's flag) |
 | `similarity.ts` | `similarityFlags`: pairs of participants with near-identical prompts or code on one problem (5-token shingle Jaccard ≥ 0.85, texts under 10 tokens skipped); integrity flag only, never a score change |
+| `integrity-flags.ts` | ADR-033 integrity flags (never a score change): `saveBursts` (saves growing > `SAVE_BURST_CHARS` within 30 s; restores skipped), `shownCodeLines`, `aiCopy` (final-code lines found in the tutor's shown code), `codeHeavyQuestions`; uses `looksLikeCode` |
 
 ## Affects / depends on
-- Used by: `apps/web/src/server/*` (prompt, participant, submission, leaderboard services), `apps/worker/src/queue.ts` (languages). `process-metrics.ts`, `similarity.ts` and `judge-prompt-v1.ts` feed the WP-07 batch judge (not wired yet).
+- Used by: `apps/web/src/server/*` (prompt, participant, submission, leaderboard services), `apps/worker/src/queue.ts` (languages). `process-metrics.ts`, `similarity.ts`, `integrity-flags.ts` and `judge-prompt-v1.ts` feed the WP-07 batch judge (not wired yet).
 - Depends on: `@codehaunt/contracts` types and `MAX_SOURCE_BYTES`.
 - Changing `verdict-projection.ts` changes what every participant sees of every run.
 - Changing a constant in `scoring.ts` changes every score and rank (live board, projector, export).
