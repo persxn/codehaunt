@@ -41,7 +41,7 @@ function NewEvent() {
   return (
     <form className={`${styles.card} ${styles.row}`} onSubmit={create}>
       <Field label="Short name (a-z, 0-9, -)" id="new-slug">
-        <input id="new-slug" className={inputClass} value={slug} onChange={(e) => setSlug(e.target.value)} pattern="[a-z0-9-]{1,40}" required />
+        <input id="new-slug" className={inputClass} value={slug} onChange={(e) => setSlug(e.target.value)} pattern="[a-z0-9\-]{1,40}" required />
       </Field>
       <Field label="Event name" id="new-name">
         <input id="new-name" className={inputClass} value={name} onChange={(e) => setName(e.target.value)} required />

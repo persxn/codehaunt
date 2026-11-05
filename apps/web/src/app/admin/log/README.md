@@ -5,7 +5,7 @@ One participant's log (WP-05): runs, conversations (prompts, replies, code versi
 | Path | What it does |
 |---|---|
 | `page.tsx` | route (ADMIN, ORGANIZER); `?event=&participant=` |
-| `participant-log.tsx` | polled every 10 s; all participant/model text in `<pre>` as plain text |
+| `participant-log.tsx` | polled every 10 s; all participant/model text in `<pre>` as plain text; each tutor turn shows its guardrail line (intent, hint level, hints-only, code lines shown/this chat, removals; ADR-042) above the unfiltered reply |
 
 ## Affects / depends on
 - Calls `/api/admin/ops/participants/[id]` (`participant-log-service.ts`).

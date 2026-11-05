@@ -5,6 +5,8 @@ const NETWORK = 'Network problem, try again.';
 
 async function failure(response: Response): Promise<Error> {
   const body = (await response.json().catch(() => null)) as ApiError | null;
+  // ADR-041: the account still has the event's default password.
+  if (body?.error?.code === 'password_change_required') window.location.assign('/account?first=1');
   return new Error(body?.error?.message ?? NETWORK);
 }
 

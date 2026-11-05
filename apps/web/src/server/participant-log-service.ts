@@ -25,7 +25,7 @@ export async function participantLog(prisma: PrismaClient, participantId: string
     select: {
       id: true, language: true, createdAt: true, closedAt: true,
       problem: { select: { id: true, title: true, practice: true } },
-      turns: { orderBy: { ord: 'asc' }, select: { id: true, ord: true, prompt: true, reply: true, promptTokens: true, completionTokens: true, latencyMs: true, node: true, createdAt: true } },
+      turns: { orderBy: { ord: 'asc' }, select: { id: true, ord: true, prompt: true, reply: true, guardrail: true, promptTokens: true, completionTokens: true, latencyMs: true, node: true, createdAt: true } },
       codeVersions: { orderBy: { createdAt: 'asc' }, select: { id: true, promptTurnId: true, language: true, source: true, createdAt: true } },
     },
   });

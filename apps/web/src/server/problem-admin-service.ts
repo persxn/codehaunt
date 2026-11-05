@@ -23,7 +23,7 @@ export async function listProblems(prisma: PrismaClient, eventId: string) {
     where: { eventId },
     orderBy: { ord: 'asc' },
     select: {
-      id: true, slug: true, title: true, difficulty: true, ord: true, practice: true, timeLimitMs: true, memoryLimitMb: true,
+      id: true, slug: true, title: true, difficulty: true, ord: true, practice: true, hintsOnly: true, timeLimitMs: true, memoryLimitMb: true,
       testCases: { select: { visibility: true } },
       solutions: { select: { language: true, kind: true } },
     },
@@ -49,7 +49,7 @@ export async function getProblem(prisma: PrismaClient, id: string): Promise<Prob
     eventId: p.eventId,
     ...ProblemInput.parse({
       slug: p.slug, title: p.title, statement: p.statement, difficulty: p.difficulty, ord: p.ord,
-      timeLimitMs: p.timeLimitMs, memoryLimitMb: p.memoryLimitMb, checker: p.checker, practice: p.practice,
+      timeLimitMs: p.timeLimitMs, memoryLimitMb: p.memoryLimitMb, checker: p.checker, practice: p.practice, hintsOnly: p.hintsOnly,
       solutions: p.solutions.map((s) => ({ language: fromDbLanguage(s.language), kind: s.kind, source: s.source })),
       visibleTests: tests('VISIBLE'),
       hiddenTests: tests('HIDDEN'),
@@ -69,7 +69,7 @@ function rows(problemId: string, input: ProblemInputT) {
 
 const fields = (input: ProblemInputT) => ({
   slug: input.slug, title: input.title, statement: input.statement, difficulty: input.difficulty, ord: input.ord,
-  timeLimitMs: input.timeLimitMs, memoryLimitMb: input.memoryLimitMb, checker: input.checker, practice: input.practice,
+  timeLimitMs: input.timeLimitMs, memoryLimitMb: input.memoryLimitMb, checker: input.checker, practice: input.practice, hintsOnly: input.hintsOnly ?? false,
 });
 
 /** Audit entries record counts and lengths, not the tests or solutions themselves. */

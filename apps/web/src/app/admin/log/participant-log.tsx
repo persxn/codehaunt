@@ -19,7 +19,7 @@ interface Log {
   };
   sessions: Array<{
     id: string; language: string; problem: string; practice: boolean; createdAt: string; closedAt: string | null;
-    turns: Array<{ id: string; ord: number; prompt: string; reply: string | null; promptTokens: number; completionTokens: number; latencyMs: number | null; node: string | null; createdAt: string }>;
+    turns: Array<{ id: string; ord: number; prompt: string; reply: string | null; guardrail: Guardrail | null; promptTokens: number; completionTokens: number; latencyMs: number | null; node: string | null; createdAt: string }>;
     codeVersions: Array<{ id: string; promptTurnId: string | null; language: string; source: string; createdAt: string }>;
   }>;
   submissions: Array<{
@@ -91,6 +91,7 @@ export function ParticipantLog() {
                     <div key={t.id} className={styles.stack}>
                       <div className={styles.muted}>#{t.ord + 1} · {time(t.createdAt)} · {t.promptTokens}+{t.completionTokens} tokens{t.latencyMs !== null ? ` · ${t.latencyMs} ms` : ''}{t.node ? ` · ${t.node}` : ''}</div>
                       <pre className={styles.pre}>{t.prompt}</pre>
+                      {t.guardrail && <GuardrailLine g={t.guardrail} />}
                       <pre className={styles.pre}>{t.reply ?? '(no reply)'}</pre>
                     </div>
                   ))}
@@ -124,4 +125,18 @@ export function ParticipantLog() {
       )}
     </div>
   );
+}
+
+/** What the tutor guardrails did on a turn (ADR-042). The reply below is the unfiltered model output. */
+type Guardrail = { intent?: string; level?: number; strict?: boolean; shownLines?: number; removed?: number; usedBefore?: number; sessionLines?: number | null };
+
+function GuardrailLine({ g }: { g: Guardrail }) {
+  const parts = [
+    `guardrail: ${(g.intent ?? 'unknown').replace('_', '-')}`,
+    g.intent === 'answer_seeking' || g.intent === 'hint' ? `hint level ${g.level ?? '?'}` : null,
+    g.strict ? 'hints-only problem' : null,
+    `${g.shownLines ?? 0} code lines shown${g.sessionLines ? ` (${(g.usedBefore ?? 0) + (g.shownLines ?? 0)}/${g.sessionLines} this chat)` : ''}`,
+    g.removed ? `${g.removed} removed before the participant saw it` : null,
+  ].filter(Boolean);
+  return <div className={g.removed || g.intent === 'answer_seeking' ? styles.flagList : styles.muted} style={{ listStyle: 'none', paddingLeft: 0 }}>{parts.join(' · ')}</div>;
 }

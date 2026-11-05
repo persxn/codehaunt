@@ -1,0 +1,150 @@
+/*
+ * Signal accents (ADR-043): glow, an animated gradient border, ambient light, RGB split and a short glitch, all in
+ * the poster palette (ADR-032). Screens opt in by class; nothing here changes layout. Budget (ADR-037): transform and
+ * opacity for anything that moves; box-shadow and filters are static; one rotating border per screen; the glitch
+ * runs once (≈ 450 ms) and never on body text or beside the contest editor. Reduced motion: everything static.
+ */
+
+/* The rotating border's angle must be a registered property to animate (Chromium/Firefox/Safari 16.4+). */
+@property --sig-angle {
+  syntax: '<angle>';
+  inherits: false;
+  initial-value: 0deg;
+}
+
+:root {
+  /* Primary glow = pumpkin, secondary = violet-hi. Soft and wide: atmosphere, not neon tubes. */
+  --glow-1: 0 0 0 1px rgb(236 91 28 / 0.35), 0 0 24px -4px rgb(236 91 28 / 0.45);
+  --glow-2: 0 0 0 1px rgb(185 139 224 / 0.3), 0 0 24px -6px rgb(185 139 224 / 0.45);
+  --glow-soft: 0 0 32px -12px rgb(236 91 28 / 0.55);
+  --glow-focus: 0 0 0 2px var(--bg), 0 0 0 4px rgb(236 91 28 / 0.9), 0 0 18px 2px rgb(236 91 28 / 0.35);
+  /* Gradients */
+  --grad-signal: linear-gradient(100deg, #ec5b1c 0%, #ff7a3d 35%, #b98be0 70%, #ec5b1c 100%);
+  --grad-ring: conic-gradient(from var(--sig-angle), rgb(236 91 28 / 0.95), rgb(185 139 224 / 0.75), rgb(236 91 28 / 0.1) 45%, rgb(185 139 224 / 0.15) 70%, rgb(236 91 28 / 0.95));
+  --grad-ambient:
+    radial-gradient(60rem 30rem at 12% -10%, rgb(78 30 97 / 0.32), transparent 70%),
+    radial-gradient(40rem 24rem at 100% 0%, rgb(236 91 28 / 0.12), transparent 70%);
+  /* Motion (adds to tokens.css) */
+  --duration-glitch: 450ms;
+  --duration-ring: 8s;
+  --duration-drift: 60s;
+}
+
+/* ---------- Glow ---------- */
+.sig-glow { box-shadow: var(--glow-1); }
+.sig-glow-2 { box-shadow: var(--glow-2); }
+
+/* Focus: a controlled glow ring on every interactive element (keyboard only). */
+:where(a, button, input, select, textarea, summary, [tabindex]):focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+  box-shadow: 0 0 16px 0 rgb(236 91 28 / 0.35);
+}
+
+/* ---------- Gradient text (headings and key numbers only) ---------- */
+.sig-gradient-text {
+  background: var(--grad-signal);
+  background-size: 200% 100%;
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  animation: sig-shift 12s var(--ease) infinite alternate;
+}
+@keyframes sig-shift { from { background-position: 0% 50%; } to { background-position: 100% 50%; } }
+
+/* ---------- Animated border ---------- */
+/* A ring drawn by a masked pseudo-element, so the content and its background are untouched. */
+.sig-border, .sig-border-hover { position: relative; isolation: isolate; }
+.sig-border::after, .sig-border-hover::after {
+  content: ''; position: absolute; inset: -1px; border-radius: inherit; padding: 1px; pointer-events: none; z-index: 1;
+  background: var(--grad-ring);
+  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+  mask: linear-gradient(#000 0 0) content-box exclude, linear-gradient(#000 0 0);
+}
+.sig-border::after { animation: sig-spin var(--duration-ring) linear infinite; }
+.sig-border-hover::after { opacity: 0; transition: opacity var(--duration-base) var(--ease); }
+.sig-border-hover:hover::after, .sig-border-hover:focus-within::after { opacity: 1; animation: sig-spin var(--duration-ring) linear infinite; }
+@keyframes sig-spin { to { --sig-angle: 360deg; } }
+
+/* ---------- Ambient light ---------- */
+.sig-ambient { background-image: var(--grad-ambient); background-attachment: fixed; }
+/* A slow drift for hero areas where nobody types: a large soft gradient moved by transform only. */
+.sig-drift { position: relative; overflow: hidden; isolation: isolate; }
+.sig-drift::before {
+  content: ''; position: absolute; inset: -40%; z-index: -1; pointer-events: none;
+  background: radial-gradient(closest-side, rgb(236 91 28 / 0.16), transparent 70%) 30% 40% / 60% 60% no-repeat,
+    radial-gradient(closest-side, rgb(185 139 224 / 0.16), transparent 70%) 70% 60% / 55% 55% no-repeat;
+  animation: sig-drift var(--duration-drift) var(--ease) infinite alternate;
+}
+@keyframes sig-drift { from { transform: translate3d(-6%, -4%, 0) rotate(0deg); } to { transform: translate3d(6%, 4%, 0) rotate(8deg); } }
+
+/* Scanlines: a static overlay for decorative panels (no animation). */
+.sig-scan { position: relative; }
+.sig-scan::before {
+  content: ''; position: absolute; inset: 0; pointer-events: none; border-radius: inherit; opacity: 0.35;
+  background: repeating-linear-gradient(180deg, rgb(240 226 204 / 0.04) 0 1px, transparent 1px 3px);
+}
+
+/* ---------- RGB split and glitch ---------- */
+/* Hover/focus: a small channel split on decorative marks (icons, numbers), never on body text. */
+.sig-rgb { transition: text-shadow var(--duration-fast) var(--ease), filter var(--duration-fast) var(--ease); }
+.sig-rgb:hover, a:hover > .sig-rgb, a:focus-visible > .sig-rgb {
+  text-shadow: -1.5px 0 rgb(236 91 28 / 0.85), 1.5px 0 rgb(185 139 224 / 0.85);
+}
+
+/* One short glitch on entry: channel offsets, a sliver displaced, then still. */
+.sig-glitch { animation: sig-glitch var(--duration-glitch) steps(1, end) 1 both; }
+@keyframes sig-glitch {
+  0% { text-shadow: -3px 0 rgb(236 91 28 / 0.9), 3px 0 rgb(185 139 224 / 0.9); transform: translateX(2px); clip-path: inset(0 0 55% 0); }
+  18% { text-shadow: 2px 0 rgb(236 91 28 / 0.9), -2px 0 rgb(185 139 224 / 0.9); transform: translateX(-3px); clip-path: inset(40% 0 0 0); }
+  36% { text-shadow: -1px 0 rgb(236 91 28 / 0.8), 1px 0 rgb(185 139 224 / 0.8); transform: translateX(1px); clip-path: inset(10% 0 30% 0); }
+  54% { text-shadow: 1px 0 rgb(236 91 28 / 0.6), -1px 0 rgb(185 139 224 / 0.6); transform: none; clip-path: inset(0); }
+  100% { text-shadow: none; transform: none; clip-path: none; }
+}
+
+/* ---------- Micro-interactions ---------- */
+.sig-lift { transition: transform var(--duration-base) var(--ease-out), border-color var(--duration-base) var(--ease), box-shadow var(--duration-base) var(--ease); }
+.sig-lift:hover { transform: translateY(-2px); border-color: rgb(236 91 28 / 0.55); box-shadow: var(--glow-soft); }
+.sig-lift:active { transform: translateY(0) scale(0.995); }
+
+/* Step change: slides in from the side it came from (set data-dir="back" for the reverse). */
+.sig-step { animation: sig-step var(--duration-slow) var(--ease-out) both; }
+.sig-step[data-dir='back'] { animation-name: sig-step-back; }
+@keyframes sig-step { from { opacity: 0; transform: translateX(12px); } to { opacity: 1; transform: none; } }
+@keyframes sig-step-back { from { opacity: 0; transform: translateX(-12px); } to { opacity: 1; transform: none; } }
+
+/* A drawn check mark: <svg class="sig-check"><path pathLength="1" d="…"/></svg>. */
+.sig-check path { stroke-dasharray: 1; stroke-dashoffset: 1; animation: sig-draw 420ms var(--ease-out) 80ms forwards; }
+@keyframes sig-draw { to { stroke-dashoffset: 0; } }
+
+/* Progress bars: width via transform so it never re-lays out. */
+.sig-progress { position: relative; height: 6px; border-radius: 999px; background: rgb(240 226 204 / 0.08); overflow: hidden; }
+.sig-progress > span {
+  position: absolute; inset: 0; transform-origin: left center; border-radius: inherit;
+  background: var(--grad-signal); background-size: 200% 100%;
+  transition: transform var(--duration-slow) var(--ease-out);
+}
+
+/* A busy shimmer for loading placeholders. */
+.sig-skeleton {
+  border-radius: var(--radius-md); min-height: 1rem;
+  background: linear-gradient(90deg, rgb(240 226 204 / 0.04), rgb(240 226 204 / 0.1), rgb(240 226 204 / 0.04)) 0 0 / 200% 100%;
+  animation: sig-shimmer 1.4s linear infinite;
+}
+@keyframes sig-shimmer { to { background-position: -200% 0; } }
+
+/* ---------- Reduced motion: static versions of everything ---------- */
+@media (prefers-reduced-motion: reduce) {
+  .sig-gradient-text, .sig-border::after, .sig-border-hover:hover::after, .sig-border-hover:focus-within::after,
+  .sig-drift::before, .sig-glitch, .sig-step, .sig-skeleton { animation: none !important; }
+  .sig-check path { animation: none; stroke-dashoffset: 0; }
+  .sig-lift:hover { transform: none; }
+  .sig-progress > span { transition: none; }
+}
+
+/* Print: no effects. */
+@media print {
+  .sig-border::after, .sig-border-hover::after, .sig-drift::before, .sig-scan::before { display: none; }
+  .sig-gradient-text { color: black; background: none; }
+}

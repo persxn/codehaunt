@@ -49,7 +49,7 @@ try {
     model: {
       baseUrl: 'http://127.0.0.1:8000/v1',
       name: 'qwen2.5-coder',
-      systemPromptVersion: 'tutor-v1',
+      systemPromptVersion: 'tutor-v2',
       temperature: 0.2,
       hostedAllowed: false,
     },

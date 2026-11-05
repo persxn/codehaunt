@@ -9,14 +9,15 @@ Next.js route folder – each sub‑folder corresponds to a URL path.
 | `contest/` | participant contest screen (WP-03; details in `contest/README.md`) |
 | `projector/` | public projector board (ADR-008, WP-05; `projector/README.md`) |
 | `system-check/` | public pre-event system check (SEB, latency, screen) |
-| `account/` | change your own password (every role) |
+| `account/` | change your own password (every role); `?first=1` = choose your own after signing in with the event password (ADR-041) |
 | `login/` | login UI |
 | `healthz/` | liveness probe (`/healthz`) |
 | `readyz/` | readiness probe (`/readyz`) |
 | `api/` | backend API routes (auth, etc.) |
 | `tokens.css` | design tokens (colours, type, spacing, radius, motion) as CSS custom properties; colours are the public theme's (ADR-032), dark only |
 | `globals.css` | base element styles on the design tokens |
-| `layout.tsx` | root layout: fonts, tokens, startup config check, `metadataBase` (`PUBLIC_ORIGIN` or the tunnel hostname) |
+| `signal.css` | ADR-043 signal accents, global: glow tokens, focus glow, gradient text, rotating gradient border (`@property --sig-angle`), ambient light, drift, scanlines, RGB split, one-shot glitch, lift, step transition, drawn check, progress bar, skeleton; all static under reduced motion |
+| `layout.tsx` | root layout: fonts, tokens, `signal.css`, startup config check, `metadataBase` (`PUBLIC_ORIGIN` or the tunnel hostname) |
 | `not-found.tsx` | 404 for unknown paths: the shared card (`components/card-page.module.css`) with the "not found" illustration in an arch, Creepster title, link home (ADR-032) |
 | `page.tsx` | public event page (ADR-029/031): composes the `_landing/` sections in the public theme; signed-in users are redirected to their area |
 | `_public/` | the public theme shared by `/` and `/login`: tokens, icons, event facts (`_public/README.md`) |

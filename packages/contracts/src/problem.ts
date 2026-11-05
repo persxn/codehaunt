@@ -37,6 +37,8 @@ export const ProblemInput = z.object({
   memoryLimitMb: z.number().int().min(16).max(1024),
   checker: Checker.default({ kind: 'caseInsensitive' }),
   practice: z.boolean().default(false),
+  /** Very easy problem: the tutor gives verbal hints only (ADR-042). */
+  hintsOnly: z.boolean().optional(),
   solutions: z.array(SolutionInput).max(8).default([]).refine(
     (list) => new Set(list.map((s) => `${s.language}:${s.kind}`)).size === list.length,
     { message: 'one solution per language and kind' },

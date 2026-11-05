@@ -22,7 +22,7 @@ const KINDS: SolutionKind[] = ['REFERENCE', 'NAIVE'];
 
 const empty = (ord: number): Form => ({
   slug: '', title: '', statement: '', difficulty: 'EASY', ord, timeLimitMs: 2000, memoryLimitMb: 256,
-  checker: { kind: 'caseInsensitive' }, practice: false, solutions: {},
+  checker: { kind: 'caseInsensitive' }, practice: false, hintsOnly: false, solutions: {},
   visibleTests: [{ input: '', expectedOutput: '' }], hiddenTests: [{ input: '', expectedOutput: '' }],
 });
 
@@ -95,7 +95,7 @@ export function ProblemEditor({ eventId, problemId, nextOrd, onSaved, onDeleted 
     <form className={`${styles.card} ${styles.stack}`} onSubmit={save} aria-label={problemId ? `Edit ${form.title}` : 'New problem'}>
       <h2>{problemId ? form.title : 'New problem'}</h2>
       <div className={styles.fieldset}>
-        <Field label="Short name (a-z, 0-9, -)" id="p-slug"><input id="p-slug" className={inputClass} value={form.slug} pattern="[a-z0-9-]{1,40}" required onChange={(e) => patch({ slug: e.target.value })} /></Field>
+        <Field label="Short name (a-z, 0-9, -)" id="p-slug"><input id="p-slug" className={inputClass} value={form.slug} pattern="[a-z0-9\-]{1,40}" required onChange={(e) => patch({ slug: e.target.value })} /></Field>
         <Field label="Title" id="p-title"><input id="p-title" className={inputClass} value={form.title} required onChange={(e) => patch({ title: e.target.value })} /></Field>
         <Field label="Difficulty" id="p-diff">
           <select id="p-diff" className={inputClass} value={form.difficulty} onChange={(e) => patch({ difficulty: e.target.value as Form['difficulty'] })}>
@@ -114,6 +114,7 @@ export function ProblemEditor({ eventId, problemId, nextOrd, onSaved, onDeleted 
           <Field label="Tolerance" id="p-tol"><input id="p-tol" type="number" step="any" className={inputClass} value={form.checker.tolerance ?? 1e-6} onChange={(e) => patch({ checker: { kind: 'float', tolerance: Number(e.target.value) } })} /></Field>
         )}
         <label className={styles.check}><input type="checkbox" checked={form.practice} onChange={(e) => patch({ practice: e.target.checked })} /> Warm-up problem (open before the start; doesn’t count)</label>
+        <label className={styles.check}><input type="checkbox" checked={form.hintsOnly ?? false} onChange={(e) => patch({ hintsOnly: e.target.checked })} /> Very easy: the tutor gives hints in words only (no code, no pseudo-code)</label>
       </div>
       <Field label="Statement (Markdown source; participants see it as plain text)" id="p-statement">
         <textarea id="p-statement" className={inputClass} rows={8} value={form.statement} required onChange={(e) => patch({ statement: e.target.value })} />

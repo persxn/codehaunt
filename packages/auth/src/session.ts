@@ -46,6 +46,8 @@ export interface SessionUser {
   username: string;
   name: string;
   role: Role;
+  /** The password is still the event default (ADR-041): only /account and sign-out work until it is changed. */
+  mustChangePassword: boolean;
 }
 
 export interface CreatedSession {
@@ -91,7 +93,7 @@ export async function resolveSession(
 
   const session = await prisma.authSession.findUnique({
     where: { id: hashSessionToken(token) },
-    include: { user: { select: { id: true, username: true, name: true, role: true, active: true } } },
+    include: { user: { select: { id: true, username: true, name: true, role: true, active: true, mustChangePassword: true } } },
   });
   if (!session) return null;
 

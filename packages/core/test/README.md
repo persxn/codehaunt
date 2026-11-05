@@ -4,6 +4,7 @@
 | File | Description |
 |---|---|
 | `reply-filter.test.ts` | Tutor reply filter (ADR-033): 6-line examples shown, 7+ removed (fenced and unfenced), per-reply limit, long one-liners by characters, stream = whole reply in any chunking, no early leak, code detection; audit R16-1 (a 9-line solution unfenced, per-line backticks, numbered, line numbers, bullets, quoted or listed fence, C++ variants: all removed) and R16-4 (300-char cap). |
+| `tutor-guardrails.test.ts` | ADR-042: answer-seeking vs. concept/hint/debugging/general classification, hint ladder cap, steering text, pseudo-code detection (strict only), hints-only replies, 3-line examples kept, the 12-line chat allowance and its markers, stats, limits rebuilt from a stored guardrail. |
 | `contest-clock.test.ts` | Unit tests for `contestClock` (actual start, pauses, elapsed time). |
 | `verdict-projection.test.ts` | Verdict projection tests. |
 | `scoring.test.ts` | Decay, ADR-034 penalties (20% per rejection after the floor; 0/1/5/6 rejections; unsolved problems; total ≥ 0; IE counts, CE/pending/reversed don't), token median, resource vs reference, weights, overrides, tie-breaks, disqualified. |

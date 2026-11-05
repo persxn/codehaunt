@@ -14,7 +14,7 @@ import { getJSON, postJSON } from '../api';
 import { EventPicker, useEventId } from '../event-picker';
 import styles from './badges.module.css';
 
-type Badge = { participantId: string; name: string; enrolmentNo: string; username: string; password: string; checkInCode: string };
+type Badge = { participantId: string; name: string; enrolmentNo: string; username: string; password: string | null; checkInCode: string };
 
 export function BadgeSheet({ admin: isAdmin }: { admin: boolean }) {
   const eventId = useEventId();
@@ -32,7 +32,7 @@ export function BadgeSheet({ admin: isAdmin }: { admin: boolean }) {
   }, [eventId]);
 
   const issue = async () => {
-    if (!eventId || !window.confirm('Issuing badges replaces any earlier badge and password for everyone not yet checked in. Continue?')) return;
+    if (!eventId || !window.confirm('Issuing badges replaces any earlier badge (and its password, unless the event uses a default password) for everyone not yet checked in. Continue?')) return;
     setBusy(true);
     setError('');
     try {
@@ -68,7 +68,7 @@ export function BadgeSheet({ admin: isAdmin }: { admin: boolean }) {
             <img src={b.qr} alt="Check-in code" width={120} height={120} className={styles.qr} />
             <dl className={styles.login}>
               <dt>Username</dt><dd>{b.username}</dd>
-              <dt>Password</dt><dd>{b.password}</dd>
+              <dt>Password</dt><dd>{b.password ?? "the event password (from the organisers)"}</dd>
             </dl>
           </article>
         ))}

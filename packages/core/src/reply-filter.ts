@@ -10,6 +10,12 @@
  */
 
 export const REMOVED_EXAMPLE = '[example removed: too long]';
+/** Shown instead when the problem's example allowance for this chat session is used up (ADR-042). */
+export const REMOVED_ALLOWANCE = '[example removed: example allowance for this problem used]';
+/** Shown instead on a hints-only problem (ADR-042): no code or pseudo-code at all. */
+export const REMOVED_HINTS_ONLY = '[removed: this problem gets hints in words only]';
+/** Code lines a chat session may show in total, as a multiple of the per-reply limit (ADR-042: 4 × 3 = 12). */
+export const SESSION_ALLOWANCE_FACTOR = 4;
 // 6 lines × 50 = 300 characters per reply (audit R16-4: 480 let a compact 3-line solution through more easily).
 export const CHARS_PER_LINE = 50;
 
@@ -58,6 +64,61 @@ export function looksLikeCode(raw: string): boolean {
   return brackets >= 4 && words < 6;
 }
 
+// Hints-only problems (strict mode, ADR-042): pseudo-code that hands over the steps also counts as code.
+const PSEUDO_START =
+  /^\s*(step\s*\d+\s*[:.)-]?\s*)?(read|input|take|get|scan|print|output|display|show|set|let|initiali[sz]e|declare|return|increment|decrement|add|subtract|multiply|divide|compute|calculate|store|assign|swap|loop|repeat|for each|for every|for|while|if|else|otherwise|end|begin|function|procedure)\b/i;
+// An operator between short names or numbers: `a + b`, `x*y`, `n % 2`, `max(a,b)`.
+const SHORT_EXPR = /\b[A-Za-z_]\w{0,3}\s*([-+*/%^]|==|!=|<=|>=|<|>)\s*[A-Za-z_0-9]\w{0,3}\b|\b(max|min|abs|sum|sqrt|pow|len|sort|sorted)\s*\(/;
+const SINGLE_LETTERS = /(^|[\s,(])[a-z](?=$|[\s,).;:])/g;
+// A step of a procedure: an ordering word, then within three words an action that does the task ("Then, receive the
+// second number", "Finally, output the sum"). Hints-only problems get questions and nudges, not procedures (WP-11 live check).
+const PROCEDURE_STEP =
+  /^\s*(step\s*\d+\s*[:.)-]?|first(ly)?\b,?|second(ly)?\b,?|then\b,?|next\b,?|after\s+that\b,?|finally\b,?|lastly\b,?|start\s+by|begin\s+by|\d{1,2}[.)])\s*(\S+\s+){0,2}(read|reading|receive|receiving|take|taking|get|getting|input|add|adding|sum|summing|calculate|calculating|compute|computing|print|printing|output|outputting|return|returning|store|storing|multiply|subtract|divide|compare|comparing|convert|converting|split|splitting|loop|iterate)\b/i;
+
+/** Pseudo-code or an inline formula: a step the student could type in directly. Only used in strict mode. */
+export function looksLikePseudo(raw: string): boolean {
+  const line = unwrapLine(raw).trim();
+  if (!line) return false;
+  // The raw line too: unwrapping drops the "1." that makes a list item a step.
+  if (SHORT_EXPR.test(line) || PROCEDURE_STEP.test(line) || PROCEDURE_STEP.test(raw.replace(/`/g, ''))) return true;
+  if (!PSEUDO_START.test(line)) return false;
+  // "Read a and b", "set i to 0": an imperative step on variables, not a sentence about ideas.
+  return (line.match(SINGLE_LETTERS)?.length ?? 0) >= 1 || /\bto\s+\d+\b|\binto\b|=/.test(line);
+}
+
+/**
+ * What a reply may show (ADR-033, ADR-038, ADR-042). A number means `{ maxLines }` (per reply only).
+ * - `sessionLines`: code lines the whole chat session may show; `usedBefore` were shown by its earlier replies.
+ * - `strict`: hints-only problem; pseudo-code counts as code (use with `maxLines: 0`).
+ */
+export interface FilterLimits {
+  maxLines: number;
+  strict?: boolean;
+  sessionLines?: number;
+  usedBefore?: number;
+}
+
+/** Limits for a tutor reply: hints-only problems show no code; otherwise the per-reply limit and the session allowance. */
+export function tutorLimits(maxLines: number, hintsOnly: boolean, usedBefore = 0): FilterLimits {
+  if (hintsOnly) return { maxLines: 0, strict: true, sessionLines: 0, usedBefore };
+  return { maxLines, sessionLines: maxLines * SESSION_ALLOWANCE_FACTOR, usedBefore };
+}
+
+/**
+ * The limits a stored turn was shown under, from its `guardrail` record (ADR-042), so every later view (history,
+ * replay, the judge) shows exactly what the participant saw. Turns from before WP-11 have none: per-reply limit only.
+ */
+export function limitsFromGuardrail(guardrail: unknown, maxLines: number): FilterLimits {
+  const g = guardrail as { maxLines?: unknown; strict?: unknown; sessionLines?: unknown; usedBefore?: unknown } | null;
+  if (!g || typeof g !== 'object' || typeof g.maxLines !== 'number') return { maxLines };
+  return {
+    maxLines: g.maxLines,
+    strict: g.strict === true,
+    ...(typeof g.sessionLines === 'number' ? { sessionLines: g.sessionLines } : {}),
+    usedBefore: typeof g.usedBefore === 'number' ? g.usedBefore : 0,
+  };
+}
+
 interface Held {
   held: string[];
   lines: number;
@@ -70,10 +131,18 @@ export interface ReplyFilter {
   push(text: string): string;
   /** End of the reply; returns whatever was held back and may be shown. */
   end(): string;
+  /** Code lines shown and blocks removed so far (for the guardrail log). */
+  stats(): { shownLines: number; removed: number };
 }
 
-export function createReplyFilter(maxLines: number): ReplyFilter {
+export function createReplyFilter(limits: number | FilterLimits): ReplyFilter {
+  const lim: FilterLimits = typeof limits === 'number' ? { maxLines: limits } : limits;
+  const left = lim.sessionLines === undefined ? Infinity : Math.max(0, lim.sessionLines - (lim.usedBefore ?? 0));
+  const maxLines = Math.min(lim.maxLines, left);
   const maxChars = maxLines * CHARS_PER_LINE;
+  const marker = lim.strict ? REMOVED_HINTS_ONLY : maxLines < lim.maxLines ? REMOVED_ALLOWANCE : REMOVED_EXAMPLE;
+  const isCode = lim.strict ? (l: string) => looksLikeCode(l) || looksLikePseudo(l) : looksLikeCode;
+  let removed = 0;
   let partial = '';
   let shownLines = 0;
   let shownChars = 0;
@@ -111,7 +180,10 @@ export function createReplyFilter(maxLines: number): ReplyFilter {
         take(f.lines, f.chars);
         return f.held.join('') + text;
       }
-      if (addToFence(fence, bare, text)) return `${REMOVED_EXAMPLE}\n`;
+      if (addToFence(fence, bare, text)) {
+        removed++;
+        return `${marker}\n`;
+      }
       return '';
     }
     if (isFence(bare)) {
@@ -119,7 +191,7 @@ export function createReplyFilter(maxLines: number): ReplyFilter {
       fence = { held: [text], lines: 0, chars: 0, dropped: false };
       return before;
     }
-    if (looksLikeCode(bare)) {
+    if (isCode(bare)) {
       run ??= { held: [], lines: 0, chars: 0, dropped: false };
       if (run.dropped) return '';
       run.held.push(text);
@@ -128,7 +200,8 @@ export function createReplyFilter(maxLines: number): ReplyFilter {
       if (!fits(run.lines, run.chars)) {
         run.dropped = true;
         run.held = [];
-        return `${REMOVED_EXAMPLE}\n`;
+        removed++;
+        return `${marker}\n`;
       }
       return '';
     }
@@ -178,11 +251,14 @@ export function createReplyFilter(maxLines: number): ReplyFilter {
       }
       return out + closeRun();
     },
+    stats() {
+      return { shownLines, removed };
+    },
   };
 }
 
 /** The whole reply as a participant sees it. */
-export function filterReply(text: string, maxLines: number): string {
-  const filter = createReplyFilter(maxLines);
+export function filterReply(text: string, limits: number | FilterLimits): string {
+  const filter = createReplyFilter(limits);
   return filter.push(text) + filter.end();
 }

@@ -9,6 +9,8 @@ import { SebHandoff } from './seb-handoff';
 
 /** Staff land on /admin, participants on /contest. */
 function homeFor(user: Me): string {
+  // Still on the event's default password: choose your own first (ADR-041).
+  if (user.mustChangePassword) return '/account?first=1';
   // Volunteers may open only check-in and the desk (ADR-013).
   return user.role === 'PARTICIPANT' ? '/contest' : user.role === 'VOLUNTEER' ? '/admin/checkin' : '/admin';
 }
@@ -19,7 +21,7 @@ export function SignIn() {
   if (handoff) return <SebHandoff onBack={() => setHandoff(false)} />;
   return (
     <>
-      <h1 className={styles.title}>Sign in</h1>
+      <h1 className={`${styles.title} sig-glitch`}>Sign in</h1>
       <p className={styles.intro}>Use the username and password from your registration.</p>
       <LoginForm onSebRequired={() => setHandoff(true)} />
       <ul className={styles.notes}>

@@ -52,6 +52,8 @@ export const ROUTE_POLICY: ReadonlyArray<readonly [prefix: string, access: Acces
   ['/admin/checkin', STAFF],
   ['/admin/desk', STAFF],
   ['/admin/event', ['ADMIN']],
+  // Setup roadmap (ADR-044): the event's settings, like the Event editor.
+  ['/admin/setup', ['ADMIN']],
   ['/admin/problems', ['ADMIN']],
   ['/api/admin', ['ADMIN', 'ORGANIZER']],
   // Event editor and role changes: admin only.

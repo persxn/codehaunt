@@ -9,7 +9,7 @@ Server-side helpers for the web app.
 | `http.ts` | request IDs (`cf-ray` or UUID), `apiError` (the one `ApiError` envelope), `clientIp` (`cf-connecting-ip` only), `sebVerified(request)` (undefined when SEB is not enforced) |
 | `session.ts` | `currentUser()`: resolves the session cookie to a user on the server (route handlers, pages) |
 | `csp.ts` | `contentSecurityPolicy(nonce, dev)` and `newNonce()`: per-request nonce CSP, no `'unsafe-inline'` scripts (set by `middleware.ts`) |
-| `route.ts` | `route(roles, handler)`: the one route-handler wrapper (session, roles, JSON, `AppError` → `ApiError`, 500 envelope); `body(request, schema)` |
+| `route.ts` | `route(roles, handler)`: the one route-handler wrapper (session, roles, JSON, `AppError` → `ApiError`, 500 envelope); `body(request, schema)`; a user still on the event password gets 403 `password_change_required` everywhere but `PASSWORD_CHANGE_PATHS` (ADR-041) |
 | `services.ts` | process-wide `modelClient()` (gateway client from env; 503 when unset) and `accessSync()` |
 
 ## Affects / depends on

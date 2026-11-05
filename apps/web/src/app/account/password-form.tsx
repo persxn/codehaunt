@@ -9,7 +9,8 @@ import { Field, inputClass } from '@/components/field';
 
 import styles from './account.module.css';
 
-export function PasswordForm() {
+/** `next`: where to go once the password is changed (first sign-in with the event default, ADR-041). */
+export function PasswordForm({ next: after = null }: { next?: string | null }) {
   const [current, setCurrent] = useState('');
   const [next, setNext] = useState('');
   const [repeat, setRepeat] = useState('');
@@ -35,6 +36,10 @@ export function PasswordForm() {
       if (!response.ok) {
         const body = (await response.json().catch(() => null)) as ApiError | null;
         setError(body?.error.message ?? 'Network problem, try again.');
+        return;
+      }
+      if (after) {
+        window.location.assign(after);
         return;
       }
       setDone('Password changed. Your other sessions were signed out.');

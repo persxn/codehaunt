@@ -3,7 +3,7 @@
  * contest state.
  * Hidden tests: every test_cases query here filters `visibility: 'VISIBLE'` (WP-03; checked by a query-level test).
  */
-import { filterReply, fromDbLanguage, toDbLanguage, toParticipantVerdict } from '@codehaunt/core';
+import { filterReply, fromDbLanguage, limitsFromGuardrail, toDbLanguage, toParticipantVerdict } from '@codehaunt/core';
 import {
   ContestState,
   ParticipantProblem,
@@ -132,7 +132,7 @@ export async function workspace(prisma: PrismaClient, ctx: ParticipantContext, p
     turns: turns.map((t) => ({
       id: t.id,
       prompt: t.prompt,
-      reply: t.reply === null ? null : filterReply(t.reply, ctx.event.config.model.maxExampleLines),
+      reply: t.reply === null ? null : filterReply(t.reply, limitsFromGuardrail(t.guardrail, ctx.event.config.model.maxExampleLines)),
       createdAt: t.createdAt.toISOString(),
     })),
     codeVersions: versions.map((v) => ({

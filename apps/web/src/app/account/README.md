@@ -4,8 +4,8 @@
 ## Contents
 | Path | What it does |
 |---|---|
-| `page.tsx` | server page in the shared card (`components/card-page.module.css`): name, username, the form; sends anonymous visitors to `/login` |
-| `password-form.tsx` | current + new + repeat; POST `/api/account/password`; shows the server's plain-language refusal |
+| `page.tsx` | server page in the shared card (`components/card-page.module.css`): name, username, the form; sends anonymous visitors to `/login`; with `mustChangePassword` (ADR-041) it says "Choose your password" and has no back link |
+| `password-form.tsx` | current + new + repeat; POST `/api/account/password`; shows the server's plain-language refusal; `next` = where to go after a first-time change |
 | `account.module.css` | form styles (tokens only); the page layout comes from the shared card |
 
 ## Affects / depends on

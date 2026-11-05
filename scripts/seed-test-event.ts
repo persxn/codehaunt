@@ -70,7 +70,7 @@ const prisma = createPrismaClient();
     const configObj = {
       branding: { title: 'Test event' },
       schedule: { checkInAt, startsAt, durationMinutes, freezeMinutes: 10 },
-      model: { baseUrl: process.env.GATEWAY_URL ?? 'http://gateway.invalid', name: 'junior', systemPromptVersion: 'tutor-v1' },
+      model: { baseUrl: process.env.GATEWAY_URL ?? 'http://gateway.invalid', name: 'junior', systemPromptVersion: 'tutor-v2' },
       judge: { rubricVersion: 'v1' },
       consent: { text: 'Test event: prompts, replies and code are logged.' },
     } as const;

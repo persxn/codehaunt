@@ -8,7 +8,18 @@
  * A reply without usage is discarded. The call always runs to the end, even if the participant's browser goes away. Practice problems
  * (open only before the start) use no ledger: their tokens don't count (ADR-007).
  */
-import { createReplyFilter, filterReply, fromDbLanguage, toDbLanguage } from '@codehaunt/core';
+import {
+  classifyIntent,
+  createReplyFilter,
+  filterReply,
+  fromDbLanguage,
+  hintLevel,
+  limitsFromGuardrail,
+  steeringLine,
+  toDbLanguage,
+  tutorLimits,
+  type TutorIntent,
+} from '@codehaunt/core';
 import type { PromptRequest, PromptResponse, PromptStreamEvent } from '@codehaunt/contracts';
 import { BudgetExhausted, reserveTokens, settleTokens, tokenBalance, type PrismaClient } from '@codehaunt/db';
 
@@ -88,8 +99,15 @@ export async function startPrompt(
     const history = await prisma.promptTurn.findMany({
       where: { chatSessionId: session.id },
       orderBy: { ord: 'asc' },
-      select: { ord: true, prompt: true, reply: true },
+      select: { ord: true, prompt: true, reply: true, guardrail: true },
     });
+    // Guardrails v2 (ADR-042): intent and hint level from this session's questions; code lines already shown in it.
+    const maxLines = config.model.maxExampleLines;
+    const earlier = history.map((t) => intentOf(t.guardrail) ?? classifyIntent(t.prompt));
+    const intent = classifyIntent(request.prompt);
+    const level = hintLevel(earlier);
+    const usedBefore = history.reduce((n, t) => n + shownLinesOf(t.guardrail), 0);
+    const limits = tutorLimits(maxLines, problem.hintsOnly, usedBefore);
     const turn = await prisma.promptTurn.create({
       data: {
         chatSessionId: session.id,
@@ -120,11 +138,14 @@ export async function startPrompt(
 
     const language = fromDbLanguage(session.language);
     const messages = [
-      { role: 'system' as const, content: systemPrompt(config.model.systemPromptVersion, language, config.model.maxExampleLines) },
+      {
+        role: 'system' as const,
+        content: systemPrompt(config.model.systemPromptVersion, language, problem.hintsOnly ? 0 : maxLines, steeringLine(intent, level, problem.hintsOnly)),
+      },
       ...history.filter((t) => t.reply !== null).flatMap((t) => [
         { role: 'user' as const, content: t.prompt },
         // The model gets back what the participant saw, so removed code can't be re-sent in pieces later.
-        { role: 'assistant' as const, content: filterReply(t.reply!, config.model.maxExampleLines) },
+        { role: 'assistant' as const, content: filterReply(t.reply!, limitsFromGuardrail(t.guardrail, maxLines)) },
       ]),
       { role: 'user' as const, content: request.prompt },
     ];
@@ -132,7 +153,7 @@ export async function startPrompt(
     const run = async (emit: (event: PromptStreamEvent) => void) => {
       const started = Date.now();
       let used = 0;
-      const filter = createReplyFilter(config.model.maxExampleLines);
+      const filter = createReplyFilter(limits);
       try {
         const outcome = await deps.model.chat(
           {
@@ -156,10 +177,26 @@ export async function startPrompt(
         const rest = filter.end();
         if (rest) emit({ type: 'delta', text: rest });
         const text = outcome.text.replaceAll('\u0000', '');
+        const stats = filter.stats();
+        const guardrail = {
+          v: 1,
+          intent,
+          level,
+          strict: limits.strict === true,
+          maxLines: limits.maxLines,
+          sessionLines: limits.sessionLines ?? null,
+          usedBefore,
+          shownLines: stats.shownLines,
+          removed: stats.removed,
+        };
+        if (stats.removed > 0 || intent === 'answer_seeking') {
+          console.info(JSON.stringify({ msg: 'tutor guardrail', requestId: deps.requestId, turnId: turn.id, ...guardrail, hintLevel: level, level: 'info' }));
+        }
         await prisma.promptTurn.update({
           where: { id: turn.id },
           data: {
             reply: text,
+            guardrail,
             node: outcome.node,
             promptTokens: outcome.usage.prompt_tokens,
             completionTokens: outcome.usage.completion_tokens,
@@ -197,7 +234,7 @@ async function responseFor(prisma: PrismaClient, ctx: ParticipantContext, turnId
   return {
     turnId: turn.id,
     chatSessionId: turn.chatSessionId,
-    reply: filterReply(turn.reply ?? '', ctx.event.config.model.maxExampleLines),
+    reply: filterReply(turn.reply ?? '', limitsFromGuardrail(turn.guardrail, ctx.event.config.model.maxExampleLines)),
     usage: {
       promptTokens: turn.promptTokens,
       completionTokens: turn.completionTokens,
@@ -206,4 +243,16 @@ async function responseFor(prisma: PrismaClient, ctx: ParticipantContext, turnId
       contextTokensLimit: ctx.event.config.budget.contextTokens,
     },
   };
+}
+
+/** The intent stored with a turn (ADR-042), if any. */
+function intentOf(guardrail: unknown): TutorIntent | null {
+  const i = (guardrail as { intent?: unknown } | null)?.intent;
+  return typeof i === 'string' ? (i as TutorIntent) : null;
+}
+
+/** Code lines a stored turn showed (0 for turns from before WP-11). */
+function shownLinesOf(guardrail: unknown): number {
+  const n = (guardrail as { shownLines?: unknown } | null)?.shownLines;
+  return typeof n === 'number' && n > 0 ? n : 0;
 }

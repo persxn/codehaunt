@@ -7,10 +7,11 @@ import type { Role } from '@codehaunt/contracts';
 
 import styles from './admin.module.css';
 
-type IconName = 'home' | 'flag' | 'trophy' | 'alert' | 'scale' | 'calendar' | 'puzzle' | 'users' | 'badge' | 'shield' | 'scan' | 'desk';
+type IconName = 'route' | 'home' | 'flag' | 'trophy' | 'alert' | 'scale' | 'calendar' | 'puzzle' | 'users' | 'badge' | 'shield' | 'scan' | 'desk';
 
 /** Line icons (Lucide-style, 24px grid, stroke currentColor), decorative: every link has its text. */
 const ICON_PATHS: Record<IconName, string> = {
+  route: 'M6 19a2 2 0 1 0 0-4 2 2 0 0 0 0 4zm12-10a2 2 0 1 0 0-4 2 2 0 0 0 0 4zM8 17h6a3 3 0 0 0 0-6h-4a3 3 0 0 1 0-6h6',
   home: 'M3 10.5 12 3l9 7.5V21h-6v-6H9v6H3z',
   flag: 'M4 21V4m0 0h12l-2 4 2 4H4',
   trophy: 'M8 21h8m-4-4v4M7 4h10v5a5 5 0 0 1-10 0zM7 6H4a3 3 0 0 0 3 4m10-4h3a3 3 0 0 1-3 4',
@@ -47,7 +48,8 @@ const GROUPS: Array<{ title: string; links: Array<{ href: string; label: string;
   {
     title: 'Set up',
     links: [
-      { href: '/admin/event', label: 'Event', icon: 'calendar', roles: ['ADMIN'] },
+      { href: '/admin/setup', label: 'Setup roadmap', icon: 'route', roles: ['ADMIN'] },
+      { href: '/admin/event', label: 'All event settings', icon: 'calendar', roles: ['ADMIN'] },
       { href: '/admin/problems', label: 'Problems', icon: 'puzzle', roles: ['ADMIN'] },
       { href: '/admin/participants', label: 'Participants', icon: 'users', roles: ['ADMIN', 'ORGANIZER'] },
       { href: '/admin/badges', label: 'Badges', icon: 'badge', roles: ['ADMIN', 'ORGANIZER'] },

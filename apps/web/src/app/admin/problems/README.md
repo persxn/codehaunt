@@ -5,8 +5,8 @@ Problem editor (`/admin/problems`, ADMIN only): statement, visible and hidden te
 | Path | What it does |
 |---|---|
 | `page.tsx` | route |
-| `problems-admin.tsx` | problem list for the selected event; opens the editor |
-| `problem-editor.tsx` | one problem as a whole form (save replaces it); delete |
+| `problems-admin.tsx` | problem list for the selected event ("hints only" marked); opens the editor |
+| `problem-editor.tsx` | one problem as a whole form (save replaces it); "Very easy: hints in words only" checkbox (`hintsOnly`, ADR-042); delete |
 | `test-list.tsx` | repeatable input/expected pairs; hidden tests from a JSON file |
 | `calibration.tsx` | runs every stored solution against every test, polls, explains the expected outcome |
 | `drafts.tsx` | GPT-OSS drafts (WP-07 task 8): edge-case tests and naive solutions to approve or reject; approving reloads the editor form so a later save keeps the new hidden test |

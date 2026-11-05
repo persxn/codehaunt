@@ -5,7 +5,7 @@ Badges (`/admin/badges`, ADMIN and ORGANIZER): issue a password and a single-use
 | Path | What it does |
 |---|---|
 | `page.tsx` | route |
-| `badge-sheet.tsx` | issue (with a warning), QR codes via `qrcode`, print |
+| `badge-sheet.tsx` | issue (with a warning), QR codes via `qrcode`, print; with an event password (ADR-041) the badge says "the event password" instead of a password |
 | `badges.module.css` | screen grid; A4 print layout, 2 × 4 per page |
 
 ## Affects / depends on

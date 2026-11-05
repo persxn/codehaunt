@@ -11,7 +11,7 @@ export default async function AdminHome() {
     <section>
       <h1>Overview</h1>
       <Suspense>
-        <Overview admin={user?.role === 'ADMIN'} />
+        <Overview admin={user?.role === "ADMIN"} name={user?.name ?? ""} />
       </Suspense>
     </section>
   );

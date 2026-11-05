@@ -78,10 +78,10 @@ export async function openProblem(
   ctx: ParticipantContext,
   problemId: string,
   forWork: boolean,
-): Promise<{ id: string; practice: boolean; timeLimitMs: number; memoryLimitMb: number; checker: unknown }> {
+): Promise<{ id: string; practice: boolean; hintsOnly: boolean; timeLimitMs: number; memoryLimitMb: number; checker: unknown }> {
   const problem = await prisma.problem.findFirst({
     where: { id: problemId, eventId: ctx.event.id },
-    select: { id: true, practice: true, timeLimitMs: true, memoryLimitMb: true, checker: true },
+    select: { id: true, practice: true, hintsOnly: true, timeLimitMs: true, memoryLimitMb: true, checker: true },
   });
   if (!problem || !visible(problem.practice, ctx.clock.phase)) throw notFound('That problem');
   if (forWork) {

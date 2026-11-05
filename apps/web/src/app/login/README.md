@@ -6,7 +6,7 @@ Login UI – renders the login form and handles authentication flow.
 | Path | What it does |
 |---|---|
 | `page.tsx` | sign-in page in the public theme (ADR-031): form panel with SEB/staff guidance, desk-scene art |
-| `login-form.tsx` | `SignIn`: title, form (username/password → `/api/auth/login`, error from the API envelope) and notes; a `seb_required` refusal swaps in the SEB handoff |
+| `login-form.tsx` | `SignIn`: title, form (username/password → `/api/auth/login`, error from the API envelope) and notes; a `seb_required` refusal swaps in the SEB handoff; a user still on the event password goes to `/account?first=1` (ADR-041); the title glitches once (ADR-043) |
 | `seb-handoff.tsx` | `[claude]` ADR-039: asks the browser to open `sebs://<host>/CodeHaunt.seb` at once, three steps, the open button, "I don't have SEB" help with the official download link, back to sign in |
 | `page.module.css` | layout; remaps the app's tool tokens onto the public theme so `Field`/`Button` match; fits 1366×768; the form rises in, the art settles then drifts slowly (ADR-037; off under reduced motion) |
 

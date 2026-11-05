@@ -49,14 +49,43 @@ async function eventWith(cap: number, rows: number) {
   return { id, a, result };
 }
 
-test('import waitlists beyond the cap and skips duplicates', async () => {
+test('import waitlists beyond the cap; a re-import of a registered row is refused whole (ADR-044)', async () => {
   const { id, a, result } = await eventWith(2, 3);
   assert.equal(result.created, 3);
   const statuses = (await db.prisma.participant.findMany({ where: { eventId: id }, orderBy: { enrolmentNo: 'asc' } })).map((p) => p.status);
   assert.deepEqual(statuses, ['REGISTERED', 'REGISTERED', 'WAITLISTED']);
-  const again = await importParticipants(db.prisma, { eventId: id, rows: [{ name: 'X', enrolmentNo: `ENR${n}X0` }] }, a);
+  const again = await importParticipants(db.prisma, { eventId: id, rows: [{ name: 'X', enrolmentNo: `ENR${n}X0` }, { name: 'New', enrolmentNo: `NEW${n}` }] }, a);
+  assert.equal(again.ok, false);
   assert.equal(again.created, 0);
-  assert.equal(again.skipped[0]?.reason, 'already registered');
+  assert.match(again.issues[0]!.message, /Already registered/);
+  assert.equal(await db.prisma.participant.count({ where: { eventId: id } }), 3, 'nothing written');
+});
+
+test('strict import: dry run reports every bad row with line and column; a commit with issues writes nothing', async () => {
+  const { id, a } = await eventWith(10, 0 + 1);
+  await db.prisma.user.create({ data: { username: `staffenr${n}`, name: 'S', role: 'ORGANIZER', passwordHash: 'x' } });
+  await db.prisma.user.create({ data: { username: `other${n}`, name: 'O', role: 'PARTICIPANT', passwordHash: 'x', email: `taken${n}@x.org` } });
+  const rows = [
+    { line: 2, name: 'Good One', enrolmentNo: `G${n}A`, email: 'good@x.org' },
+    { line: 3, name: '', enrolmentNo: `G${n}B` },
+    { line: 4, name: 'Bad Mail', enrolmentNo: `G${n}C`, email: 'not-an-email' },
+    { line: 5, name: 'Dup', enrolmentNo: `g${n}a` },
+    { line: 6, name: 'Staff', enrolmentNo: `STAFFENR${n}` },
+    { line: 7, name: 'Taken', enrolmentNo: `G${n}D`, email: `TAKEN${n}@x.org` },
+    { line: 8, name: 'Bad enrol', enrolmentNo: 'has space' },
+    { line: 9, name: 'Empty optional', enrolmentNo: `G${n}E`, email: '', phone: '  ' },
+  ];
+  const preview = await importParticipants(db.prisma, { eventId: id, dryRun: true, rows }, a);
+  assert.equal(preview.ok, false);
+  assert.deepEqual(preview.issues.map((i) => [i.line, i.column]), [[3, 'name'], [4, 'email'], [5, 'enrolment'], [6, 'enrolment'], [7, 'email'], [8, 'enrolment']]);
+  assert.deepEqual(preview.rows.map((r) => r.line), [2, 9]);
+  const before = await db.prisma.participant.count({ where: { eventId: id } });
+  const commit = await importParticipants(db.prisma, { eventId: id, rows }, a);
+  assert.equal(commit.ok, false);
+  assert.equal(await db.prisma.participant.count({ where: { eventId: id } }), before);
+  const clean = await importParticipants(db.prisma, { eventId: id, rows: [rows[0]!, rows[7]!] }, a);
+  assert.equal(clean.created, 2);
+  assert.equal(await db.prisma.participant.count({ where: { eventId: id } }), before + 2);
 });
 
 test('an unscanned participant cannot log in; scanning activates them; a reused code is rejected', async () => {
@@ -64,14 +93,14 @@ test('an unscanned participant cannot log in; scanning activates them; a reused 
   const { id, a } = await eventWith(5, 1);
   const [badge] = await issueBadges(db.prisma, { eventId: id, actorId: a.id, requestId: 'r' });
   assert.ok(badge && /^CH1:[A-Za-z0-9_-]{43}$/.test(badge.checkInCode));
-  assert.equal((await login(db.prisma, badge.username, badge.password)).ok, false, 'inactive until scanned');
+  assert.equal((await login(db.prisma, badge.username, badge.password!)).ok, false, 'inactive until scanned');
   // Only the hash is stored.
   const stored = await db.prisma.participant.findUniqueOrThrow({ where: { id: badge.participantId } });
   assert.notEqual(stored.checkInTokenHash, badge.checkInCode.slice(4));
 
   const result = await checkIn(db.prisma, { code: badge.checkInCode, seatLabel: 'A-12', actorId: a.id, requestId: 'r' });
   assert.equal(result.seatLabel, 'A-12');
-  assert.equal((await login(db.prisma, badge.username, badge.password)).ok, true);
+  assert.equal((await login(db.prisma, badge.username, badge.password!)).ok, true);
   assert.equal(await tokenBalance(db.prisma, badge.participantId), 20_000, 'event budget granted once');
   await assert.rejects(checkIn(db.prisma, { code: badge.checkInCode, seatLabel: 'B-1', actorId: a.id, requestId: 'r' }), (e) => code(e, 'invalid_code'));
   await assert.rejects(checkIn(db.prisma, { code: 'CH1:nope', seatLabel: 'B-1', actorId: a.id, requestId: 'r' }), (e) => code(e, 'invalid_code'));
@@ -259,6 +288,7 @@ test('run-12: the desk sees a draft event once its check-in opens; import never 
   await db.prisma.event.update({ where: { id: first.id }, data: { status: 'DRAFT' } });
   const second = await eventWith(5, 1);
   const result = await importParticipants(db.prisma, { eventId: second.id, rows: [{ name: p.user.name, enrolmentNo: p.enrolmentNo }] }, second.a);
-  assert.equal(result.skipped[0]?.reason, 'checked in at another live event');
+  assert.equal(result.ok, false);
+  assert.match(result.issues[0]!.message, /Checked in at another event/);
   assert.equal((await db.prisma.user.findUniqueOrThrow({ where: { id: p.userId } })).active, true);
 });

@@ -6,7 +6,7 @@ Event editor (`/admin/event`, ADMIN only; ADR-006): create an event and edit its
 |---|---|
 | `page.tsx` | route; renders the editor |
 | `event-editor.tsx` | new-event form, config form by section, languages, reason; locked events keep only Budget and Schedule editable |
-| `config-fields.ts` | the form's field list per `EventConfig` section, dotted get/set, datetime-local ↔ ISO with offset, `defaultConfig` for new events |
+| `config-fields.ts` | the form's field list per `EventConfig` section, dotted get/set, datetime-local ↔ ISO with offset, `defaultConfig` for new events (tutor prompt `tutor-v2`, ADR-042) |
 
 ## Affects / depends on
 - Calls `GET/POST /api/admin/events`, `GET/PUT /api/admin/events/{id}`.

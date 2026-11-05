@@ -12,6 +12,10 @@
     content: ''; position: fixed; inset: 0; z-index: -1; pointer-events: none;
     background: url('../_public/texture.webp') center / cover; opacity: 0.18;
   }
+  /* Ambient light (ADR-043): two fixed radial glows, static. */
+  .shell::after {
+    content: ''; position: fixed; inset: 0; z-index: -1; pointer-events: none; background: var(--grad-ambient);
+  }
 }
 .header {
   grid-column: 1 / -1; position: sticky; top: 0; z-index: 5; height: 48px; box-sizing: border-box;
@@ -51,14 +55,22 @@
 .nav a svg { flex: none; color: var(--text-muted); transition: color var(--duration-fast) var(--ease), transform var(--duration-base) var(--ease-out); }
 .nav a:hover { background: var(--raised); }
 .nav a:hover svg { color: var(--accent); transform: translateX(2px); }
-.nav a[aria-current='page'] { background: var(--raised); color: var(--accent); font-weight: 600; }
-.nav a[aria-current='page'] svg { color: var(--accent); }
+.nav a[aria-current='page'] {
+  background: linear-gradient(90deg, rgb(236 91 28 / 0.16), var(--raised) 70%); color: var(--accent); font-weight: 600;
+  box-shadow: inset 0 0 0 1px rgb(236 91 28 / 0.25);
+}
+.nav a[aria-current='page'] svg { color: var(--accent); filter: drop-shadow(0 0 6px rgb(236 91 28 / 0.6)); }
 .nav a[aria-current='page']::before {
   content: ''; position: absolute; left: 0; top: 6px; bottom: 6px; width: 3px; border-radius: 2px; background: var(--accent);
+  box-shadow: 0 0 10px 1px rgb(236 91 28 / 0.7);
 }
+/* RGB split on the icon while hovering (decorative mark only, ADR-043). */
+.nav a:hover svg { filter: drop-shadow(-1px 0 rgb(236 91 28 / 0.8)) drop-shadow(1px 0 rgb(185 139 224 / 0.8)); }
 
 .content { padding: var(--space-6) var(--space-8) var(--space-8); max-width: 1240px; width: 100%; box-sizing: border-box; min-width: 0; }
 .content > section { display: grid; gap: var(--space-4); animation: rise var(--duration-slow) var(--ease-out) both; }
+/* Page titles glitch once as the page enters (ADR-043). */
+.content > section > h1 { animation: glitch var(--duration-glitch) steps(1, end) 120ms 1 both; }
 /* Page title: Creepster with the poster's double rule under it. */
 .content > section > h1 {
   margin: 0 0 var(--space-2); padding-bottom: var(--space-3); font-size: 2.25rem; line-height: 1.1; color: var(--text);
@@ -67,13 +79,18 @@
 .content h2 { font-size: var(--text-lg); margin: var(--space-2) 0 0; }
 /* The poster's double rule under the header and page titles (a line, not a shadow). */
 .header::after { content: ''; position: absolute; left: 0; right: 0; bottom: -4px; height: 1px; background: rgb(236 91 28 / 0.35); pointer-events: none; }
+/* A thin signal line along the header's bottom edge. */
+.header::before {
+  content: ''; position: absolute; left: 0; right: 0; bottom: -1px; height: 1px; pointer-events: none;
+  background: var(--grad-signal); opacity: 0.7;
+}
 
 .content > section > h1::after { content: ''; position: absolute; left: 0; right: 0; bottom: -4px; height: 1px; background: rgb(236 91 28 / 0.35); pointer-events: none; }
 
 @media (max-width: 900px) {
   .shell { grid-template-columns: 1fr; grid-template-rows: auto auto 1fr; }
   .consoleLabel, .who { display: none; }
-  .header { position: static; }
+  .header { position: relative; }
   .signOut { margin-left: auto; }
   .nav {
     position: static; height: auto; display: flex; gap: var(--space-2); overflow-x: auto; padding: var(--space-2) var(--space-3);
@@ -110,7 +127,8 @@
 }
 .pre { font-family: var(--font-mono); font-size: var(--text-sm); white-space: pre-wrap; background: var(--bg); border: 1px solid var(--border); border-radius: var(--radius-sm); padding: var(--space-2); max-height: 12rem; overflow: auto; }
 .cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(10rem, 1fr)); gap: var(--space-3); }
-.cards > * { animation: rise var(--duration-slow) var(--ease-out) both; }
+.cards > * { animation: rise var(--duration-slow) var(--ease-out) both; transition: transform var(--duration-base) var(--ease-out), border-color var(--duration-base) var(--ease), box-shadow var(--duration-base) var(--ease); }
+.cards > *:hover { transform: translateY(-2px); border-color: rgb(236 91 28 / 0.45); box-shadow: var(--glow-soft); }
 .cards > :nth-child(2) { animation-delay: 40ms; } .cards > :nth-child(3) { animation-delay: 80ms; }
 .cards > :nth-child(4) { animation-delay: 120ms; } .cards > :nth-child(5) { animation-delay: 160ms; } .cards > :nth-child(n + 6) { animation-delay: 200ms; }
 .big { font-family: var(--font-mono); font-size: 1.75rem; font-weight: 600; line-height: 1.2; font-variant-numeric: tabular-nums; }
@@ -200,4 +218,18 @@
   .heroFacts { margin-left: 0; }
   .heroClock { font-size: 2.25rem; }
   .choice { white-space: normal; text-align: left; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .content > section > h1 { animation: none; }
+  .cards > *:hover { transform: none; }
+}
+
+/* Local copy of signal.css's glitch (CSS modules rename keyframes per file). */
+@keyframes glitch {
+  0% { text-shadow: -3px 0 rgb(236 91 28 / 0.9), 3px 0 rgb(185 139 224 / 0.9); transform: translateX(2px); clip-path: inset(0 0 55% 0); }
+  18% { text-shadow: 2px 0 rgb(236 91 28 / 0.9), -2px 0 rgb(185 139 224 / 0.9); transform: translateX(-3px); clip-path: inset(40% 0 0 0); }
+  36% { text-shadow: -1px 0 rgb(236 91 28 / 0.8), 1px 0 rgb(185 139 224 / 0.8); transform: translateX(1px); clip-path: inset(10% 0 30% 0); }
+  54% { text-shadow: 1px 0 rgb(236 91 28 / 0.6), -1px 0 rgb(185 139 224 / 0.6); transform: none; clip-path: inset(0); }
+  100% { text-shadow: none; transform: none; clip-path: none; }
 }

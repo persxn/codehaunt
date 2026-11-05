@@ -116,7 +116,7 @@ export async function login(
 
   return {
     ok: true,
-    user: { id: user.id, username: user.username, name: user.name, role: user.role },
+    user: { id: user.id, username: user.username, name: user.name, role: user.role, mustChangePassword: user.mustChangePassword },
     session,
     replacedSessions,
   };
@@ -218,10 +218,14 @@ async function changePasswordNow(
   }
   const strength = checkPasswordStrength(input.newPassword, user.username);
   if (!strength.ok) return strength;
+  // Leaving the event default in place (ADR-041) would keep the shared secret valid for this account.
+  if (await verifyPassword(user.passwordHash, input.newPassword)) {
+    return { ok: false, reason: 'Choose a password different from your current one.' };
+  }
   const passwordHash = await hashPassword(input.newPassword);
   const keep = hashSessionToken(input.sessionToken);
   const ended = await prisma.$transaction(async (tx) => {
-    await tx.user.update({ where: { id: user.id }, data: { passwordHash } });
+    await tx.user.update({ where: { id: user.id }, data: { passwordHash, mustChangePassword: false } });
     const { count } = await tx.authSession.deleteMany({ where: { userId: user.id, id: { not: keep } } });
     await tx.auditLog.create({
       data: {
@@ -249,7 +253,8 @@ export async function setPassword(
   if (!strength.ok) return strength;
   const passwordHash = await hashPassword(input.newPassword);
   const ended = await prisma.$transaction(async (tx) => {
-    await tx.user.update({ where: { id: user.id }, data: { passwordHash } });
+    // A password staff chose and handed over is the person's own, not the event default (ADR-041).
+    await tx.user.update({ where: { id: user.id }, data: { passwordHash, mustChangePassword: false } });
     const count = await destroyAllSessions(tx, user.id);
     await tx.auditLog.create({
       data: {

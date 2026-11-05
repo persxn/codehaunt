@@ -14,8 +14,8 @@ questions, filtered replies that can't be copied), sample runs and submissions, 
 | `code-editor.tsx` | `CodeEditor`: transparent textarea over highlight.js output (4 languages), line numbers, Tab = 4 spaces, Enter keeps indent; `noClipboard` handlers (paste, drop, copy, cut, drag, context menu, paste-type `beforeinput`); the only `dangerouslySetInnerHTML` (hljs output) |
 | `runs-panel.tsx` | runs newest first: verdict badge, counts, time, memory, compile log, per-sample results; the newest run's state art in an arch; a verdict that arrives live plays its moment once for its full length (ADR-037: Accepted ring + bats, rejected shake; R17-1), never on reload |
 | `consent-dialog.tsx` | blocking consent dialog (ADR-010): required agree, guardian when the event allows minors, optional reuse; ghost header, cornered, checkbox rows outlined when ticked |
-| `api.ts` | `getJSON`, `postJSON` (errors carry the server's message), `streamPrompt` (NDJSON reader, always ends in one done/error) |
-| `contest.module.css` | layout (column shell, three framed panes at 1366×768, tabs, one column ≤ 720 px) and styles, design tokens only; keyframes `rise`/`drop`/`pop`/`shake`/… (transform/opacity), reduced-motion overrides |
+| `api.ts` | `getJSON`, `postJSON` (errors carry the server's message; `password_change_required` sends the browser to `/account?first=1`), `streamPrompt` (NDJSON reader, always ends in one done/error) |
+| `contest.module.css` | layout (column shell, three framed panes at 1366×768, tabs, one column ≤ 720 px) and styles, design tokens only; keyframes `rise`/`drop`/`pop`/`shake`/… (transform/opacity), reduced-motion overrides; ADR-043 static accents only (signal line under the top bar, ambient light, timer and active-tab glow) |
 
 ## Affects / depends on
 - Calls `/api/contest/*` (state, consent, problems, workspace, code, sessions, revert, prompt, runs).

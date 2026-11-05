@@ -12,6 +12,7 @@ import { generatePassword, hashPassword } from '@codehaunt/auth';
 import { EventConfig } from '@codehaunt/contracts';
 import type { PrismaClient } from '@codehaunt/db';
 
+import { applyEventDefault } from './default-password-service.ts';
 import { AppError, conflict, notFound } from './errors.ts';
 
 const PREFIX = 'CH1:';
@@ -25,7 +26,8 @@ export interface Badge {
   name: string;
   enrolmentNo: string;
   username: string;
-  password: string;
+  /** Null when the event has a default password (ADR-041): the badge then says "the event password". */
+  password: string | null;
   /** What the QR encodes. Shown once, for printing; only its hash is kept. */
   checkInCode: string;
 }
@@ -47,18 +49,25 @@ export async function issueBadges(
     orderBy: { enrolmentNo: 'asc' },
     select: { id: true, enrolmentNo: true, user: { select: { id: true, name: true, username: true } } },
   });
+  const event = await prisma.event.findUnique({ where: { id: input.eventId }, select: { defaultPasswordHash: true } });
+  const eventDefault = event?.defaultPasswordHash ?? null;
   // argon2 first (slow), then every write and the audit row in one transaction: all badges or none (audit L2).
+  // With an event default (ADR-041) the badge carries only the code; the account gets the default + forced change.
   const prepared = await Promise.all(participants.map(async (p) => {
     const token = randomBytes(32).toString('base64url');
+    if (eventDefault) return { p, token, password: null, passwordHash: null };
     const password = generatePassword();
     return { p, token, password, passwordHash: await hashPassword(password) };
   }));
   await prisma.$transaction(async (tx) => {
     for (const { p, token, passwordHash } of prepared) {
       await tx.participant.update({ where: { id: p.id }, data: { checkInTokenHash: hash(token) } });
-      await tx.user.update({ where: { id: p.user.id }, data: { passwordHash } });
-      await tx.authSession.deleteMany({ where: { userId: p.user.id } });
+      if (passwordHash) {
+        await tx.user.update({ where: { id: p.user.id }, data: { passwordHash, mustChangePassword: false } });
+        await tx.authSession.deleteMany({ where: { userId: p.user.id } });
+      }
     }
+    if (eventDefault) await applyEventDefault(tx, input.eventId, eventDefault, prepared.map(({ p }) => p.user.id));
     await tx.auditLog.create({
       data: {
         actorId: input.actorId,

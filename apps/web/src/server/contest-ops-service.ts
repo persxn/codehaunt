@@ -18,6 +18,7 @@ import {
 import { adjustTokensIn, type PrismaClient, type Tx } from '@codehaunt/db';
 
 import { eventClock } from './contest.ts';
+import { assertLaunchable } from './setup-service.ts';
 import { conflict, notFound } from './errors.ts';
 
 export interface Actor {
@@ -54,6 +55,8 @@ export async function controlContest(prisma: PrismaClient, eventId: string, inpu
     switch (input.action) {
       case 'open_checkin':
         if (event.status !== 'DRAFT') throw conflict('wrong_state', 'Check-in is already open.');
+        // ADR-044: the setup roadmap's required conditions (problems with hidden tests, participants, schedule, model).
+        await assertLaunchable(tx, eventId, now);
         data = { status: 'CHECK_IN' };
         break;
       case 'start':

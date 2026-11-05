@@ -18,6 +18,7 @@ import {
   codeHeavyQuestions,
   computeProcessMetrics,
   filterReply,
+  limitsFromGuardrail,
   fromDbLanguage,
   saveBursts,
   untrustedJson,
@@ -119,7 +120,7 @@ export async function buildJudgeInput(prisma: PrismaClient, participantId: strin
     where: { participantId, problemId: { in: problems.map((p) => p.id) } },
     select: {
       problemId: true,
-      turns: { where: { reply: { not: null } }, select: { prompt: true, reply: true, promptTokens: true, completionTokens: true, createdAt: true } },
+      turns: { where: { reply: { not: null } }, select: { prompt: true, reply: true, guardrail: true, promptTokens: true, completionTokens: true, createdAt: true } },
       codeVersions: { select: { id: true, source: true, language: true, createdAt: true } },
     },
   });
@@ -169,7 +170,7 @@ export async function buildJudgeInput(prisma: PrismaClient, participantId: strin
       const mine = turns.filter((t) => t.problemId === problem.id).sort((a, b) => a.createdAt.getTime() - b.createdAt.getTime());
       const saves = versions.filter((v) => v.problemId === problem.id).sort((a, b) => a.createdAt.getTime() - b.createdAt.getTime());
       const runs = submissions.filter((s) => s.problemId === problem.id && s.verdict);
-      const shown = mine.map((t) => filterReply(t.reply!, maxLines));
+      const shown = mine.map((t) => filterReply(t.reply!, limitsFromGuardrail(t.guardrail, maxLines)));
       const bursts = saveBursts(saves.map((v) => ({ atMs: at(v.createdAt), source: v.source })));
       const burstSet = new Set(bursts);
       const accepted = runs.find((s) => s.kind === 'SUBMIT' && s.verdict!.verdict === 'AC');

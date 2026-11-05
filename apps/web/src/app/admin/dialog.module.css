@@ -1,0 +1,20 @@
+/* Modal dialog (WP-11): scales in from 96 %, backdrop fades; reduced motion = fade only. */
+.dialog {
+  width: min(32rem, calc(100vw - 2rem)); max-height: calc(100dvh - 2rem); padding: 0; box-sizing: border-box;
+  border: 1px solid rgb(236 91 28 / 0.45); border-radius: var(--radius-lg); background: var(--surface); color: var(--text);
+  box-shadow: var(--shadow-menu), var(--glow-soft);
+}
+.dialog[open] { animation: pop var(--duration-slow) var(--ease-out) both; }
+.dialog::backdrop { background: rgb(10 8 9 / 0.72); animation: fade var(--duration-base) var(--ease) both; }
+.body { display: grid; gap: var(--space-3); padding: var(--space-6); }
+.title { margin: 0; font-size: var(--text-lg); }
+.content { display: grid; gap: var(--space-3); color: var(--text-muted); font-size: var(--text-sm); }
+.content p { margin: 0; }
+.content b, .content strong { color: var(--text); }
+.error { margin: 0; color: var(--danger); font-size: var(--text-sm); }
+.actions { display: flex; justify-content: flex-end; flex-wrap: wrap; gap: var(--space-2); margin-top: var(--space-2); }
+@keyframes pop { from { opacity: 0; transform: scale(0.96) translateY(6px); } to { opacity: 1; transform: none; } }
+@keyframes fade { from { opacity: 0; } to { opacity: 1; } }
+@media (prefers-reduced-motion: reduce) {
+  .dialog[open] { animation: fade 120ms linear both; }
+}

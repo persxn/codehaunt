@@ -17,5 +17,7 @@ export const GET = route(STAFF, async ({ request, user }) => {
     const event = await prisma.event.findUnique({ where: { id: eventId }, select: { status: true, config: true } });
     if (!event || !deskVisible(event)) throw notFound('That event');
   }
-  return { participants: await listParticipants(prisma, eventId) };
+  const event = await prisma.event.findUnique({ where: { id: eventId }, select: { defaultPasswordHash: true } });
+  // Whether "reset to the event password" is possible (ADR-041); never the hash.
+  return { participants: await listParticipants(prisma, eventId), eventDefaultPassword: Boolean(event?.defaultPasswordHash) };
 });

@@ -10,7 +10,7 @@ export type LoginRequest = z.infer<typeof LoginRequest>;
 export const Role = z.enum(['ADMIN', 'ORGANIZER', 'VOLUNTEER', 'PARTICIPANT']);
 export type Role = z.infer<typeof Role>;
 
-export const Me = z.object({ id: z.string(), username: z.string(), name: z.string(), role: Role });
+export const Me = z.object({ id: z.string(), username: z.string(), name: z.string(), role: Role, mustChangePassword: z.boolean().optional() });
 export type Me = z.infer<typeof Me>;
 
 /** Every error response: a stable code and the request ID, never stack traces (standards §2). */

@@ -19,3 +19,4 @@ deploy/release/.current
 deploy/release/.previous
 apps/web/.next-branch/
 apps/web/.next-main/
+apps/web/.next-*/

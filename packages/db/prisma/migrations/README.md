@@ -10,6 +10,7 @@ Database migration history.
 | `20261102210000_token_reservations/` | adds `RESERVE` and `RELEASE` to `TokenEntryKind` (ADR-022) |
 | `20261103090000_participant_flow/` | WP-03/04: `problems.practice`, `reference_solutions` (per language, REFERENCE/NAIVE; moves the old columns), `calibration_runs`, participant consent columns, queue columns `submissions.attempts/startedAt` (ADR-025) |
 | `20261104090000_contest_ops/` | WP-05 (ADR-028): event `pausedAt/pausedMs/frozenAt/projectorTokenHash/resultsState/provisionalAt`, `participants.extraMinutes`, `submissions.contestMs/firstInternalError`, `incidents` |
+| `20261105120000_wp11_accounts_guardrails/` | WP-11 (ADR-041/042): `users.mustChangePassword`, `events.defaultPasswordHash`, `problems.hintsOnly`, `prompt_turns.guardrail` (additive; the previous image ignores them, so rollback stays safe) |
 | `20261105090000_batch_judge/` | WP-07 (ADR-035): `judge_jobs` (batch-judging queue per participant + rubric version), `problem_drafts` (GPT-OSS test / naive-solution drafts, R8-Q6) |
 
 ## Affects / depends on

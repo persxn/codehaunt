@@ -12,7 +12,7 @@ import { EventPicker, useEventId } from '../event-picker';
 import { ProblemEditor } from './problem-editor';
 
 type Summary = {
-  id: string; slug: string; title: string; difficulty: Difficulty; ord: number; practice: boolean;
+  id: string; slug: string; title: string; difficulty: Difficulty; ord: number; practice: boolean; hintsOnly: boolean;
   visibleTests: number; hiddenTests: number; solutions: Array<{ language: Language; kind: SolutionKind }>;
 };
 
@@ -50,7 +50,7 @@ export function ProblemsAdmin() {
                 <tr key={p.id}>
                   <td>{p.practice ? 'Warm-up' : p.ord + 1}</td>
                   <td>{p.title} <span className={styles.muted}>{p.slug}</span></td>
-                  <td>{p.difficulty.toLowerCase()}</td>
+                  <td>{p.difficulty.toLowerCase()}{p.hintsOnly ? ' · hints only' : ''}</td>
                   <td>{p.visibleTests} / {p.hiddenTests}</td>
                   <td>{p.solutions.map((s) => `${s.language} ${s.kind.toLowerCase()}`).join(', ') || '—'}</td>
                   <td><Button variant="secondary" onClick={() => { setNotice(''); setEditing(p.id); }}>Edit</Button></td>

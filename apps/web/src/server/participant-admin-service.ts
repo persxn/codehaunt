@@ -4,41 +4,108 @@
  */
 import { generatePassword, hashPassword } from '@codehaunt/auth';
 import { toParticipantVerdict } from '@codehaunt/core';
-import { EventConfig, type ParticipantImportRequest } from '@codehaunt/contracts';
+import { EventConfig, ParticipantRow, type ImportIssue, type ParticipantImportRequest } from '@codehaunt/contracts';
 import type { PrismaClient } from '@codehaunt/db';
 
+import { applyEventDefault } from './default-password-service.ts';
 import { notFound } from './errors.ts';
 
 type Actor = { id: string; requestId: string };
+type Tx = Parameters<Parameters<PrismaClient['$transaction']>[0]>[0];
+type ParticipantRowT = ParticipantRow;
+
+/** One row as the preview shows it: what will be created, and whether it lands on the waitlist (R8-Q5). */
+export interface ImportPreviewRow {
+  line: number | null;
+  enrolmentNo: string;
+  name: string;
+  email: string | null;
+  phone: string | null;
+  status: 'REGISTERED' | 'WAITLISTED';
+  existingAccount: boolean;
+}
+
+export interface ImportResult {
+  dryRun: boolean;
+  /** True when no row has an issue: a commit imports every row. */
+  ok: boolean;
+  created: number;
+  rows: ImportPreviewRow[];
+  issues: ImportIssue[];
+}
+
+const COLUMN: Record<string, ImportIssue['column']> = { enrolmentNo: 'enrolment', name: 'name', email: 'email', phone: 'phone' };
+const blank = (v: string | undefined) => (v === undefined || v.trim() === '' ? undefined : v.trim());
 
 /**
- * Adds participants (skipping enrolment numbers already in the event). Registrations beyond the event's check-in cap
- * are waitlisted (R8-Q5). The username is the lower-cased enrolment number; the password is set when badges are issued.
+ * Strict import (ADR-044). Every row is checked (format, duplicates in the file, already in this event, staff
+ * usernames, emails of other accounts, checked in at another live event) and every problem is reported with its line
+ * and column. A dry run stops there. A commit re-checks inside one transaction serialised on the event row and writes
+ * all rows or none: one bad row means nothing is imported. Rows beyond the check-in cap are waitlisted, not refused.
+ * The username is the lower-cased enrolment number; the password comes from the badge or the event default (ADR-041).
  */
-export async function importParticipants(prisma: PrismaClient, input: ParticipantImportRequest, actor: Actor) {
-  const event = await prisma.event.findUnique({ where: { id: input.eventId }, select: { id: true, config: true } });
+export async function importParticipants(prisma: PrismaClient, input: ParticipantImportRequest, actor: Actor): Promise<ImportResult> {
+  const event = await prisma.event.findUnique({ where: { id: input.eventId }, select: { id: true, config: true, defaultPasswordHash: true } });
   if (!event) throw notFound('That event');
   const cap = EventConfig.parse(event.config).access.checkInCap;
+  const dryRun = input.dryRun === true;
   // A random, never-shown password: nobody can sign in before a badge is issued (and the account activated).
-  const placeholderHash = await hashPassword(generatePassword(32));
-  const created: string[] = [];
-  const skipped: Array<{ enrolmentNo: string; reason: string }> = [];
-  await prisma.$transaction(async (tx) => {
-    await tx.$queryRaw`SELECT id FROM events WHERE id = ${event.id} FOR NO KEY UPDATE`;
+  const placeholderHash = dryRun || event.defaultPasswordHash ? null : await hashPassword(generatePassword(32));
+
+  const run = async (tx: Tx): Promise<ImportResult> => {
+    if (!dryRun) await tx.$queryRaw`SELECT id FROM events WHERE id = ${event.id} FOR NO KEY UPDATE`;
+    const issues: ImportIssue[] = [];
+    const valid: Array<{ line: number | null; row: ParticipantRowT }> = [];
+    const seenEnrol = new Map<string, number | null>();
+    const seenEmail = new Map<string, number | null>();
+    input.rows.forEach((raw, i) => {
+      const line = raw.line ?? null;
+      const label = raw.enrolmentNo.trim() || `row ${i + 1}`;
+      const parsed = ParticipantRow.safeParse({
+        name: raw.name, enrolmentNo: raw.enrolmentNo, email: blank(raw.email), phone: blank(raw.phone),
+      });
+      if (!parsed.success) {
+        for (const issue of parsed.error.issues) {
+          const key = String(issue.path[0] ?? '');
+          issues.push({ line, enrolmentNo: label, column: COLUMN[key] ?? null, message: rowMessage(key, raw) });
+        }
+        return;
+      }
+      const row = parsed.data;
+      const enrol = row.enrolmentNo.toLowerCase();
+      if (seenEnrol.has(enrol)) {
+        issues.push({ line, enrolmentNo: label, column: 'enrolment', message: `Enrolment number appears twice in the file${at(seenEnrol.get(enrol))}.` });
+        return;
+      }
+      seenEnrol.set(enrol, line);
+      if (row.email) {
+        const email = row.email.toLowerCase();
+        if (seenEmail.has(email)) {
+          issues.push({ line, enrolmentNo: label, column: 'email', message: `Email appears twice in the file${at(seenEmail.get(email))}.` });
+          return;
+        }
+        seenEmail.set(email, line);
+      }
+      valid.push({ line, row });
+    });
+
+    const preview: ImportPreviewRow[] = [];
     let registered = await tx.participant.count({ where: { eventId: event.id, status: { in: ['REGISTERED', 'CHECKED_IN'] } } });
-    for (const row of input.rows) {
+    const plan: Array<{ row: ParticipantRowT; existing: { id: string } | null; status: 'REGISTERED' | 'WAITLISTED' }> = [];
+    for (const { line, row } of valid) {
       const username = row.enrolmentNo.toLowerCase();
+      const issue = (column: ImportIssue['column'], message: string) => issues.push({ line, enrolmentNo: row.enrolmentNo, column, message });
       const existing = await tx.user.findUnique({ where: { username }, select: { id: true, role: true } });
       if (existing && existing.role !== 'PARTICIPANT') {
-        skipped.push({ enrolmentNo: row.enrolmentNo, reason: 'username belongs to a staff account' });
+        issue('enrolment', 'This enrolment number is a staff username. Use a different one.');
         continue;
       }
       if (existing && (await tx.participant.findUnique({ where: { eventId_userId: { eventId: event.id, userId: existing.id } } }))) {
-        skipped.push({ enrolmentNo: row.enrolmentNo, reason: 'already registered' });
+        issue('enrolment', 'Already registered for this event. Remove the row.');
         continue;
       }
-      if (row.email && (await tx.user.findFirst({ where: { email: row.email.toLowerCase(), NOT: { username } } }))) {
-        skipped.push({ enrolmentNo: row.enrolmentNo, reason: 'email used by another account' });
+      if (row.email && (await tx.user.findFirst({ where: { email: row.email.toLowerCase(), NOT: { username } }, select: { id: true } }))) {
+        issue('email', 'This email belongs to another account. Use the person’s own email or leave it empty.');
         continue;
       }
       if (existing) {
@@ -49,31 +116,65 @@ export async function importParticipants(prisma: PrismaClient, input: Participan
         });
         if (live) {
           // Signing them out would end their contest elsewhere (audit run-11 R11-3).
-          skipped.push({ enrolmentNo: row.enrolmentNo, reason: 'checked in at another live event' });
+          issue('enrolment', 'Checked in at another event that has not ended. Import them after it ends.');
           continue;
         }
+      }
+      const status = registered < cap ? 'REGISTERED' : 'WAITLISTED';
+      if (status === 'REGISTERED') registered++;
+      plan.push({ row, existing, status });
+      preview.push({ line, enrolmentNo: row.enrolmentNo, name: row.name, email: row.email ?? null, phone: row.phone ?? null, status, existingAccount: existing !== null });
+    }
+    issues.sort((x, y) => (x.line ?? 0) - (y.line ?? 0));
+    if (dryRun || issues.length) return { dryRun, ok: issues.length === 0, created: 0, rows: preview, issues };
+
+    const userIds: string[] = [];
+    for (const { row, existing, status } of plan) {
+      const username = row.enrolmentNo.toLowerCase();
+      if (existing) {
         // Re-imported from an earlier event: inactive again until scanned at this event's desk (audit L4).
         await tx.user.update({ where: { id: existing.id }, data: { active: false } });
         await tx.authSession.deleteMany({ where: { userId: existing.id } });
       }
       const user = existing ?? (await tx.user.create({
-        data: { username, name: row.name, email: row.email?.toLowerCase() ?? null, role: 'PARTICIPANT', passwordHash: placeholderHash, active: false },
-        select: { id: true, role: true },
-      }));
-      const status = registered < cap ? 'REGISTERED' : 'WAITLISTED';
-      if (status === 'REGISTERED') registered++;
-      const p = await tx.participant.create({
-        data: { eventId: event.id, userId: user.id, enrolmentNo: row.enrolmentNo, phone: row.phone ?? null, status },
+        data: {
+          username, name: row.name, email: row.email?.toLowerCase() ?? null, role: 'PARTICIPANT',
+          passwordHash: event.defaultPasswordHash ?? placeholderHash!, mustChangePassword: event.defaultPasswordHash !== null, active: false,
+        },
         select: { id: true },
-      });
-      created.push(p.id);
+      }));
+      await tx.participant.create({ data: { eventId: event.id, userId: user.id, enrolmentNo: row.enrolmentNo, phone: row.phone ?? null, status } });
+      userIds.push(user.id);
     }
+    // ADR-041: re-imported accounts get the event default too.
+    if (event.defaultPasswordHash) await applyEventDefault(tx, event.id, event.defaultPasswordHash, userIds);
     await tx.auditLog.create({
-      // Counts and reasons only: the audit log is append-only and outlives anonymisation (ADR-010).
-      data: { actorId: actor.id, action: 'participant.imported', targetType: 'event', targetId: event.id, after: { created: created.length, skipped: skipped.map((s) => s.reason) }, requestId: actor.requestId },
+      // Counts only: the audit log is append-only and outlives anonymisation (ADR-010).
+      data: { actorId: actor.id, action: 'participant.imported', targetType: 'event', targetId: event.id, after: { created: plan.length, waitlisted: plan.filter((p) => p.status === 'WAITLISTED').length }, requestId: actor.requestId },
     });
-  });
-  return { created: created.length, skipped };
+    return { dryRun, ok: true, created: plan.length, rows: preview, issues: [] };
+  };
+
+  return dryRun ? run(prisma as unknown as Tx) : prisma.$transaction(run, { timeout: 60_000 });
+}
+
+const at = (line: number | null | undefined) => (line ? ` (first on line ${line})` : '');
+
+function rowMessage(key: string, raw: { name: string; enrolmentNo: string }): string {
+  switch (key) {
+    case 'name':
+      return raw.name.trim() ? 'Name is too long (at most 120 characters).' : 'Name is missing.';
+    case 'enrolmentNo':
+      return raw.enrolmentNo.trim()
+        ? 'Enrolment number may use only letters, digits, / _ - (at most 40 characters).'
+        : 'Enrolment number is missing.';
+    case 'email':
+      return 'Not a valid email address (or leave it empty).';
+    case 'phone':
+      return 'Phone must be 6–20 digits (spaces, + and - allowed), or empty.';
+    default:
+      return 'This row does not match the template.';
+  }
 }
 
 /** Desk and console list. No prompts, scores or token data: volunteers see this too (ADR-013). */
@@ -83,7 +184,7 @@ export async function listParticipants(prisma: PrismaClient, eventId: string) {
     orderBy: [{ status: 'asc' }, { enrolmentNo: 'asc' }],
     select: {
       id: true, enrolmentNo: true, status: true, seatLabel: true, checkedInAt: true, checkInTokenHash: true, consentAt: true,
-      user: { select: { id: true, name: true, username: true, active: true } },
+      user: { select: { id: true, name: true, username: true, active: true, mustChangePassword: true, sessions: { where: { expiresAt: { gt: new Date() } }, select: { id: true }, take: 1 } } },
     },
   });
   return rows.map(({ checkInTokenHash, user, checkedInAt, consentAt, ...p }) => ({
@@ -92,6 +193,10 @@ export async function listParticipants(prisma: PrismaClient, eventId: string) {
     name: user.name,
     username: user.username,
     active: user.active,
+    /** Has a live sign-in session now (WP-11 participant management). */
+    signedIn: user.sessions.length > 0,
+    /** Still on the event's default password (ADR-041). */
+    mustChangePassword: user.mustChangePassword,
     badgeIssued: checkInTokenHash !== null,
     checkedInAt: checkedInAt?.toISOString() ?? null,
     consented: consentAt !== null,
@@ -136,6 +241,54 @@ export async function exportParticipant(prisma: PrismaClient, participantId: str
     signIns: authSessions,
     auditTrail: audit,
   };
+}
+
+/**
+ * Remove a participant (ADR-044). Without any activity (no token ledger rows, chats, submissions, reviews, overrides,
+ * incidents or judge jobs) the participant row is deleted, and the account too when it belongs to no other event and
+ * has never acted (append-only audit rows reference actors). With activity the data is anonymised instead
+ * (`anonymiseParticipant`), because the ledgers are append-only. Admin only; audit-logged; not reversible.
+ */
+export async function removeParticipant(prisma: PrismaClient, participantId: string, actor: Actor & { reason: string }) {
+  const mode = await prisma.$transaction(async (tx) => {
+    const p = await tx.participant.findUnique({
+      where: { id: participantId },
+      select: {
+        id: true, eventId: true, userId: true,
+        _count: { select: { tokenLedger: true, chatSessions: true, submissions: true, judgeReviews: true, scoreOverrides: true, incidents: true, judgeJobs: true } },
+      },
+    });
+    if (!p) throw notFound('That participant');
+    if (Object.values(p._count).some((c) => c > 0)) return 'anonymise' as const;
+    await tx.participant.delete({ where: { id: p.id } });
+    const user = await tx.user.findUniqueOrThrow({
+      where: { id: p.userId },
+      select: { role: true, _count: { select: { participants: true, auditEntries: true } } },
+    });
+    await tx.authSession.deleteMany({ where: { userId: p.userId } });
+    const userDeleted = user.role === 'PARTICIPANT' && user._count.participants === 0 && user._count.auditEntries === 0;
+    if (userDeleted) await tx.user.delete({ where: { id: p.userId } });
+    await tx.auditLog.create({
+      data: {
+        actorId: actor.id, action: 'participant.deleted', targetType: 'participant', targetId: p.id,
+        after: { eventId: p.eventId, userDeleted }, reason: actor.reason, requestId: actor.requestId,
+      },
+    });
+    return 'deleted' as const;
+  });
+  if (mode === 'deleted') return { ok: true, mode };
+  await anonymiseParticipant(prisma, participantId, actor);
+  return { ok: true, mode: 'anonymised' as const };
+}
+
+/** What `removeParticipant` will do, for the confirm dialog. */
+export async function removalMode(prisma: PrismaClient, participantId: string): Promise<'deleted' | 'anonymised'> {
+  const p = await prisma.participant.findUnique({
+    where: { id: participantId },
+    select: { _count: { select: { tokenLedger: true, chatSessions: true, submissions: true, judgeReviews: true, scoreOverrides: true, incidents: true, judgeJobs: true } } },
+  });
+  if (!p) throw notFound('That participant');
+  return Object.values(p._count).some((c) => c > 0) ? 'anonymised' : 'deleted';
 }
 
 /**

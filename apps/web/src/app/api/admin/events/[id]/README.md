@@ -6,6 +6,8 @@ GET the event with its config; PUT `EventUpdateRequest` (after the start only bu
 |---|---|
 | `route.ts` | handler |
 | `problems/` | its problems |
+| `setup/` | setup roadmap state (GET) and launch = open check-in (POST; 409 `setup_incomplete` lists what's missing) |
+| `default-password/` | set or clear the event's default participant password (ADR-041) |
 
 ## Affects / depends on
 - Depends on: `src/lib/route.ts` (session, roles, error envelope), services in `src/server/`.

@@ -6,7 +6,8 @@ import { EventEditor } from './event-editor';
 export default function EventPage() {
   return (
     <section>
-      <h1>Event</h1>
+      <h1>Event settings</h1>
+      <p>Every setting on one page. For a guided setup, use the <a href="/admin/setup">setup roadmap</a>.</p>
       <Suspense>
         <EventEditor />
       </Suspense>

@@ -37,6 +37,8 @@ model User {
   createdAt    DateTime  @default(now())
   updatedAt    DateTime  @updatedAt
   lastLoginAt  DateTime?
+  /// Set while the password is the event's default (ADR-041): every route but /account answers 403 until changed.
+  mustChangePassword Boolean @default(false)
 
   sessions     AuthSession[]
   participants Participant[]
@@ -101,6 +103,8 @@ model Event {
   resultsState       ResultsState @default(NONE)
   /// When provisional results were published: the appeal window runs from here.
   provisionalAt      DateTime?
+  /// argon2 hash of the event's default participant password (ADR-041); the plaintext is never stored.
+  defaultPasswordHash String?
   createdAt          DateTime     @default(now())
   updatedAt          DateTime     @updatedAt
 
@@ -175,6 +179,8 @@ model Problem {
   checker       Json
   /// Warm-up problem (ADR-007): open only before the contest starts; its tokens and score don't count.
   practice      Boolean    @default(false)
+  /// Very easy problem (ADR-042): the tutor gives verbal hints only, no code or pseudo-code.
+  hintsOnly     Boolean    @default(false)
   createdAt     DateTime   @default(now())
   updatedAt     DateTime   @updatedAt
 
@@ -336,6 +342,8 @@ model PromptTurn {
   promptTokens     Int         @default(0)
   completionTokens Int         @default(0)
   latencyMs        Int?
+  /// What the guardrails did on this turn (ADR-042): intent, hint level, code lines shown, removals. Staff-facing.
+  guardrail        Json?
   createdAt        DateTime    @default(now())
 
   codeVersions CodeVersion[]
