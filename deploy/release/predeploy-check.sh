@@ -11,7 +11,8 @@ check() { if eval "$2"; then echo "ok    $1"; else echo "FAIL  $1"; fail=1; fi; 
 
 check "COOKIE_SECURE unset (session cookie must be Secure)" '[[ -z "${COOKIE_SECURE:-}" ]]'
 check "SEB_CONFIG_KEY and PUBLIC_ORIGIN both set (participants SEB-only, ADR-013/029)" '[[ -n "${SEB_CONFIG_KEY:-}" && -n "${PUBLIC_ORIGIN:-}" ]]'
-check "PUBLIC_ORIGIN is https with no path" '[[ "${PUBLIC_ORIGIN:-}" =~ ^https://[^/]+$ ]]'
+check "PUBLIC_ORIGIN is https with no path (comma list allowed, ADR-045)" '[[ "${PUBLIC_ORIGIN:-}" =~ ^https://[^/,]+(,\ ?https://[^/,]+)*$ ]]'
+check "SEB_CONFIG_KEY lists as many keys as PUBLIC_ORIGIN lists origins" '[[ "$(tr -cd , <<<"${SEB_CONFIG_KEY:-}")" == "$(tr -cd , <<<"${PUBLIC_ORIGIN:-}")" ]]'
 check "GATEWAY_URL and GATEWAY_TOKEN set" '[[ -n "${GATEWAY_URL:-}" && -n "${GATEWAY_TOKEN:-}" ]]'
 check "DATABASE_URL is CodeHaunt's own Postgres (not cjudge's :5432)" '[[ "${DATABASE_URL:-}" != *":5432/"* && "${DATABASE_URL:-}" != *cjudge* ]]'
 check "DB role passwords set" '[[ -n "${POSTGRES_PASSWORD:-}" && -n "${WEB_DB_PASSWORD:-}" && -n "${WORKER_DB_PASSWORD:-}" ]]'

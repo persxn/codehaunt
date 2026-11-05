@@ -10,7 +10,7 @@ Implementation of `@codehaunt/auth`.
 | `login.ts` | login (timing-safe, throttled), single participant session, `seb_required` for participants outside SEB (after the password check, old session kept; audit-logged `auth.seb_refused`), `checkPasswordStrength`, audit-logged `setAccountActive`, `changePassword` (current password throttled like a login, one at a time per account; refuses keeping the current password; clears `mustChangePassword`), `setPassword` (staff reset; clears the flag) |
 | `rate-limit.ts` | in-memory login throttling per username, per IP and globally; slows down, never refuses (ADR-020); `slowedUsernames()` for the incident dashboard (usernames only, no IPs) |
 | `common-passwords.ts` | generated: SecLists 10k common passwords, lowercased (see `/VENDORED.md`) |
-| `seb.ts` | `[claude]` SEB Config Key check (ADR-013 §3): `sebConfig` (env `SEB_CONFIG_KEY` + `PUBLIC_ORIGIN`, both or neither, throws on half config), `sebHash`, `sebHeaderValid` (public origin + path + query, timing-safe) |
+| `seb.ts` | `[claude]` SEB Config Key check (ADR-013 §3): `sebConfig` (env `SEB_CONFIG_KEY` + `PUBLIC_ORIGIN`, both or neither, each may be a comma list paired by position for a domain move (ADR-045); throws on half config or unequal counts), `primaryOrigin` (first `PUBLIC_ORIGIN` entry), `sebHash`, `sebHeaderValid` (each origin only with its own key + path + query, timing-safe, all entries checked) |
 | `policy.ts` | route → roles table and `authorize()`; pure, no Node imports (`@codehaunt/auth/policy`); `/projector` and `/api/projector` are public (WP-05); `/`, `/icon.png`, `/opengraph-image.jpg` are public (ADR-029); `/admin/setup` ADMIN only (WP-11) |
 
 ## Affects / depends on

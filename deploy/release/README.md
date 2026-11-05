@@ -4,7 +4,7 @@ Deploying a tagged release to the DGX compose stack, rolling back, the pre-deplo
 ## Contents
 | Path | What it does |
 |---|---|
-| `predeploy-check.sh` | refuses a production `.env` with `COOKIE_SECURE` set, half SEB config, a non-https `PUBLIC_ORIGIN`, a missing gateway token, cjudge's database or a seed password |
+| `predeploy-check.sh` | refuses a production `.env` with `COOKIE_SECURE` set, half SEB config, a non-https `PUBLIC_ORIGIN`, unequal `PUBLIC_ORIGIN`/`SEB_CONFIG_KEY` list lengths, a missing gateway token, cjudge's database or a seed password |
 | `deploy.sh` | `deploy.sh <tag>`: HEAD must be the tag and clean; runs the check; keeps the running images as `codehaunt-<svc>:previous`; builds; tags the new images `:<tag>`; `up --wait`; `/healthz`. Refuses the tag already running (`.current`), which would make `:previous` the running release |
 | `backup.sh` | ADR-036: custom-format `pg_dump` to `~/codehaunt-backups` (mode 600, last 72) and a copy to `root@gpu-master:/root/codehaunt-backups` (root-only, never the NFS share); a failed copy only warns (Tailscale SSH sign-in may expire) |
 | `restore.sh` | restores a dump into `codehaunt_restore_check` (drill / inspection) or, with `--live` and a typed confirmation, the live database; `--live` refuses while web or worker run and first saves the live database as `pre-restore-<time>.dump` |

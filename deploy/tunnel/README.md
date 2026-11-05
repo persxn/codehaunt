@@ -1,5 +1,5 @@
 # deploy/tunnel
-Cloudflare Tunnel that publishes the DGX web service (`127.0.0.1:3100`) as `codehaunt.jojocode.in` (ADR-003).
+Cloudflare Tunnel that publishes the DGX web service (`127.0.0.1:3100`) as `codehaunt.jojocode.in` (ADR-003) and, from the domain move, `codehaunt.csiuem.site` (ADR-045).
 
 ## Contents
 | Path | What it does |
@@ -8,6 +8,8 @@ Cloudflare Tunnel that publishes the DGX web service (`127.0.0.1:3100`) as `code
 | `config.yml` | full-launch ingress (everything → web on 3100); live copy `~/.cloudflared-codehaunt/config.full.yml` |
 | `config-preview.yml` | retired at the full launch (2026-11-04), live copy kept as `~/.cloudflared-codehaunt/config.preview.backup.yml`: landing-page-only ingress; only `/`, `/_next/static/…`, `/icon.png`, `/opengraph-image.jpg` reach the preview server, everything else is 404 at the edge; live copy `~/.cloudflared-codehaunt/config.yml` |
 | `codehaunt-tunnel-2.service` | user unit: a second connector of the same tunnel on the DGX (ADR-036), so a crashed or stuck connector never takes the site down (drill: stop one, 20/20 requests still served) |
+| `csiuem-setup.sh` | one-shot, idempotent Cloudflare setup in the CSI account for `codehaunt.csiuem.site` (ADR-045): remotely managed tunnel `codehaunt-csi`, proxied CNAME, SEB WAF rule, login rate limit, Always HTTPS + TLS 1.2; reads `~/.config/codehaunt-csiuem.env` (600), writes `~/.cloudflared-codehaunt/csiuem.token` (600) |
+| `codehaunt-tunnel-csi.service`, `codehaunt-tunnel-csi-2.service` | user units: two connectors of tunnel `codehaunt-csi` (token file, no local config) |
 | `codehaunt-preview.service` | user unit: `next start` on 127.0.0.1:3200 from `apps/web/.next-preview` (env `~/.config/codehaunt-preview.env`, mode 600) |
 
 ## Facts
@@ -22,6 +24,17 @@ Cloudflare Tunnel that publishes the DGX web service (`127.0.0.1:3100`) as `code
   restart both tunnel units.
 - Updating the preview: `NEXT_DIST_DIR=.next-preview` build in `apps/web` (env from `~/.config/codehaunt-preview.env`),
   restore `apps/web/tsconfig.json` + `next-env.d.ts` (the build rewrites them), `systemctl --user restart codehaunt-preview`.
+
+## csiuem.site (ADR-045)
+The new domain lives in the CSI chapter's own Cloudflare account, so it gets its own tunnel there (a tunnel can only
+route hostnames of its own account). Both tunnels run side by side until the old domain is retired.
+1. Put the professor's values in `~/.config/codehaunt-csiuem.env` (`chmod 600`): `CSI_CF_TOKEN=`, `CSI_ACCOUNT_ID=`,
+   `CSI_ZONE_ID=`. The token expires 7 days after it was made.
+2. `deploy/tunnel/csiuem-setup.sh` (needs the zone `Active`).
+3. Copy both `codehaunt-tunnel-csi*.service` to `~/.config/systemd/user/`, `daemon-reload`, `enable --now` both.
+4. `curl -sI https://codehaunt.csiuem.site/login` → 200; `/contest` without SEB → 403 from Cloudflare.
+5. `.env`: `PUBLIC_ORIGIN=https://codehaunt.csiuem.site,https://codehaunt.jojocode.in` and
+   `SEB_CONFIG_KEY=<new key>,<old key>`; `docker compose --profile core up -d web` (env only, no rebuild).
 
 ## Affects / depends on
 - Depends on: the compose `web` service on 127.0.0.1:3100; `~/.local/bin/cloudflared`.

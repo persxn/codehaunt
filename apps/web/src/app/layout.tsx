@@ -1,5 +1,7 @@
 import type { ReactNode } from 'react';
 
+import { primaryOrigin } from '@codehaunt/auth';
+
 import { loadConfig } from '@/lib/config';
 
 import '@fontsource/creepster/400.css';
@@ -17,8 +19,8 @@ loadConfig();
 
 export const metadata = {
   title: 'CodeHaunt',
-  // Absolute URLs for the link-preview image (opengraph-image.jpg); the tunnel hostname unless PUBLIC_ORIGIN says otherwise.
-  metadataBase: new URL(process.env.PUBLIC_ORIGIN || 'https://codehaunt.jojocode.in'),
+  // Absolute URLs for the link-preview image (opengraph-image.jpg): the first PUBLIC_ORIGIN entry, else the public hostname (ADR-045).
+  metadataBase: new URL(primaryOrigin() || 'https://codehaunt.csiuem.site'),
 };
 // Every page renders per request: the CSP nonce (middleware.ts) differs each time, so nothing can be prerendered.
 export const dynamic = 'force-dynamic';

@@ -11,25 +11,27 @@ the **SEB Config Tool on Windows** (SEB for Windows 3.10.x) and shares it with p
 ## Settings (labels as in the SEB Config Tool for Windows)
 | Tab | Setting | Value | Why |
 |---|---|---|---|
-| General | Start URL | `https://codehaunt.jojocode.in/login?seb=1` | participants land on the login form (ADR-029); `?seb=1` is what the live `.seb` uses |
+| General | Start URL | `https://codehaunt.csiuem.site/login?seb=1` | participants land on the login form (ADR-029); `?seb=1` is what the live `.seb` uses |
 | General | Quit/unlock password | organisers' password, never shared with participants | no leaving SEB mid-contest |
 | Exam | Use Browser Exam Key and Config Key | on | the server checks the Config Key hash on every participant request (ADR-013) |
 | Security | Clipboard Policy | **Block** (`clipboardPolicy` 1; SEB source: Allow 0 / Block 1 / Isolated 2) | no paste from outside SEB (ADR-033); the app also blocks paste/copy inside |
 | Hooked Keys | Enable Right Mouse | off | no context menu (paste, inspect) |
 | User Interface | Allow spell checking | off | needs the right mouse; no suggestions in the editor |
 | User Interface | Show developer tools in window menu | off | |
-| Network → Filter | Activate URL filtering | on, allow only `codehaunt.jojocode.in` | no other sites |
+| Network → Filter | Activate URL filtering | on, allow only `codehaunt.csiuem.site` | no other sites |
 | Down/Uploads | Allow downloading and uploading files | off | |
 | Applications | permitted third-party applications | none | |
 | Security | Create new desktop | on | other windows stay out of reach |
 
-Checked from the live `.seb` file itself (2026-11-04): clipboard Block, downloads/uploads off, right mouse, spell check
+Checked from the live `.seb` file itself (2026-11-04, old domain): clipboard Block, downloads/uploads off, right mouse, spell check
 and developer tools off, URL filter allows `codehaunt.jojocode.in/*` only, no permitted applications, new desktop on,
 quit password set. Paste blocked and quit with the quit password were tested in SEB on Windows.
 
+The previous file (`codehaunt.jojocode.in`) stays accepted while both origins are listed (ADR-045).
+
 ## Affects / depends on
 - The **Config Key** shown in the Exam tab goes into the server `.env` as `SEB_CONFIG_KEY`, together with
-  `PUBLIC_ORIGIN=https://codehaunt.jojocode.in` (`packages/auth/src/seb.ts`). Any change to the settings changes the
+  `PUBLIC_ORIGIN=https://codehaunt.csiuem.site` (during the move: comma lists, new first; ADR-045) (`packages/auth/src/seb.ts`). Any change to the settings changes the
   Config Key: update `.env` and redeploy, or every participant gets 403 `seb_required`.
 - `deploy/release/predeploy-check.sh` fails until both are set.
 

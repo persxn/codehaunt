@@ -1,0 +1,11 @@
+[Unit]
+Description=CodeHaunt — Cloudflare tunnel connector 2 (codehaunt.csiuem.site, ADR-045)
+After=network-online.target
+
+[Service]
+ExecStart=%h/.local/bin/cloudflared --no-autoupdate --config /dev/null tunnel run --token-file %h/.cloudflared-codehaunt/csiuem.token
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=default.target
