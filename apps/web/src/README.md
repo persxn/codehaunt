@@ -7,7 +7,7 @@ Source code for the web frontend.
 |---|---|
 | `app/` | Next.js route hierarchy (pages, API routes, health checks) |
 | `components/` | shared UI components (ghost mark, buttons, fields, verdict badge, meters, banner) on the design tokens |
-| `middleware.ts` | deny-by-default gate on every request (Node runtime): session lookup, 401/403, cross-origin POST refusal, SEB gate for participants (`sebGate`, 403 `seb_required`; ADR-013), per-request nonce CSP |
+| `middleware.ts` | deny-by-default gate on every request (Node runtime): session lookup, 401/403, cross-origin POST refusal, SEB gate for participants (`sebGate`, 403 `seb_required`; ADR-013), per-request nonce CSP; `/CodeHaunt.seb` on `codehaunt.jojocode.in` is rewritten to `/CodeHaunt-jojocode.seb` (ADR-045) |
 | `lib/` | server helpers: config validation, error envelope and request IDs, session lookup, the route wrapper, service instances |
 | `server/` | services behind the API routes (participant flow, prompt/gateway, check-in, event editor, staff); framework-free |
 

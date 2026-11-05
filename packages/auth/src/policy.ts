@@ -38,6 +38,8 @@ export const ROUTE_POLICY: ReadonlyArray<readonly [prefix: string, access: Acces
   ['/opengraph-image.jpg', 'public'],
   // SEB config for the login page's sebs:// link (ADR-039): every participant receives it anyway; no data.
   ['/CodeHaunt.seb', 'public'],
+  // The previous file (start URL on codehaunt.jojocode.in), served there during the domain move (ADR-045).
+  ['/CodeHaunt-jojocode.seb', 'public'],
 
   ['/api/auth/logout', ROLES],
   ['/api/auth/me', ROLES],

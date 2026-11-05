@@ -99,3 +99,12 @@ test('SEB refusal on an API route is the seb_required envelope', async () => {
     delete env.PUBLIC_ORIGIN;
   }
 });
+
+test('domain move (ADR-045): /CodeHaunt.seb on the old host is the old file; elsewhere the new one', async () => {
+  const old = await middleware(new NextRequest('https://codehaunt.jojocode.in/CodeHaunt.seb', { headers: { host: 'codehaunt.jojocode.in' } }));
+  assert.match(old.headers.get('x-middleware-rewrite') ?? '', /\/CodeHaunt-jojocode\.seb$/);
+  const fresh = await middleware(new NextRequest('https://codehaunt.csiuem.site/CodeHaunt.seb', { headers: { host: 'codehaunt.csiuem.site' } }));
+  assert.equal(fresh.headers.get('x-middleware-rewrite'), null);
+  assert.equal(fresh.status, 200);
+  assert.equal((await middleware(request('/CodeHaunt-jojocode.seb'))).status, 200);
+});

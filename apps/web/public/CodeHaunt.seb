@@ -5,19 +5,19 @@
     <key>originatorVersion</key>
     <string>SEB_Win_2.1.1</string>
     <key>startURL</key>
-    <string>https://codehaunt.jojocode.in/login?seb=1</string>
+    <string>https://codehaunt.csiuem.site/login?seb=1</string>
     <key>startResource</key>
     <string />
     <key>sebServerURL</key>
     <string />
     <key>hashedAdminPassword</key>
-    <string />
+    <string>28038F038EC02328173740C140E595A730B120E77AFD1BEAB8E85B38B4DB739A</string>
     <key>allowQuit</key>
     <true />
     <key>ignoreExitKeys</key>
     <true />
     <key>hashedQuitPassword</key>
-    <string>F5BE9BE928829D0A2644EAE708C4C7D29DD9CB63795D89B903E7F0841C1B8390</string>
+    <string>ABD36C73E1221699F56F243E28025705BAFB9C8AC8975F1AFEC43C41BE439AC9</string>
     <key>exitKey1</key>
     <integer>2</integer>
     <key>exitKey2</key>
@@ -1709,7 +1709,7 @@
         <key>regex</key>
         <false />
         <key>expression</key>
-        <string>codehaunt.jojocode.in/*</string>
+        <string>codehaunt.csiuem.site/*</string>
         <key>action</key>
         <integer>1</integer>
       </dict>
@@ -1721,7 +1721,7 @@
     <key>blacklistURLFilter</key>
     <string />
     <key>whitelistURLFilter</key>
-    <string>^.*?:\/\/((codehaunt\.jojocode\.in)|(.*?\.codehaunt\.jojocode\.in))\/((/.*?)|(/.*?))(()|(\?.*?))$</string>
+    <string>^.*?:\/\/((codehaunt\.csiuem\.site)|(.*?\.codehaunt\.csiuem\.site))\/((/.*?)|(/.*?))(()|(\?.*?))$</string>
     <key>urlFilterTrustedContent</key>
     <true />
     <key>urlFilterRegex</key>

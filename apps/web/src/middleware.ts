@@ -25,6 +25,14 @@ const SEB_PAGE =
   '<p>Open CodeHaunt in Safe Exam Browser with the event config file. Ask a volunteer if you need it.</p>';
 const SEB_MESSAGE = 'Open CodeHaunt in Safe Exam Browser with the event config file.';
 
+/**
+ * Domain move (ADR-045): each domain hands out the .seb whose Start URL and URL filter name that domain, so the
+ * login page's `sebs://<host>/CodeHaunt.seb` link opens SEB on the address the participant is already using.
+ * Host is client-controlled, but it only picks between two public files. Remove with the old domain.
+ */
+const LEGACY_SEB_HOST = 'codehaunt.jojocode.in';
+const LEGACY_SEB_FILE = '/CodeHaunt-jojocode.seb';
+
 /** `null` for an unparsable Origin (including the literal "null"), which then never matches. */
 function hostOf(origin: string): string | null {
   try {
@@ -61,6 +69,10 @@ export async function middleware(request: NextRequest) {
   const requestId = requestIdOf(request.headers);
   const { pathname } = request.nextUrl;
   const isApi = pathname.startsWith('/api/');
+
+  if (pathname === '/CodeHaunt.seb' && request.headers.get('host') === LEGACY_SEB_HOST) {
+    return NextResponse.rewrite(new URL(LEGACY_SEB_FILE, request.url));
+  }
 
   // CSRF backstop for state-changing requests: a cross-site Origin is refused outright.
   if (!SAFE_METHODS.has(request.method)) {

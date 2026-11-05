@@ -16,6 +16,7 @@ test('/ is public (ADR-029) but only itself, not everything under it', () => {
 
 test('the SEB config file is public, the rest of public/ is not (ADR-039)', () => {
   assert.deepEqual(authorize('/CodeHaunt.seb', null), { allow: true });
+  assert.deepEqual(authorize('/CodeHaunt-jojocode.seb', null), { allow: true });
   for (const path of ['/README.md', '/CodeHaunt.sebx', '/other.seb']) {
     assert.deepEqual(authorize(path, null), { allow: false, status: 401 }, path);
   }
