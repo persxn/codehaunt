@@ -35,7 +35,13 @@ export const CURRENT_TUTOR_PROMPT = 'tutor-v2';
  * Unknown versions fall back to `tutor-v2`, so a typo in the event config (or an event still set to the retired
  * junior persona `v1`) can't leave the model without the tutor rules. `steering` is this turn's line (ADR-042).
  */
+/** Replaces the code-example bullet when no code lines are allowed (ADR-046, the default). */
+const WORDS_ONLY_RULE = '- Never write code of any kind: no code lines, snippets, pseudo-code, formulas or step lists that solve their task. Explain everything in plain words; any code you write is removed before the student sees it.';
+
 export function systemPrompt(version: string, language: Language, maxLines: number, steering = ''): string {
-  const text = (SYSTEM_PROMPTS[version] ?? TUTOR_V2).replace('{maxLines}', String(maxLines));
+  const base = SYSTEM_PROMPTS[version] ?? TUTOR_V2;
+  const text = maxLines <= 0
+    ? base.split('\n').map((line) => (line.includes('{maxLines}') ? WORDS_ONLY_RULE : line)).join('\n').replace('Keep replies short: a few sentences and at most one tiny example.', 'Keep replies short: a few sentences.')
+    : base.replace('{maxLines}', String(maxLines));
   return `${text}\nThe student is writing ${LANGUAGES[language].label}.${steering ? `\n${steering}` : ''}`;
 }

@@ -79,8 +79,9 @@ const LEVEL_TEXT: Record<HintLevel, string> = {
  * The one-line instruction added to the system prompt for this turn (not stored in the history). Empty when the
  * question needs no steering.
  */
+/** `hintsOnly` = words only: a hints-only problem or an event with 0 code lines (ADR-046 default). */
 export function steeringLine(intent: TutorIntent, level: HintLevel, hintsOnly: boolean): string {
-  const words = hintsOnly ? ' This problem is very easy: words only, no code, no pseudo-code, no formulas.' : '';
+  const words = hintsOnly ? ' Words only: no code, no pseudo-code, no formulas.' : '';
   switch (intent) {
     case 'answer_seeking':
       return `This turn: the student is asking for the answer, the full code or the next part of it. Do not give it: no code, no formulas or index expressions for their task, no list of the steps that solve it. Begin with a short friendly line such as "Let's work it out together.", then give ${LEVEL_TEXT[level]}${NO_LABEL}${words}`;

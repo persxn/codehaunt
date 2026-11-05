@@ -13,7 +13,7 @@ export const REMOVED_EXAMPLE = '[example removed: too long]';
 /** Shown instead when the problem's example allowance for this chat session is used up (ADR-042). */
 export const REMOVED_ALLOWANCE = '[example removed: example allowance for this problem used]';
 /** Shown instead on a hints-only problem (ADR-042): no code or pseudo-code at all. */
-export const REMOVED_HINTS_ONLY = '[removed: this problem gets hints in words only]';
+export const REMOVED_HINTS_ONLY = '[removed: the tutor answers in words only]';
 /** Code lines a chat session may show in total, as a multiple of the per-reply limit (ADR-042: 4 × 3 = 12). */
 export const SESSION_ALLOWANCE_FACTOR = 4;
 // 6 lines × 50 = 300 characters per reply (audit R16-4: 480 let a compact 3-line solution through more easily).
@@ -99,8 +99,9 @@ export interface FilterLimits {
 }
 
 /** Limits for a tutor reply: hints-only problems show no code; otherwise the per-reply limit and the session allowance. */
+/** Words only (strict, 0 lines) when the problem is hints-only or the event allows no code lines (ADR-046 default). */
 export function tutorLimits(maxLines: number, hintsOnly: boolean, usedBefore = 0): FilterLimits {
-  if (hintsOnly) return { maxLines: 0, strict: true, sessionLines: 0, usedBefore };
+  if (hintsOnly || maxLines <= 0) return { maxLines: 0, strict: true, sessionLines: 0, usedBefore };
   return { maxLines, sessionLines: maxLines * SESSION_ALLOWANCE_FACTOR, usedBefore };
 }
 

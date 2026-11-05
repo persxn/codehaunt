@@ -15,7 +15,7 @@ export function eventConfig(overrides: Partial<Record<string, unknown>> = {}) {
   return EventConfig.parse({
     branding: { title: 'Test' },
     schedule: { checkInAt: '2026-11-07T09:00:00+05:30', startsAt: new Date(Date.now() - 60_000).toISOString(), durationMinutes: 180 },
-    model: { baseUrl: 'http://gateway.test', name: 'junior', systemPromptVersion: 'tutor-v1' },
+    model: { baseUrl: 'http://gateway.test', name: 'junior', systemPromptVersion: 'tutor-v1', maxExampleLines: 3 },
     judge: { rubricVersion: 'r1' },
     consent: { text: 'I agree.' },
     budget: { tokensPerParticipant: 20_000, contextTokens: 4096, replyTokens: 512 },

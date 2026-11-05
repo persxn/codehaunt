@@ -66,7 +66,7 @@ test('steering lines name the level and never invite the solution', () => {
   assert.match(s, /Do not give it/);
   assert.match(s, /no formulas/);
   assert.match(s, /Do not name or number the hint level/);
-  assert.match(steeringLine('hint', 1, true), /words only/);
+  assert.match(steeringLine('hint', 1, true), /words only/i);
   assert.match(steeringLine('concept', 1, false), /Explain it properly/);
   assert.equal(steeringLine('general', 1, false), '');
 });
@@ -136,4 +136,13 @@ test('limits are rebuilt from the stored guardrail; old turns fall back to the p
   });
   const reply = [`${F}`, 'a = 1', 'b = 2', F].join('\n');
   assert.equal(filterReply(reply, limitsFromGuardrail({ maxLines: 3, sessionLines: 12, usedBefore: 11 }, 3)), `${REMOVED_ALLOWANCE}\n`);
+});
+
+test('ADR-046: 0 code lines (the event default) is words-only strict mode on every problem', () => {
+  assert.deepEqual(tutorLimits(0, false), tutorLimits(3, true));
+  const reply = 'Think about pairs.\n```python\nprint(a + b)\n```\nread a and b\nThen add them.';
+  const shown = filterReply(reply, tutorLimits(0, false));
+  assert.doesNotMatch(shown, /print\(a \+ b\)/);
+  assert.doesNotMatch(shown, /read a and b/);
+  assert.match(shown, /Think about pairs\./);
 });

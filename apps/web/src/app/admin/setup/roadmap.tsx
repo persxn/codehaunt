@@ -425,9 +425,9 @@ function StepLimits({ draft, setDraft, locked }: DraftProps & { locked: boolean 
       <NumberField id="s3-question" label="Longest question (characters)" value={c.budget.maxPromptChars} min={100} max={20_000} onChange={(v) => budget({ maxPromptChars: v })} />
       <NumberField id="s3-reply" label="Longest reply (tokens)" value={c.budget.replyTokens} min={64} max={4096} onChange={(v) => budget({ replyTokens: v })} />
       <NumberField id="s3-context" label="Conversation memory (tokens)" hint="When full, the participant starts a fresh chat." value={c.budget.contextTokens} min={512} max={131_072} onChange={(v) => budget({ contextTokens: v })} />
-      <Field label="Code lines the tutor may show per reply" id="s3-lines" hint="3 recommended (ADR-038). Hints-only problems always get 0.">
+      <Field label="Code lines the tutor may show per reply" id="s3-lines" hint="0 recommended: the tutor explains in words only, no code (ADR-046). Hints-only problems always get 0.">
         <select id="s3-lines" className={inputClass} value={c.model.maxExampleLines} disabled={locked} onChange={(e) => model({ maxExampleLines: Number(e.target.value) })}>
-          {[0, 1, 2, 3, 4, 5].map((n) => <option key={n} value={n}>{n === 0 ? '0 (words only)' : n}</option>)}
+          {[0, 1, 2, 3, 4, 5].map((n) => <option key={n} value={n}>{n === 0 ? '0 · words only (recommended)' : n}</option>)}
         </select>
       </Field>
       <Field label="Tutor behaviour" id="s3-prompt" hint="tutor-v2 notices requests for the answer and gives step-by-step hints instead.">
@@ -465,7 +465,7 @@ function StepProblems({ eventId }: { eventId: string }) {
           ))}
         </ul>
       ) : (
-        <div className={s.info}><p>No problems yet. Each problem needs a statement, sample tests and hidden tests. Mark very easy ones “hints only” so the tutor never shows code for them.</p></div>
+        <div className={s.info}><p>No problems yet. Each problem needs a statement, sample tests and hidden tests. The tutor answers in words only by default (ADR-046); “hints only” keeps a problem words-only even if code examples are switched on.</p></div>
       )}
       <div><Link href={`/admin/problems?event=${encodeURIComponent(eventId)}`}>Open the Problems editor →</Link></div>
     </>

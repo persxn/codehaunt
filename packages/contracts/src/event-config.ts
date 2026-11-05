@@ -63,7 +63,7 @@ export const EventConfig = z.object({
     /** `tutor-v1` (ADR-033); unknown versions fall back to it. */
     systemPromptVersion: z.string().min(1),
     /** Most code lines a tutor reply may show (ADR-033 reply filter). */
-    maxExampleLines: z.number().int().min(0).max(40).default(3), // ADR-038 (client, 2026-11-04): 3, was 6
+    maxExampleLines: z.number().int().min(0).max(40).default(0), // ADR-046 (client, 2026-11-06): 0 = words only, no code at all; was 3 (ADR-038)
     temperature: z.number().min(0).max(2).default(0.2),
     hostedAllowed: z.boolean().default(false),
   }),

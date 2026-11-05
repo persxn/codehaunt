@@ -46,7 +46,7 @@ export const FAQ = [
   },
   {
     q: 'Will the AI write the code for me?',
-    a: 'No. You write every line. The tutor explains ideas and how to improve your code, and shows at most a few lines of example on a different case. Paste and copy are blocked in the editor and the chat.',
+    a: 'No. You write every line. The tutor explains ideas and how to improve your code in words only: it never writes code. Paste and copy are blocked in the editor and the chat.',
   },
   {
     q: 'Which languages can I use?',

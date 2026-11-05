@@ -89,10 +89,10 @@ async function buildSetup(prisma: Tx, eventId: string, now: Date): Promise<Setup
   // 03 Limits
   const limitIssues: SetupStep['issues'] = [];
   if (config.model.systemPromptVersion !== 'tutor-v2') limitIssues.push({ text: `Tutor prompt is ${config.model.systemPromptVersion}; tutor-v2 adds the hint ladder.`, level: 'warning' });
-  if (config.model.maxExampleLines > 5) limitIssues.push({ text: `Tutor examples may be ${config.model.maxExampleLines} lines; 3 is recommended (ADR-038).`, level: 'warning' });
+  if (config.model.maxExampleLines > 0) limitIssues.push({ text: `The tutor may show up to ${config.model.maxExampleLines} code lines per reply; 0 (words only) is recommended (ADR-046).`, level: 'warning' });
   steps.push(step(3, 'limits', 'Configure limits', [
     `${config.budget.tokensPerParticipant.toLocaleString('en-IN')} tokens each`,
-    `Check-in cap ${config.access.checkInCap} · examples ≤ ${config.model.maxExampleLines} lines`,
+    `Check-in cap ${config.access.checkInCap} · ${config.model.maxExampleLines === 0 ? 'tutor: words only' : `examples ≤ ${config.model.maxExampleLines} lines`}`,
   ], [...limitIssues, ...confirm(3)]));
 
   // 04 Problems

@@ -12,7 +12,7 @@ import { createTestDatabase, type TestDatabase } from '@codehaunt/db/testing';
 
 import { workspace } from '../src/server/participant-service.ts';
 import { startPrompt } from '../src/server/prompt-service.ts';
-import { fakeModel, setup } from './support/fixtures.ts';
+import { eventConfig, fakeModel, setup } from './support/fixtures.ts';
 
 const F = '\x60\x60\x60';
 let db: TestDatabase;
@@ -66,7 +66,7 @@ test('hints-only problem: code and pseudo-code removed live, on replay and in th
   const { model, calls } = fakeModel({ text: reply });
   const { shown, final } = await ask(f, model, 'how do I add the numbers');
   assert.match(calls[0]!.messages[0]!.content, /words only/);
-  assert.match(calls[0]!.messages[0]!.content, /at most 0 lines/);
+  assert.match(calls[0]!.messages[0]!.content, /Never write code of any kind/);
   for (const text of [shown, final]) {
     assert.doesNotMatch(text, /print|Read a/);
     assert.match(text, new RegExp(REMOVED_HINTS_ONLY.replace(/[[\]]/g, '\\$&')));
@@ -90,4 +90,22 @@ test('the session allowance: after 12 shown code lines further examples are remo
   const ws = await workspace(db.prisma, await f.ctx(), f.problem.id);
   assert.equal(ws.turns[4]!.reply, `${REMOVED_ALLOWANCE}\n`);
   assert.equal(ws.turns[3]!.reply, block);
+});
+
+test('ADR-046 default (0 code lines): any problem is words only, code and pseudo-code removed, no-code prompt', async () => {
+  const f = await setup(db.prisma);
+  const config = eventConfig();
+  await db.prisma.event.update({ where: { id: f.event.id }, data: { config: { ...config, model: { ...config.model, maxExampleLines: 0 } } } });
+  const reply = ['A loop repeats:', `${F}py`, 'for i in range(3):', '    print(i)', F, 'What should repeat in your task?'].join('\n');
+  const { model, calls } = fakeModel({ text: reply });
+  const { shown, final } = await ask(f, model, 'What is a for loop?');
+  const system = calls[0]!.messages[0]!.content;
+  assert.match(system, /Never write code of any kind/);
+  assert.doesNotMatch(system, /tiny example|at most \d+ lines/);
+  for (const text of [shown, final]) {
+    assert.doesNotMatch(text, /range|print/);
+    assert.match(text, /What should repeat in your task\?/);
+  }
+  const turn = await db.prisma.promptTurn.findFirstOrThrow({ where: { chatSession: { participantId: f.participant.id } } });
+  assert.equal((turn.guardrail as { strict: boolean }).strict, true);
 });

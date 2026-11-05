@@ -107,6 +107,8 @@ export async function startPrompt(
     const intent = classifyIntent(request.prompt);
     const level = hintLevel(earlier);
     const usedBefore = history.reduce((n, t) => n + shownLinesOf(t.guardrail), 0);
+    // Words only (ADR-046): the event default (0 lines) or a hints-only problem; strict filter, no-code prompt and steering.
+    const wordsOnly = problem.hintsOnly || maxLines <= 0;
     const limits = tutorLimits(maxLines, problem.hintsOnly, usedBefore);
     const turn = await prisma.promptTurn.create({
       data: {
@@ -140,7 +142,7 @@ export async function startPrompt(
     const messages = [
       {
         role: 'system' as const,
-        content: systemPrompt(config.model.systemPromptVersion, language, problem.hintsOnly ? 0 : maxLines, steeringLine(intent, level, problem.hintsOnly)),
+        content: systemPrompt(config.model.systemPromptVersion, language, wordsOnly ? 0 : maxLines, steeringLine(intent, level, wordsOnly)),
       },
       ...history.filter((t) => t.reply !== null).flatMap((t) => [
         { role: 'user' as const, content: t.prompt },
