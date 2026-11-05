@@ -26,6 +26,8 @@ Cloudflare Tunnel that publishes the DGX web service (`127.0.0.1:3100`) as `code
   restore `apps/web/tsconfig.json` + `next-env.d.ts` (the build rewrites them), `systemctl --user restart codehaunt-preview`.
 
 ## csiuem.site (ADR-045)
+State (2026-11-06 00:55 IST): set up and live. Tunnel `codehaunt-csi` = `e25771fb-f6a3-4c08-9929-b964d4a6069e`
+(remotely managed, ingress in the dashboard); both `codehaunt-tunnel-csi*` units enabled.
 The new domain lives in the CSI chapter's own Cloudflare account, so it gets its own tunnel there (a tunnel can only
 route hostnames of its own account). Both tunnels run side by side until the old domain is retired.
 1. Put the professor's values in `~/.config/codehaunt-csiuem.env` (`chmod 600`): `CSI_CF_TOKEN=`, `CSI_ACCOUNT_ID=`,
