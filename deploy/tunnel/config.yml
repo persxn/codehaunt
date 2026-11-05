@@ -1,6 +1,0 @@
-tunnel: 2f3d5e18-83a2-47c6-8e27-12b11f04fa7b
-credentials-file: ~/.cloudflared-codehaunt/2f3d5e18-83a2-47c6-8e27-12b11f04fa7b.json
-ingress:
-  - hostname: codehaunt.jojocode.in
-    service: http://127.0.0.1:3100
-  - service: http_status:404

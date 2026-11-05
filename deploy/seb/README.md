@@ -27,7 +27,7 @@ Checked from the live `.seb` file itself (2026-11-04, old domain): clipboard Blo
 and developer tools off, URL filter allows `codehaunt.jojocode.in/*` only, no permitted applications, new desktop on,
 quit password set. Paste blocked and quit with the quit password were tested in SEB on Windows.
 
-The previous file (`codehaunt.jojocode.in`) stays accepted while both origins are listed (ADR-045).
+The previous file (`codehaunt.jojocode.in`) is no longer accepted: its host and Config Key were removed (ADR-047).
 
 ## Affects / depends on
 - The **Config Key** shown in the Exam tab goes into the server `.env` as `SEB_CONFIG_KEY`, together with
