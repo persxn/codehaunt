@@ -6,7 +6,7 @@
 
 **A locked-down, AI-tutored coding contest you can host yourself.**
 Participants write every line of their code; a small local AI tutor explains ideas but never writes the solution.
-Code is judged in a sandbox; the *way* people used the tutor is judged afterwards by a larger local model.
+Code is judged in a sandbox; the *way* people used the tutor is judged afterwards by a larger local model!
 
 <p>
 <img alt="Next.js 15" src="https://img.shields.io/badge/Next.js-15-000000?logo=nextdotjs&logoColor=white">
